@@ -1,0 +1,95 @@
+#pragma once
+#include <array>
+#include <vector>
+#include "RtMidiWrapper/MidiMessage/MidiMessage.h"
+
+struct TimedMidiEvent
+{
+	MidiInterface::MidiMessage mm;
+	uint64_t	tick;
+};
+
+using Track = std::vector<TimedMidiEvent>;
+using TrackBank = std::array<Track, 16>;
+
+class TrackSet
+{
+public:
+	Track& GetTrack(ubyte channelNumber)
+	{
+		return mTracks[channelNumber];
+	}
+
+	/*
+	void Record(TimedMidiEvent midiEvent, ubyte channel)
+	{
+		mTracks[channel].push_back(midiEvent);
+	}
+	*/
+
+	std::vector<MidiMessage> PlayBack(uint64_t currentTick)
+	{
+		std::vector<MidiMessage> scheduledMessages;
+
+		for (int t = 0; t < 16; t++)
+		{
+			if (iterators[t] == -1) continue;
+
+			auto& track = GetTrack(t);
+			auto& timedMidi = track.at(iterators[t]);
+			if (currentTick >= timedMidi.tick)
+			{
+				scheduledMessages.push_back(timedMidi.mm);
+				iterators[t] = (++iterators[t] < track.size()) ? iterators[t] : -1;
+			}
+
+		}
+		return scheduledMessages;
+	}
+
+	void FindStart(uint64_t startTick)
+	{
+		// we want to avoid messages with timestamp < startTick
+		for (int t = 0; t < 16; t++)
+		{		
+			auto& track = GetTrack(t);
+			if (track.empty())
+			{
+				iterators[t] = -1;
+				continue;
+			}
+			int i = 0;
+			while (i < track.size() && track[i].tick < startTick)
+			{
+				i++;
+			}
+			iterators[t] = (i < track.size()) ? i : -1;
+		}
+	}
+
+	void FinalizeRecording(Track& recordingBuffer)
+	{
+		for (const auto& event : recordingBuffer)
+		{
+			ubyte channel = event.mm.getChannel();
+			mTracks[channel].push_back(event);
+		}
+		Sort();
+		recordingBuffer.clear();
+	}
+	void Sort()
+	{
+		for (auto& track : mTracks)
+		{
+			if (track.empty()) continue;
+			
+			std::sort(track.begin(), track.end(), [](const TimedMidiEvent& a, const TimedMidiEvent& b) 
+			{
+				return a.tick < b.tick;
+			});
+		}
+	}
+private:
+	TrackBank mTracks;
+	int iterators[16]{-1};
+};
