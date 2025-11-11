@@ -13,6 +13,8 @@ class AppModel
 
 public:
 	std::shared_ptr<MidiIn> mMidiIn;
+	TimedMidiEvent			mLogMessage{MidiMessage::NoteOff(0), 0};
+	bool					mUpdateLog = false;
 
 	AppModel() { mMidiIn = std::make_shared<MidiIn>(); }
 
@@ -77,18 +79,22 @@ public:
 		CheckMidiInQueue();
 	}
 
-	// Checks for Midi In Messages
-	// If a SoundBank Channel is active, the message will playback.
-	// If a SoundBank Channel is set to record, the message will be pushed to the TrackSet.
+	/*  Checks for Midi In Messages
+		If a SoundBank Channel is active, the message will playback.
+		If a SoundBank Channel is set to record: the message will be pushed to the mRecordingBuffer.
+		This buffer is used to temporarily store the midi messages during recording, 
+		when finished recording, the buffer is added to the track and sorted by timestamp. 
+	*/
 	void CheckMidiInQueue()
 	{
 		if (!mMidiIn->checkForMessage()) return;
 
 		MidiMessage mm = mMidiIn->getMessage();
+		auto currentTick = mTransport.GetCurrentTick();
 		auto channels = mSoundBank.GetAllChannels();
-
 		bool solosFound = mSoundBank.SolosFound();
-
+		mLogMessage = {mm, currentTick}; // logging midi in messages 
+		mUpdateLog = true;
 		for (MidiChannel& c : channels)
 		{
 			bool shouldPlay = solosFound ? c.solo : (c.record && !c.mute);
@@ -98,11 +104,9 @@ public:
 				routed.setChannel(c.channelNumber);
 				mSoundBank.GetMidiOutDevice()->sendMessage(routed);
 
-				if (c.record && IsMusicalMessage(routed))
+				if (c.record && IsMusicalMessage(routed) && mTransport.mState == Transport::State::Recording)
 				{
-					TimedMidiEvent tme{routed, mTransport.GetCurrentTick()};
-					mRecordingBuffer.push_back(tme);
-					//mTrackSet.Record(tme, c.channelNumber);
+					mRecordingBuffer.push_back({routed, currentTick});
 				}
 			}
 		}
@@ -120,6 +124,7 @@ private:
 	Transport	mTransport;
 	TrackSet	mTrackSet;
 	Track		mRecordingBuffer;
+
 	uint64_t GetDeltaTimeMs()
 	{
 		auto now = std::chrono::steady_clock::now();
@@ -136,7 +141,6 @@ private:
 		return (event >= NOTE_OFF && event <= PITCH_BEND && event != PROGRAM_CHANGE);
 
 	}
-
 
 	void PlayMessages(std::vector<MidiMessage> msgs)
 	{

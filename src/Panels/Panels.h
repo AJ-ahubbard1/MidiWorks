@@ -5,3 +5,4 @@
 #include "SoundBankPanel.h"
 #include "TransportPanel.h"
 #include "MidiCanvas.h"
+#include "Log.h"

@@ -101,5 +101,8 @@
     <ClInclude Include="src\Panels\MidiCanvas.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="src\Panels\ChannelTrackRow.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
 </Project>

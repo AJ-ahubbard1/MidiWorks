@@ -3,6 +3,8 @@
 #include <vector>
 #include "RtMidiWrapper/MidiMessage/MidiMessage.h"
 
+
+
 struct TimedMidiEvent
 {
 	MidiInterface::MidiMessage mm;

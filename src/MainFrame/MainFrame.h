@@ -18,6 +18,7 @@ private:
     SoundBankPanel* mSoundBankPanel;
     TransportPanel* mTransportPanel;
     MidiCanvasPanel* mMidiCanvasPanel;
+    LogPanel* mLogPanel;
 
     void CreateDockablePanes();
     void CreateMenuBar();

@@ -151,6 +151,7 @@
     <ClInclude Include="src\AppModel\Transport.h" />
     <ClInclude Include="src\MainFrame\MainFrame.h" />
     <ClInclude Include="src\Panels\ChannelControls.h" />
+    <ClInclude Include="src\Panels\ChannelTrackRow.h" />
     <ClInclude Include="src\Panels\Dummy.h" />
     <ClInclude Include="src\Panels\Inspector.h" />
     <ClInclude Include="src\Panels\Instrument.h" />

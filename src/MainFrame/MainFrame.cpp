@@ -34,12 +34,13 @@ void MainFrame::CreateDockablePanes()
 	mSoundBankPanel = new SoundBankPanel(this, soundBank);
 	mTransportPanel = new TransportPanel(this, transport, *wxLIGHT_GREY, "Transport");
 	mMidiCanvasPanel = new MidiCanvasPanel(this, transport, mAppModel->GetTrack(0), "Canvas");
+	mLogPanel = new LogPanel(this);
 
 	// Define layout metadata and register each panel
 	PanelInfo midiSettingsPanelInfo
 	{
 		"Midi Settings", mMidiSettingsPanel, idBase++,
-		PanePosition::Float, wxSize(169, -1), wxSize(-1, -1), true, true, false
+		PanePosition::Float, wxSize(169, -1), wxSize(-1, -1)	
 	};
 	PanelInfo soundBankInfo
 	{
@@ -55,18 +56,24 @@ void MainFrame::CreateDockablePanes()
 	{
 		"Midi Canvas", mMidiCanvasPanel, idBase++, PanePosition::Center
 	};
+	PanelInfo logPanelInfo
+	{
+		"Midi Log", mLogPanel, idBase++, PanePosition::Right
+	};
 
 	// Add PanelIDs as needed inside of AppModel/PanelInfo.h
 	mAppModel->RegisterPanel(PanelID::MidiSettings, midiSettingsPanelInfo);
 	mAppModel->RegisterPanel(PanelID::SoundBank, soundBankInfo);
 	mAppModel->RegisterPanel(PanelID::Transport, transportPanelInfo);
 	mAppModel->RegisterPanel(PanelID::MidiCanvas, midiCanvasInfo);
+	mAppModel->RegisterPanel(PanelID::Log, logPanelInfo);
 
 	// CreatePaneInfo defined inside AppModel.h, returns type wxAuiPaneInfo
 	mAuiManager.AddPane(mMidiSettingsPanel, CreatePaneInfo(midiSettingsPanelInfo));
 	mAuiManager.AddPane(mSoundBankPanel, CreatePaneInfo(soundBankInfo));
 	mAuiManager.AddPane(mTransportPanel, CreatePaneInfo(transportPanelInfo));
 	mAuiManager.AddPane(mMidiCanvasPanel, CreatePaneInfo(midiCanvasInfo));
+	mAuiManager.AddPane(mLogPanel, CreatePaneInfo(logPanelInfo));
 }
 
 // Builds View Menu Dynamically from AppModel
@@ -136,6 +143,11 @@ void MainFrame::OnTimer(wxTimerEvent&)
 	// for multiple panes
 	mTransportPanel->UpdateDisplay();
 	mMidiCanvasPanel->Update();
+	if (mAppModel->mUpdateLog)
+	{
+		mLogPanel->PrependMessage(mAppModel->mLogMessage);
+		mAppModel->mUpdateLog = false;
+	}
 }
 
 void MainFrame::OnAuiRender(wxAuiManagerEvent& event)

@@ -41,12 +41,12 @@ private:
 		mTimeDisplay = new wxStaticText(this, wxID_ANY, "");
 		mResetButton = new wxButton(this, wxID_ANY, "|<");
 		mRewindButton = new wxButton(this, wxID_ANY, "<<");
-		mStopButton = new wxButton(this, wxID_ANY, "[ ]");
-		mPlayButton = new wxButton(this, wxID_ANY, ">");
-		mRecordButton = new wxButton(this, wxID_ANY, "Rec");
+		mStopButton = new wxButton(this, wxID_ANY, "STOP");
+		mPlayButton = new wxButton(this, wxID_ANY, "PLAY");
+		mRecordButton = new wxButton(this, wxID_ANY, "REC");
 		mFastForwardButton = new wxButton(this, wxID_ANY, ">>");
-	}
-
+	} 
+	
 	void SetupSizers()
 	{
 		auto* sizer = new wxBoxSizer(wxHORIZONTAL);
@@ -110,21 +110,18 @@ private:
 		}
 	}
 	void OnRecord(wxCommandEvent&) { mTransport.mState = Transport::State::ClickedRecord; }
-
 	void OnRewindDown(wxMouseEvent& event)
 	{
 		mPreviousState = mTransport.mState;
 		mTransport.mState = Transport::State::Rewinding;
 		event.Skip();
 	}
-
 	void OnFastForwardDown(wxMouseEvent& event)
 	{
 		mPreviousState = mTransport.mState;
 		mTransport.mState = Transport::State::FastForwarding;
 		event.Skip();
 	}
-
 	void StopTransport(wxMouseEvent& event)
 	{
 		switch (mPreviousState)

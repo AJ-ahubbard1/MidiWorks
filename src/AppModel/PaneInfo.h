@@ -15,6 +15,7 @@ enum class PanelID
 	OnScreenKeyboard,
 	Transport,
 	MidiCanvas,
+	Log
 	// Add Panels as needed
 };
 
