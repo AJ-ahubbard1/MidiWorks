@@ -3,6 +3,8 @@
 class Transport
 {
 public:
+	// StopRecording, StopPlaying, ClickedPlay, and ClickedRecord are Transition States: 
+	// used to setup their corresponding states.
 	enum class	State { Stopped, StopRecording, StopPlaying, Playing, ClickedPlay, 
 						Recording, ClickedRecord, Rewinding, FastForwarding };
 
@@ -20,16 +22,12 @@ public:
 	void UpdatePlayBack(uint64_t deltaMs)
 	{
 		mCurrentTimeMs += deltaMs;
-	}
-
-	//uint64_t GetCurrentTimeMs() const { return mCurrentTimeMs; }
-
-	uint64_t GetCurrentTick() const
-	{
 		// Convert ms to ticks based on tempo
 		double beats = (mCurrentTimeMs / 60000.0) * mTempo;
-		return static_cast<uint64_t>(beats * mTicksPerQuarter);
+		mCurrentTick = static_cast<uint64_t>(beats * mTicksPerQuarter);
 	}
+
+	uint64_t GetCurrentTick() const { return mCurrentTick; }
 
 	uint64_t GetStartPlayBackTick() const { return mStartPlayBackTick; }
 
@@ -69,6 +67,7 @@ public:
 private:
 	uint64_t		mCurrentTimeMs = 0;
 	uint64_t		mStartPlayBackTick = 0;
+	uint64_t		mCurrentTick = 0;
 	int				mTicksPerQuarter = 960;
 	const double	DEFAULT_SHIFT_SPEED = 5.0f;
 	double			mShiftSpeed = DEFAULT_SHIFT_SPEED;

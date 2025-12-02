@@ -59,11 +59,10 @@ void MainFrame::CreateDockablePanes()
 	};
 	PanelInfo logPanelInfo
 	{
-		"Midi Log", mLogPanel, idBase++, PanePosition::Right
+		"Midi Log", mLogPanel, idBase++, 
+		PanePosition::Right, wxSize(247, -1)
 	};
 
-	// Add PanelIDs as needed inside of PanelInfo.h
-	// returns type wxAuiPaneInfo
 	RegisterPanel(midiSettingsPanelInfo);
 	RegisterPanel(soundBankInfo);
 	RegisterPanel(transportPanelInfo);
@@ -74,6 +73,7 @@ void MainFrame::CreateDockablePanes()
 // Add Panels to map, used to toggle visibility
 void MainFrame::RegisterPanel(const PanelInfo& info)
 {
+	// The IDs are incremented inside of CreateDockablePanes to insure they are unique
 	mPanels.insert({info.menuId, info});
 	mAuiManager.AddPane(info.window, CreatePaneInfo(info));
 }
