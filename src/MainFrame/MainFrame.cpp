@@ -20,12 +20,13 @@ MainFrame::MainFrame()
 	mAuiManager.Update();
 	mTimer.Start(10);
 	Bind(wxEVT_AUI_RENDER, &MainFrame::OnAuiRender, this);
+
 	CreateStatusBar();
 	SetStatusText("Thanks for using MidiWorks");
 }
 
-// Instantiate panels and register them in AppModel
-void MainFrame::CreateDockablePanes() 
+// Instantiate panels, define layout metadata, and add panel into mPanels map
+void MainFrame::CreateDockablePanes()
 {
 	int idBase = wxID_HIGHEST + 1;
 	auto& soundBank = mAppModel->GetSoundBank();
@@ -40,11 +41,11 @@ void MainFrame::CreateDockablePanes()
 	PanelInfo midiSettingsPanelInfo
 	{
 		"Midi Settings", mMidiSettingsPanel, idBase++,
-		PanePosition::Float, wxSize(169, -1), wxSize(-1, -1)	
+		PanePosition::Float, wxSize(169, -1), wxSize(-1, -1)
 	};
 	PanelInfo soundBankInfo
 	{
-		"Sound Bank", mSoundBankPanel, idBase++, 
+		"Sound Bank", mSoundBankPanel, idBase++,
 		PanePosition::Left, wxSize(247, -1)
 	};
 	PanelInfo transportPanelInfo
@@ -61,19 +62,30 @@ void MainFrame::CreateDockablePanes()
 		"Midi Log", mLogPanel, idBase++, PanePosition::Right
 	};
 
-	// Add PanelIDs as needed inside of AppModel/PanelInfo.h
-	mAppModel->RegisterPanel(PanelID::MidiSettings, midiSettingsPanelInfo);
-	mAppModel->RegisterPanel(PanelID::SoundBank, soundBankInfo);
-	mAppModel->RegisterPanel(PanelID::Transport, transportPanelInfo);
-	mAppModel->RegisterPanel(PanelID::MidiCanvas, midiCanvasInfo);
-	mAppModel->RegisterPanel(PanelID::Log, logPanelInfo);
+	// Add PanelIDs as needed inside of PanelInfo.h
+	// returns type wxAuiPaneInfo
+	RegisterPanel(midiSettingsPanelInfo);
+	RegisterPanel(soundBankInfo);
+	RegisterPanel(transportPanelInfo);
+	RegisterPanel(midiCanvasInfo);
+	RegisterPanel(logPanelInfo);
+}
 
-	// CreatePaneInfo defined inside AppModel.h, returns type wxAuiPaneInfo
-	mAuiManager.AddPane(mMidiSettingsPanel, CreatePaneInfo(midiSettingsPanelInfo));
-	mAuiManager.AddPane(mSoundBankPanel, CreatePaneInfo(soundBankInfo));
-	mAuiManager.AddPane(mTransportPanel, CreatePaneInfo(transportPanelInfo));
-	mAuiManager.AddPane(mMidiCanvasPanel, CreatePaneInfo(midiCanvasInfo));
-	mAuiManager.AddPane(mLogPanel, CreatePaneInfo(logPanelInfo));
+// Add Panels to map, used to toggle visibility
+void MainFrame::RegisterPanel(const PanelInfo& info)
+{
+	mPanels.insert({info.menuId, info});
+	mAuiManager.AddPane(info.window, CreatePaneInfo(info));
+}
+
+std::unordered_map<int, PanelInfo>& MainFrame::GetAllPanels() 
+{ 
+	return mPanels; 
+}
+
+void MainFrame::SetPanelVisibility(int id, bool vis) 
+{ 
+	mPanels.at(id).isVisible = vis; 
 }
 
 // Builds View Menu Dynamically from AppModel
@@ -82,10 +94,10 @@ void MainFrame::CreateMenuBar()
 	auto* menuBar = new wxMenuBar();
 	auto* viewMenu = new wxMenu();
 
-	for (const auto& [id, info] : mAppModel->GetAllPanels())
+	for (const auto& [id, info] : GetAllPanels())
 	{
-		viewMenu->AppendCheckItem(info.menuId, "Show " + info.name);
-		Bind(wxEVT_MENU, &MainFrame::OnTogglePane, this, info.menuId);
+		viewMenu->AppendCheckItem(id, "Show " + info.name);
+		Bind(wxEVT_MENU, &MainFrame::OnTogglePane, this, id);
 	}
 	menuBar->Append(viewMenu, "View");
 	SetMenuBar(menuBar);
@@ -99,22 +111,22 @@ void MainFrame::CreateSizer()
 	SetSizer(sizer);
 }
 
-// Toggle visibility of panes associated with clicked menu items
+// Toggle visibility of panes associated with clicked panes in view menu
 void MainFrame::OnTogglePane(wxCommandEvent& event)
 {
-	for (const auto& [id, info] : mAppModel->GetAllPanels())
+	for (const auto& [id, info] : GetAllPanels())
 	{
 		// find the correct pane and flip visibility
 		// new state needs to be passed to AUI manager, menu, and AppModel
-		if (event.GetId() == info.menuId)
+		if (event.GetId() == id)
 		{
 			auto& pane = mAuiManager.GetPane(info.name);
 			bool newState = !pane.IsShown();
 			pane.Show(newState);
 			mAuiManager.Update();
 
-			GetMenuBar()->Check(info.menuId, newState);
-			mAppModel->SetPanelVisibility(id, newState);
+			GetMenuBar()->Check(id, newState);
+			SetPanelVisibility(id, newState);
 			break;
 		}
 	}
@@ -125,12 +137,12 @@ void MainFrame::OnPaneClosed(wxAuiManagerEvent& event)
 {
 	wxString name = event.GetPane()->name;
 
-	for (const auto& [id, info] : mAppModel->GetAllPanels())
+	for (const auto& [id, info] : GetAllPanels())
 	{
 		if (info.name == name)
 		{
-			GetMenuBar()->Check(info.menuId, false);
-			mAppModel->SetPanelVisibility(id, false);
+			GetMenuBar()->Check(id, false);
+			SetPanelVisibility(id, false);
 			break;
 		}
 	}
@@ -139,37 +151,34 @@ void MainFrame::OnPaneClosed(wxAuiManagerEvent& event)
 void MainFrame::OnTimer(wxTimerEvent&)
 {
 	mAppModel->Update();
-	// @TODO: If needed later on, make a MainFrame::Update function
-	// for multiple panes
+	// @TODO: If needed later on, make a MainFrame::Update function for the multiple panes
 	mTransportPanel->UpdateDisplay();
 	mMidiCanvasPanel->Update();
 	if (mAppModel->mUpdateLog)
 	{
-		mLogPanel->PrependMessage(mAppModel->mLogMessage);
+		mLogPanel->LogMidiEvent(mAppModel->mLogMessage);
 		mAppModel->mUpdateLog = false;
 	}
 }
 
+// Debug Tool for layout, when docked panes are resized, the dimensions are shown in controlbar
 void MainFrame::OnAuiRender(wxAuiManagerEvent& event)
 {
 	wxString msg = "Layout changed";
 	for (const auto& pane : mAuiManager.GetAllPanes())
 	{
 		wxSize sz = pane.window->GetSize();
-		msg += wxString::Format("| %s: %d x %d", pane.name, sz.GetWidth(), sz.GetHeight());
+		msg += wxString::Format("|%s: %d x %d", pane.name, sz.GetWidth(), sz.GetHeight());
 	}
 	SetStatusText(msg);
 	event.Skip();
 }
 
-// After Panes are created, set views menu checks to match visibilities in AppModel
+// After Panes are created, set the checks in the views menu to match the panes' visibilities 
 void MainFrame::SyncMenuChecks()
 {
-	for (const auto& [id, info] : mAppModel->GetAllPanels())
+	for (const auto& [id, info] : GetAllPanels())
 	{
-		if (info.menuId != -1)
-		{
-			GetMenuBar()->Check(info.menuId, info.isVisible);
-		}
+		GetMenuBar()->Check(id, info.isVisible);
 	}
 }

@@ -4,7 +4,6 @@
 #include "RtMidiWrapper/MidiMessage/MidiMessage.h"
 
 
-
 struct TimedMidiEvent
 {
 	MidiInterface::MidiMessage mm;
@@ -12,6 +11,7 @@ struct TimedMidiEvent
 };
 
 using Track = std::vector<TimedMidiEvent>;
+
 using TrackBank = std::array<Track, 16>;
 
 class TrackSet
@@ -79,6 +79,11 @@ public:
 		Sort();
 		recordingBuffer.clear();
 	}
+
+private:
+	TrackBank mTracks;
+	int iterators[16]{-1};
+
 	void Sort()
 	{
 		for (auto& track : mTracks)
@@ -91,7 +96,5 @@ public:
 			});
 		}
 	}
-private:
-	TrackBank mTracks;
-	int iterators[16]{-1};
+
 };

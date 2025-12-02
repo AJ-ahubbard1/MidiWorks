@@ -4,7 +4,6 @@
 #include <memory>
 #include <chrono>
 #include "SoundBank.h"
-#include "PaneInfo.h"
 #include "Transport.h"
 #include "TrackSet.h"
 
@@ -17,14 +16,6 @@ public:
 	bool					mUpdateLog = false;
 
 	AppModel() { mMidiIn = std::make_shared<MidiIn>(); }
-
-	void RegisterPanel(PanelID id, const PanelInfo& info) { mPanels.insert({id, info}); }
-
-	void SetPanelVisibility(PanelID id, bool vis) { mPanels.at(id).isVisible = vis; }
-	//bool IsPanelVisible(PanelID id) const { return mPanels.at(id).isVisible; }
-
-	PanelInfo& GetPanelInfo(PanelID id) { return mPanels.at(id); }
-	std::unordered_map<PanelID, PanelInfo>& GetAllPanels() { return mPanels; }
 
 	// Called inside of MainFrame::OnTimer event
 	void Update()
@@ -118,7 +109,6 @@ public:
 	Track& GetTrack(ubyte c) { return mTrackSet.GetTrack(c); }
 
 private:
-	std::unordered_map<PanelID, PanelInfo> mPanels;
 	std::chrono::steady_clock::time_point mLastTick = std::chrono::steady_clock::now();
 	SoundBank	mSoundBank;
 	Transport	mTransport;

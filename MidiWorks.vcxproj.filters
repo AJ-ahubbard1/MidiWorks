@@ -77,7 +77,7 @@
     <ClInclude Include="src\RtMidiWrapper\RtMidiWrapper.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="src\AppModel\PaneInfo.h">
+    <ClInclude Include="src\MainFrame\PaneInfo.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="src\AppModel\SoundBank.h">

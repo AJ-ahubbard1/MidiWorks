@@ -18,7 +18,7 @@ public:
 		SetSizer(sizer);
 	}
 
-	void PrependMessage(const TimedMidiEvent& msg)
+	void LogMidiEvent(const TimedMidiEvent& msg)
 	{
 		std::ostringstream oss;
 		oss << "[" << msg.tick << "] ";

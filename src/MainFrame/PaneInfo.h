@@ -6,19 +6,6 @@
 
 enum class PanePosition { Left, Right, Bottom, Center, Top, Float };
 
-enum class PanelID
-{
-	MidiSettings,
-	SoundBank,
-	ChannelControls,
-	TrackList,
-	OnScreenKeyboard,
-	Transport,
-	MidiCanvas,
-	Log
-	// Add Panels as needed
-};
-
 struct PanelInfo
 {
 	wxString		name;
@@ -45,14 +32,15 @@ inline wxAuiPaneInfo CreatePaneInfo(const PanelInfo& info)
 
 	switch (info.defaultPosition)
 	{
-		case PanePosition::Left:   pane.Left();   break;
-		case PanePosition::Right:  pane.Right();  break;
-		case PanePosition::Bottom: pane.Bottom(); break;
-		case PanePosition::Center: pane.Center(); break;
-		case PanePosition::Top:    pane.Top();    break;
-		case PanePosition::Float:  pane.Float();  break;
-		
-	} 
+	case PanePosition::Left:   pane.Left();   break;
+	case PanePosition::Right:  pane.Right();  break;
+	case PanePosition::Bottom: pane.Bottom(); break;
+	case PanePosition::Center: pane.Center(); break;
+	case PanePosition::Top:    pane.Top();    break;
+	case PanePosition::Float:  pane.Float();  break;
+
+	}
 
 	return pane;
 }
+

@@ -5,6 +5,8 @@
 #include <memory>
 #include "AppModel/AppModel.h"
 #include "Panels/Panels.h"
+#include "PaneInfo.h"
+
 
 class MainFrame : public wxFrame {
 public:
@@ -19,8 +21,12 @@ private:
     TransportPanel* mTransportPanel;
     MidiCanvasPanel* mMidiCanvasPanel;
     LogPanel* mLogPanel;
+	std::unordered_map<int, PanelInfo> mPanels;
 
     void CreateDockablePanes();
+    void RegisterPanel(const PanelInfo& info);
+    std::unordered_map<int, PanelInfo>& GetAllPanels();
+    void SetPanelVisibility(int id, bool vis);
     void CreateMenuBar();
     void CreateSizer();
     void SyncMenuChecks();
