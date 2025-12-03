@@ -12,7 +12,7 @@ struct TimedMidiEvent
 
 using Track = std::vector<TimedMidiEvent>;
 
-using TrackBank = std::array<Track, 16>;
+using TrackBank = std::array<Track, 15>;  // 15 tracks (channel 16 reserved for metronome)
 
 class TrackSet
 {
@@ -33,7 +33,7 @@ public:
 	{
 		std::vector<MidiMessage> scheduledMessages;
 
-		for (int t = 0; t < 16; t++)
+		for (int t = 0; t < 15; t++)
 		{
 			if (iterators[t] == -1) continue;
 
@@ -52,8 +52,8 @@ public:
 	void FindStart(uint64_t startTick)
 	{
 		// we want to avoid messages with timestamp < startTick
-		for (int t = 0; t < 16; t++)
-		{		
+		for (int t = 0; t < 15; t++)
+		{
 			auto& track = GetTrack(t);
 			if (track.empty())
 			{
@@ -82,7 +82,7 @@ public:
 
 private:
 	TrackBank mTracks;
-	int iterators[16]{-1};
+	int iterators[15]{-1};
 
 	void Sort()
 	{

@@ -17,7 +17,7 @@ class SoundBank
 public:
 	SoundBank()
 	{
-		for (ubyte c = 0; c < 16; c++)
+		for (ubyte c = 0; c < 15; c++)
 		{
 			mChannels[c].channelNumber = c;
 			mChannels[c].programNumber = c * 8;
@@ -71,6 +71,6 @@ public:
 
 private:
 	std::shared_ptr<MidiOut> mMidiOut;
-	MidiChannel mChannels[16];
+	MidiChannel mChannels[15];  // 15 channels (channel 16 reserved for metronome)
 };
 

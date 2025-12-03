@@ -31,10 +31,12 @@ void MainFrame::CreateDockablePanes()
 	int idBase = wxID_HIGHEST + 1;
 	auto& soundBank = mAppModel->GetSoundBank();
 	auto& transport = mAppModel->GetTransport();
+	auto& trackSet = mAppModel->GetTrackSet();
+	auto& recordingBuffer = mAppModel->GetRecordingBuffer();
 	mMidiSettingsPanel = new MidiSettingsPanel(this, mAppModel, *wxLIGHT_GREY, "Midi Settings");
 	mSoundBankPanel = new SoundBankPanel(this, soundBank);
 	mTransportPanel = new TransportPanel(this, mAppModel, *wxLIGHT_GREY, "Transport");
-	mMidiCanvasPanel = new MidiCanvasPanel(this, transport, mAppModel->GetTrack(0), "Canvas");
+	mMidiCanvasPanel = new MidiCanvasPanel(this, transport, trackSet, recordingBuffer, "Canvas");
 	mLogPanel = new LogPanel(this);
 
 	// Define layout metadata and register each panel

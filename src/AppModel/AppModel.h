@@ -149,6 +149,8 @@ public:
 
 	SoundBank& GetSoundBank() { return mSoundBank; }
 	Transport& GetTransport() { return mTransport; }
+	TrackSet& GetTrackSet() { return mTrackSet; }
+	Track& GetRecordingBuffer() { return mRecordingBuffer; }
 
 	Track& GetTrack(ubyte c) { return mTrackSet.GetTrack(c); }
 

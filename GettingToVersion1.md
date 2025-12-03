@@ -18,15 +18,14 @@
 - ✅ Channel mixer (patch, volume, mute, solo)
 - ✅ Piano roll visualization (view-only)
 - ✅ Dockable panel system
+- ✅ Basic metronome with adjustable tempo
 
 **What's Missing:**
 - ❌ Can't edit notes (add/move/delete)
 - ❌ Can't save/load projects
-- ❌ No metronome
 - ❌ No quantize
 - ❌ No undo/redo
 - ❌ Can't loop sections
-- ❌ Tempo is hardcoded to 120 BPM
 
 ---
 
