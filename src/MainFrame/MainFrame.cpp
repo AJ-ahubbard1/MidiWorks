@@ -18,7 +18,7 @@ MainFrame::MainFrame()
 	mTimer.Bind(wxEVT_TIMER, &MainFrame::OnTimer, this);
 
 	mAuiManager.Update();
-	mTimer.Start(10);
+	mTimer.Start(2);
 	Bind(wxEVT_AUI_RENDER, &MainFrame::OnAuiRender, this);
 
 	CreateStatusBar();
@@ -36,19 +36,20 @@ void MainFrame::CreateDockablePanes()
 	mMidiSettingsPanel = new MidiSettingsPanel(this, mAppModel, *wxLIGHT_GREY, "Midi Settings");
 	mSoundBankPanel = new SoundBankPanel(this, soundBank);
 	mTransportPanel = new TransportPanel(this, mAppModel, *wxLIGHT_GREY, "Transport");
-	mMidiCanvasPanel = new MidiCanvasPanel(this, transport, trackSet, recordingBuffer, "Canvas");
+	mMidiCanvasPanel = new MidiCanvasPanel(this, mAppModel, transport, trackSet, recordingBuffer, "Canvas");
 	mLogPanel = new LogPanel(this);
+	mUndoHistoryPanel = new UndoHistoryPanel(this, mAppModel);
 
 	// Define layout metadata and register each panel
-	PanelInfo midiSettingsPanelInfo
-	{
-		"Midi Settings", mMidiSettingsPanel, idBase++,
-		PanePosition::Float, wxSize(169, -1), wxSize(-1, -1)
-	};
 	PanelInfo soundBankInfo
 	{
 		"Sound Bank", mSoundBankPanel, idBase++,
-		PanePosition::Left, wxSize(247, -1)
+		PanePosition::Left, wxSize(247, 636)
+	};
+	PanelInfo midiSettingsPanelInfo
+	{
+		"Midi Settings", mMidiSettingsPanel, idBase++,
+		PanePosition::Left, wxSize(247, 253), wxSize(-1, -1)
 	};
 	PanelInfo transportPanelInfo
 	{
@@ -61,15 +62,21 @@ void MainFrame::CreateDockablePanes()
 	};
 	PanelInfo logPanelInfo
 	{
-		"Midi Log", mLogPanel, idBase++, 
+		"Midi Log", mLogPanel, idBase++,
+		PanePosition::Right, wxSize(247, -1)
+	};
+	PanelInfo undoHistoryPanelInfo
+	{
+		"Undo History", mUndoHistoryPanel, idBase++,
 		PanePosition::Right, wxSize(247, -1)
 	};
 
-	RegisterPanel(midiSettingsPanelInfo);
 	RegisterPanel(soundBankInfo);
+	RegisterPanel(midiSettingsPanelInfo);
 	RegisterPanel(transportPanelInfo);
 	RegisterPanel(midiCanvasInfo);
 	RegisterPanel(logPanelInfo);
+	RegisterPanel(undoHistoryPanelInfo);
 }
 
 // Add Panels to map, used to toggle visibility
@@ -94,14 +101,24 @@ void MainFrame::SetPanelVisibility(int id, bool vis)
 void MainFrame::CreateMenuBar()
 {
 	auto* menuBar = new wxMenuBar();
-	auto* viewMenu = new wxMenu();
 
+	// Edit Menu - Undo/Redo
+	auto* editMenu = new wxMenu();
+	editMenu->Append(wxID_UNDO, "Undo\tCtrl+Z", "Undo last action");
+	editMenu->Append(wxID_REDO, "Redo\tCtrl+Y", "Redo last undone action");
+	Bind(wxEVT_MENU, &MainFrame::OnUndo, this, wxID_UNDO);
+	Bind(wxEVT_MENU, &MainFrame::OnRedo, this, wxID_REDO);
+	menuBar->Append(editMenu, "Edit");
+
+	// View Menu - Dockable Panels
+	auto* viewMenu = new wxMenu();
 	for (const auto& [id, info] : GetAllPanels())
 	{
 		viewMenu->AppendCheckItem(id, "Show " + info.name);
 		Bind(wxEVT_MENU, &MainFrame::OnTogglePane, this, id);
 	}
 	menuBar->Append(viewMenu, "View");
+
 	SetMenuBar(menuBar);
 }
 
@@ -176,11 +193,27 @@ void MainFrame::OnAuiRender(wxAuiManagerEvent& event)
 	event.Skip();
 }
 
-// After Panes are created, set the checks in the views menu to match the panes' visibilities 
+// After Panes are created, set the checks in the views menu to match the panes' visibilities
 void MainFrame::SyncMenuChecks()
 {
 	for (const auto& [id, info] : GetAllPanels())
 	{
 		GetMenuBar()->Check(id, info.isVisible);
 	}
+}
+
+// Undo last action (Ctrl+Z)
+void MainFrame::OnUndo(wxCommandEvent& event)
+{
+	mAppModel->Undo();
+	mUndoHistoryPanel->UpdateDisplay();  // Update command history display
+	Refresh();  // Redraw canvas to show changes
+}
+
+// Redo last undone action (Ctrl+Y)
+void MainFrame::OnRedo(wxCommandEvent& event)
+{
+	mAppModel->Redo();
+	mUndoHistoryPanel->UpdateDisplay();  // Update command history display
+	Refresh();  // Redraw canvas to show changes
 }

@@ -21,6 +21,7 @@ private:
     TransportPanel* mTransportPanel;
     MidiCanvasPanel* mMidiCanvasPanel;
     LogPanel* mLogPanel;
+    UndoHistoryPanel* mUndoHistoryPanel;
 	std::unordered_map<int, PanelInfo> mPanels;
 
     void CreateDockablePanes();
@@ -34,5 +35,7 @@ private:
     void OnPaneClosed(wxAuiManagerEvent& event);
     void OnTimer(wxTimerEvent&);
     void OnAuiRender(wxAuiManagerEvent& event);
+    void OnUndo(wxCommandEvent& event);
+    void OnRedo(wxCommandEvent& event);
     uint64_t GetDeltaTimeMs();
 };

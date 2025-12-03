@@ -4,6 +4,8 @@
 #include <wx/graphics.h>
 #include "AppModel/Transport.h"
 #include "AppModel/TrackSet.h"
+#include "AppModel/AppModel.h"
+#include "Commands/NoteEditCommands.h"
 
 using namespace MidiInterface;
 
@@ -11,14 +13,16 @@ class MidiCanvasPanel : public wxPanel
 {
 public:
 
-	MidiCanvasPanel(wxWindow* parent, Transport& transport, TrackSet& trackSet, Track& recordingBuffer, const wxString& label)
+	MidiCanvasPanel(wxWindow* parent, std::shared_ptr<AppModel> appModel, Transport& transport, TrackSet& trackSet, Track& recordingBuffer, const wxString& label)
 		: wxPanel(parent, wxID_ANY, wxDefaultPosition, wxDefaultSize, 0, label),
-		mTransport(transport), mTrackSet(trackSet), mRecordingBuffer(recordingBuffer)
+		mAppModel(appModel), mTransport(transport), mTrackSet(trackSet), mRecordingBuffer(recordingBuffer)
 	{
 		SetBackgroundStyle(wxBG_STYLE_PAINT);
 		mDebugMessage = new wxStaticText(this, wxID_ANY, "");
 		Bind(wxEVT_PAINT, &MidiCanvasPanel::Draw, this);
 		Bind(wxEVT_MOUSEWHEEL, &MidiCanvasPanel::OnMouseWheel, this);
+		Bind(wxEVT_LEFT_DOWN, &MidiCanvasPanel::OnLeftDown, this);
+		Bind(wxEVT_LEFT_UP, &MidiCanvasPanel::OnLeftUp, this);
 		Bind(wxEVT_RIGHT_DOWN, &MidiCanvasPanel::OnRightDown, this);
 		Bind(wxEVT_RIGHT_UP, &MidiCanvasPanel::OnRightUp, this);
 		Bind(wxEVT_MOTION, &MidiCanvasPanel::OnMouseMove, this);
@@ -31,6 +35,7 @@ public:
 	}
 
 private:
+	std::shared_ptr<AppModel> mAppModel;
 	Transport& mTransport;
 	TrackSet& mTrackSet;
 	Track& mRecordingBuffer;
@@ -38,9 +43,26 @@ private:
 	int mNoteHeight = 5;  // Current note height in pixels (pixels per MIDI note)
 	int mMinNoteHeight = 1;  // Minimum zoom: canvasHeight / 128 (all notes visible)
 	int mTicksPerPixel = 30;
-	bool mIsDragging = false;
+	bool mIsDragging = false;  // Right-click dragging (panning)
 	wxPoint mLastMouse;
 	wxPoint mOriginOffset;
+
+	// Note editing state
+	int mCurrentEditTrack = 0;  // Which track/channel we're editing (0-14)
+	enum class MouseMode {
+		Idle,
+		Adding,
+		MovingNote,
+		ResizingNote
+	};
+	MouseMode mMouseMode = MouseMode::Idle;
+	size_t mSelectedNoteOnIndex = 0;
+	size_t mSelectedNoteOffIndex = 0;
+
+	// Preview note state (for pitch auditioning)
+	bool mIsPreviewingNote = false;
+	uint8_t mPreviewPitch = 0;
+	uint64_t mPreviewStartTick = 0;
 
 	void Draw(wxPaintEvent&)
 	{
@@ -205,6 +227,31 @@ private:
 
 	int Flip(int y) { return GetSize().GetHeight() - y; }
 
+	// Coordinate conversion helpers
+	uint64_t ScreenXToTick(int screenX)
+	{
+		int x = screenX - mOriginOffset.x;
+		return x * mTicksPerPixel;
+	}
+
+	uint8_t ScreenYToPitch(int screenY)
+	{
+		int y = screenY - mOriginOffset.y;
+		int flippedY = GetSize().GetHeight() - y;
+		int pitch = flippedY / mNoteHeight;
+		return std::clamp(pitch, 0, 127);
+	}
+
+	int TickToScreenX(uint64_t tick)
+	{
+		return tick / mTicksPerPixel + mOriginOffset.x;
+	}
+
+	int PitchToScreenY(uint8_t pitch)
+	{
+		return Flip(pitch * mNoteHeight) + mOriginOffset.y;
+	}
+
 	void ClampOffset()
 	{
 		int canvasWidth = GetSize().GetWidth();
@@ -274,13 +321,48 @@ private:
 		Refresh(); // trigger redraw
 
 	}
-	void OnRightDown(wxMouseEvent& event) 
-	{ 
+	void OnLeftDown(wxMouseEvent& event)
+	{
+		wxPoint pos = event.GetPosition();
+		uint64_t tick = ScreenXToTick(pos.x);
+		uint8_t pitch = ScreenYToPitch(pos.y);
+
+		// For now, add a quarter note (960 ticks duration)
+		const uint64_t DEFAULT_NOTE_DURATION = 960;
+		const uint8_t DEFAULT_VELOCITY = 100;
+
+		// Create note-on and note-off events (pitch, velocity, channel)
+		MidiMessage noteOn = MidiMessage::NoteOn(pitch, DEFAULT_VELOCITY, mCurrentEditTrack);
+		MidiMessage noteOff = MidiMessage::NoteOff(pitch, mCurrentEditTrack);
+
+		TimedMidiEvent timedNoteOn{noteOn, tick};
+		TimedMidiEvent timedNoteOff{noteOff, tick + DEFAULT_NOTE_DURATION};
+
+		// Get the track we're editing
+		Track& track = mTrackSet.GetTrack(mCurrentEditTrack);
+
+		// Create and execute command
+		auto cmd = std::make_unique<AddNoteCommand>(track, timedNoteOn, timedNoteOff);
+		mAppModel->ExecuteCommand(std::move(cmd));
+
+		// Update displays
+		Refresh();
+		// TODO: Also update undo history panel
+	}
+
+	void OnLeftUp(wxMouseEvent& event)
+	{
+		// For now, just reset mode
+		mMouseMode = MouseMode::Idle;
+	}
+
+	void OnRightDown(wxMouseEvent& event)
+	{
 		mIsDragging = true;
 		mLastMouse = event.GetPosition();
 	}
-	void OnRightUp(wxMouseEvent& event) 
-	{ 
+	void OnRightUp(wxMouseEvent& event)
+	{
 		mIsDragging = false;
 	}
 	void OnMouseMove(wxMouseEvent& event)

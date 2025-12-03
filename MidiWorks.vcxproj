@@ -145,6 +145,8 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="src\AppModel\AppModel.h" />
+    <ClInclude Include="src\Commands\Command.h" />
+    <ClInclude Include="src\Commands\NoteEditCommands.h" />
     <ClInclude Include="src\MainFrame\PaneInfo.h" />
     <ClInclude Include="src\AppModel\SoundBank.h" />
     <ClInclude Include="src\AppModel\TrackSet.h" />

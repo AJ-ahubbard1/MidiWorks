@@ -104,5 +104,11 @@
     <ClInclude Include="src\Panels\ChannelTrackRow.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="src\Commands\Command.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="src\Commands\NoteEditCommands.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
 </Project>
