@@ -66,6 +66,15 @@ private:
 				break;
 			}
 		}
+
+		// Draw playhead (vertical line at current tick)
+		uint64_t currentTick = mTransport.GetCurrentTick();
+		int playheadX = currentTick / mTicksPerPixel + mOriginOffset.x;
+		int canvasHeight = GetSize().GetHeight();
+
+		gc->SetPen(wxPen(*wxRED, 2)); // Red line, 2 pixels wide
+		gc->StrokeLine(playheadX, 0, playheadX, canvasHeight);
+
 		delete gc;
 	}
 

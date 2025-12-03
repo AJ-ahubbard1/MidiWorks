@@ -14,8 +14,22 @@ public:
 	std::shared_ptr<MidiIn> mMidiIn;
 	TimedMidiEvent			mLogMessage{MidiMessage::NoteOff(0), 0};
 	bool					mUpdateLog = false;
+	bool					mMetronomeEnabled = true;  // Metronome on by default
 
-	AppModel() { mMidiIn = std::make_shared<MidiIn>(); }
+	AppModel()
+	{
+		mMidiIn = std::make_shared<MidiIn>();
+		InitializeMetronome();
+	}
+
+	void InitializeMetronome()
+	{
+		// Set channel 16 to woodblock sound for metronome
+		// We're using channel 16 (index 15) to avoid conflicts with user channels
+		// Program 115 = Woodblock (percussive, short click sound)
+		auto player = mSoundBank.GetMidiOutDevice();
+		player->sendMessage(MidiMessage::ProgramChange(115, METRONOME_CHANNEL));
+	}
 
 	// Called inside of MainFrame::OnTimer event
 	void Update()
@@ -44,10 +58,25 @@ public:
 			break;
 
 		case Transport::State::Playing:
+		{
+			uint64_t lastTick = mTransport.GetCurrentTick();
 			mTransport.UpdatePlayBack(GetDeltaTimeMs());
-			messages = mTrackSet.PlayBack(mTransport.GetCurrentTick());
+			uint64_t currentTick = mTransport.GetCurrentTick();
+
+			// Metronome
+			if (mMetronomeEnabled)
+			{
+				auto beat = mTransport.CheckForBeat(lastTick, currentTick);
+				if (beat.beatOccurred)
+				{
+					PlayMetronomeClick(beat.isDownbeat);
+				}
+			}
+
+			messages = mTrackSet.PlayBack(currentTick);
 			PlayMessages(messages);
 			break;
+		}
 
 		case Transport::State::ClickedRecord:
 			GetDeltaTimeMs();
@@ -56,10 +85,25 @@ public:
 			break;
 
 		case Transport::State::Recording:
+		{
+			uint64_t lastTick = mTransport.GetCurrentTick();
 			mTransport.UpdatePlayBack(GetDeltaTimeMs());
-			messages = mTrackSet.PlayBack(mTransport.GetCurrentTick());
+			uint64_t currentTick = mTransport.GetCurrentTick();
+
+			// Metronome
+			if (mMetronomeEnabled)
+			{
+				auto beat = mTransport.CheckForBeat(lastTick, currentTick);
+				if (beat.beatOccurred)
+				{
+					PlayMetronomeClick(beat.isDownbeat);
+				}
+			}
+
+			messages = mTrackSet.PlayBack(currentTick);
 			PlayMessages(messages);
 			break;
+		}
 
 		case Transport::State::FastForwarding:
 		case Transport::State::Rewinding:
@@ -136,7 +180,7 @@ private:
 	{
 		auto player = mSoundBank.GetMidiOutDevice();
 		auto channels = mSoundBank.GetAllChannels();
-		
+
 		bool solosFound = mSoundBank.SolosFound();
 
 		for (auto& mm : msgs)
@@ -149,6 +193,20 @@ private:
 				player->sendMessage(mm);
 			}
 		}
+	}
+
+	void PlayMetronomeClick(bool isDownbeat)
+	{
+		auto player = mSoundBank.GetMidiOutDevice();
+
+		// Different pitches and velocities for downbeat vs other beats
+		ubyte note = isDownbeat ? 76 : 72;      // High E vs High C (woodblock sounds good high-pitched)
+		ubyte velocity = isDownbeat ? 127 : 90; // Downbeat louder
+
+		// Send note on metronome channel (channel 16)
+		player->sendMessage(MidiMessage::NoteOn(note, velocity, METRONOME_CHANNEL));
+
+		// Note: Woodblock has short natural decay, but could add explicit note-off if needed
 	}
 };
 

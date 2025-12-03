@@ -1,15 +1,26 @@
 #pragma once
 
+// Channel 16 (index 15) is reserved for metronome
+static constexpr unsigned char METRONOME_CHANNEL = 15;
+
 class Transport
 {
 public:
-	// StopRecording, StopPlaying, ClickedPlay, and ClickedRecord are Transition States: 
+	// StopRecording, StopPlaying, ClickedPlay, and ClickedRecord are Transition States:
 	// used to setup their corresponding states.
-	enum class	State { Stopped, StopRecording, StopPlaying, Playing, ClickedPlay, 
+	enum class	State { Stopped, StopRecording, StopPlaying, Playing, ClickedPlay,
 						Recording, ClickedRecord, Rewinding, FastForwarding };
+
+	struct BeatInfo
+	{
+		bool beatOccurred = false;
+		bool isDownbeat = false;  // First beat of measure
+	};
 
 	State		mState = State::Stopped;
 	double		mTempo = 120.0;
+	int			mTimeSignatureNumerator = 4;    // Top number (beats per measure)
+	int			mTimeSignatureDenominator = 4;  // Bottom number (note value)
 
 	Transport() { }
 
@@ -26,7 +37,7 @@ public:
 		double beats = (mCurrentTimeMs / 60000.0) * mTempo;
 		mCurrentTick = static_cast<uint64_t>(beats * mTicksPerQuarter);
 	}
-
+ 
 	uint64_t GetCurrentTick() const { return mCurrentTick; }
 
 	uint64_t GetStartPlayBackTick() const { return mStartPlayBackTick; }
@@ -43,6 +54,9 @@ public:
 		{
 			mCurrentTimeMs += shift;
 		}
+		double beats = (mCurrentTimeMs / 60000.0) * mTempo;
+		mCurrentTick = static_cast<uint64_t>(beats * mTicksPerQuarter);
+
 	}
 
 	void Stop()
@@ -54,6 +68,7 @@ public:
 	void Reset()
 	{
 		mCurrentTimeMs = 0;
+		mCurrentTick = 0;
 		Stop();
 	}
 	
@@ -62,6 +77,32 @@ public:
 	{
 		return wxString::Format("%02llu:%02llu:%03llu",
 			timeMs / 60000, (timeMs % 60000) / 1000, timeMs % 1000);
+	}
+
+	// Check if a beat occurred between lastTick and currentTick
+	BeatInfo CheckForBeat(uint64_t lastTick, uint64_t currentTick) const
+	{
+		BeatInfo info;
+
+		// Calculate ticks per beat based on time signature
+		// Quarter note = mTicksPerQuarter (960)
+		// Whole note = 960 * 4 = 3840
+		// Time signature bottom number determines note value (4 = quarter note)
+		uint64_t ticksPerBeat = (mTicksPerQuarter * 4) / mTimeSignatureDenominator;
+
+		// Which beat are we on?
+		uint64_t lastBeat = lastTick / ticksPerBeat;
+		uint64_t currentBeat = currentTick / ticksPerBeat;
+
+		// Did we cross a beat boundary, or are we starting at beat 0?
+		if (currentBeat > lastBeat || (lastTick == 0 && currentBeat == 0))
+		{
+			info.beatOccurred = true;
+			// Is this the first beat of a measure?
+			info.isDownbeat = (currentBeat % mTimeSignatureNumerator) == 0;
+		}
+
+		return info;
 	}
 
 private:

@@ -33,7 +33,7 @@ void MainFrame::CreateDockablePanes()
 	auto& transport = mAppModel->GetTransport();
 	mMidiSettingsPanel = new MidiSettingsPanel(this, mAppModel, *wxLIGHT_GREY, "Midi Settings");
 	mSoundBankPanel = new SoundBankPanel(this, soundBank);
-	mTransportPanel = new TransportPanel(this, transport, *wxLIGHT_GREY, "Transport");
+	mTransportPanel = new TransportPanel(this, mAppModel, *wxLIGHT_GREY, "Transport");
 	mMidiCanvasPanel = new MidiCanvasPanel(this, transport, mAppModel->GetTrack(0), "Canvas");
 	mLogPanel = new LogPanel(this);
 

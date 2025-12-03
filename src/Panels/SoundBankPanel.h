@@ -21,7 +21,7 @@ private:
 	SoundBank& mSoundBank;
 	wxStaticText* mMidiOutLabel;
 	wxChoice* mMidiOutChoice;
-	std::array<ChannelControlsPanel*, 16> mChannelControls;
+	std::array<ChannelControlsPanel*, 15> mChannelControls;  // 15 channels (channel 16 reserved for metronome)
 
 	void OnMidiOutChoice(wxCommandEvent& event)
 	{
@@ -42,8 +42,9 @@ private:
 			mMidiOutChoice->Append(port);
 		}
 		mMidiOutChoice->SetSelection(0);
-	
-		for (int i = 0; i < 16; i++)
+
+		// Only create controls for channels 1-15 (channel 16 reserved for metronome)
+		for (int i = 0; i < 15; i++)
 		{
 			mChannelControls[i] = new ChannelControlsPanel(this, mSoundBank.GetChannel(i), midiOut);
 		}

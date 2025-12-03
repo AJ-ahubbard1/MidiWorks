@@ -1,13 +1,15 @@
 ﻿#pragma once
 #include <wx/wx.h>
+#include <wx/spinctrl.h>
 #include "AppModel/AppModel.h"
 
 class TransportPanel : public wxPanel
 {
 public:
-	TransportPanel(wxWindow* parent, Transport& transport, const wxColour& bgColor, const wxString& label)
+	TransportPanel(wxWindow* parent, std::shared_ptr<AppModel> model, const wxColour& bgColor, const wxString& label)
 		: wxPanel(parent, wxID_ANY, wxDefaultPosition, wxDefaultSize, 0, label),
-		mTransport(transport)
+		mModel(model),
+		mTransport(model->GetTransport())
 	{
 		SetBackgroundColour(bgColor);
 		CreateControls();
@@ -24,6 +26,7 @@ public:
 	}
 
 private:
+	std::shared_ptr<AppModel> mModel;
 	Transport& mTransport;
 	wxStaticText* mTickDisplay;
 	wxStaticText* mTimeDisplay;
@@ -33,6 +36,9 @@ private:
 	wxButton* mPlayButton;
 	wxButton* mRecordButton;
 	wxButton* mFastForwardButton;
+	wxStaticText* mTempoLabel;
+	wxSpinCtrlDouble* mTempoControl;
+	wxCheckBox* mMetronomeCheckBox;
 	Transport::State mPreviousState;
 
 	void CreateControls()
@@ -45,6 +51,18 @@ private:
 		mPlayButton = new wxButton(this, wxID_ANY, "PLAY");
 		mRecordButton = new wxButton(this, wxID_ANY, "REC");
 		mFastForwardButton = new wxButton(this, wxID_ANY, ">>");
+
+		// Tempo control
+		mTempoLabel = new wxStaticText(this, wxID_ANY, "Tempo:");
+		mTempoControl = new wxSpinCtrlDouble(this, wxID_ANY, "", wxDefaultPosition, wxSize(80, -1));
+		mTempoControl->SetRange(40.0, 300.0);  // 40-300 BPM range
+		mTempoControl->SetValue(mTransport.mTempo);
+		mTempoControl->SetIncrement(1.0);
+		mTempoControl->SetDigits(1);  // Show 1 decimal place
+
+		// Metronome checkbox (renamed to "Click")
+		mMetronomeCheckBox = new wxCheckBox(this, wxID_ANY, "Click");
+		mMetronomeCheckBox->SetValue(mModel->mMetronomeEnabled);
 	} 
 	
 	void SetupSizers()
@@ -70,6 +88,12 @@ private:
 		sizer->AddSpacer(buttonSpace);
 		sizer->Add(mFastForwardButton, flags);
 		sizer->AddStretchSpacer();
+		sizer->Add(mTempoLabel, flags);
+		sizer->AddSpacer(5);
+		sizer->Add(mTempoControl, flags);
+		sizer->AddSpacer(buttonSpace);
+		sizer->Add(mMetronomeCheckBox, flags);
+		sizer->AddSpacer(buttonSpace);
 		SetSizer(sizer);
 	}
 
@@ -83,6 +107,8 @@ private:
 		mFastForwardButton->Bind(wxEVT_LEFT_UP, &TransportPanel::StopTransport, this);
 		mResetButton->Bind(wxEVT_BUTTON, &TransportPanel::OnReset, this);
 		mRecordButton->Bind(wxEVT_BUTTON, &TransportPanel::OnRecord, this);
+		mTempoControl->Bind(wxEVT_SPINCTRLDOUBLE, &TransportPanel::OnTempoChange, this);
+		mMetronomeCheckBox->Bind(wxEVT_CHECKBOX, &TransportPanel::OnMetronomeToggle, this);
 	}
 
 	void OnStop(wxCommandEvent&)
@@ -137,6 +163,16 @@ private:
 			break;
 		}
 		event.Skip();
+	}
+
+	void OnTempoChange(wxSpinDoubleEvent& event)
+	{
+		mModel->GetTransport().mTempo = mTempoControl->GetValue();
+	}
+
+	void OnMetronomeToggle(wxCommandEvent& event)
+	{
+		mModel->mMetronomeEnabled = mMetronomeCheckBox->GetValue();
 	}
 };
 
