@@ -43,13 +43,15 @@ public:
 			mTransport.Stop();
 			mTransport.mState = Transport::State::Stopped;
 			mTrackSet.FinalizeRecording(mRecordingBuffer);
+			SilenceAllChannels();
 			break;
 
 		case Transport::State::StopPlaying:
 			mTransport.Stop();
 			mTransport.mState = Transport::State::Stopped;
+			SilenceAllChannels();
 			break;
-
+		
 		case Transport::State::Stopped:
 			break;
 
@@ -274,6 +276,16 @@ private:
 		player->sendMessage(MidiMessage::NoteOn(note, velocity, METRONOME_CHANNEL));
 
 		// Note: Woodblock has short natural decay, but could add explicit note-off if needed
+	}
+
+	void SilenceAllChannels()
+	{
+		auto player = mSoundBank.GetMidiOutDevice();
+
+		for (ubyte c = 0; c < 15; c++)
+		{
+			player->sendMessage(MidiMessage::AllNotesOff(c));
+		}
 	}
 };
 

@@ -2,6 +2,7 @@
 #include <wx/wx.h>
 #include <wx/dcbuffer.h>
 #include <wx/graphics.h>
+#include "RtMidiWrapper/RtMidiWrapper.h"
 #include "AppModel/Transport.h"
 #include "AppModel/TrackSet.h"
 #include "AppModel/AppModel.h"
@@ -12,27 +13,9 @@ using namespace MidiInterface;
 class MidiCanvasPanel : public wxPanel
 {
 public:
+	MidiCanvasPanel(wxWindow* parent, std::shared_ptr<AppModel> appModel, const wxString& label);
 
-	MidiCanvasPanel(wxWindow* parent, std::shared_ptr<AppModel> appModel, Transport& transport, TrackSet& trackSet, Track& recordingBuffer, const wxString& label)
-		: wxPanel(parent, wxID_ANY, wxDefaultPosition, wxDefaultSize, 0, label),
-		mAppModel(appModel), mTransport(transport), mTrackSet(trackSet), mRecordingBuffer(recordingBuffer)
-	{
-		SetBackgroundStyle(wxBG_STYLE_PAINT);
-		mDebugMessage = new wxStaticText(this, wxID_ANY, "");
-		Bind(wxEVT_PAINT, &MidiCanvasPanel::Draw, this);
-		Bind(wxEVT_MOUSEWHEEL, &MidiCanvasPanel::OnMouseWheel, this);
-		Bind(wxEVT_LEFT_DOWN, &MidiCanvasPanel::OnLeftDown, this);
-		Bind(wxEVT_LEFT_UP, &MidiCanvasPanel::OnLeftUp, this);
-		Bind(wxEVT_RIGHT_DOWN, &MidiCanvasPanel::OnRightDown, this);
-		Bind(wxEVT_RIGHT_UP, &MidiCanvasPanel::OnRightUp, this);
-		Bind(wxEVT_MOTION, &MidiCanvasPanel::OnMouseMove, this);
-		Bind(wxEVT_SIZE, &MidiCanvasPanel::OnSize, this);
-	}
-
-	void Update()
-	{
-		Refresh();
-	}
+	void Update();
 
 private:
 	std::shared_ptr<AppModel> mAppModel;
@@ -40,8 +23,11 @@ private:
 	TrackSet& mTrackSet;
 	Track& mRecordingBuffer;
 	wxStaticText* mDebugMessage;
+	wxCheckBox* mGridSnapCheckbox;
+	wxChoice* mDurationChoice;
 	int mNoteHeight = 5;  // Current note height in pixels (pixels per MIDI note)
 	int mMinNoteHeight = 1;  // Minimum zoom: canvasHeight / 128 (all notes visible)
+	int mMaxNoteHeight = 50;  // Maximum zoom: 50 pixels per note
 	int mTicksPerPixel = 30;
 	bool mIsDragging = false;  // Right-click dragging (panning)
 	wxPoint mLastMouse;
@@ -63,336 +49,61 @@ private:
 	bool mIsPreviewingNote = false;
 	uint8_t mPreviewPitch = 0;
 	uint64_t mPreviewStartTick = 0;
+	std::vector<uint8_t> mPreviewChannels;  // Channels currently playing preview
 
-	void Draw(wxPaintEvent&)
-	{
-		wxAutoBufferedPaintDC dc(this);
-		dc.Clear();
-		wxGraphicsContext* gc = wxGraphicsContext::Create(dc);
-		if (!gc) return;
+	// Note selection/hover state
+	struct NoteInfo {
+		int trackIndex = -1;
+		size_t noteOnIndex = 0;
+		size_t noteOffIndex = 0;
+		uint64_t startTick = 0;
+		uint64_t endTick = 0;
+		uint8_t pitch = 0;
+		bool valid = false;
+	};
+	NoteInfo mHoveredNote;
+	NoteInfo mSelectedNote;
 
-		// Draw grid lines first (behind notes)
-		DrawGrid(gc);
+	// For move/resize operations
+	uint64_t mOriginalStartTick = 0;
+	uint64_t mOriginalEndTick = 0;
+	uint8_t mOriginalPitch = 0;
+	wxPoint mDragStartPos;
 
-		// Define colors for each of the 15 tracks (channel 16 reserved for metronome)
-		wxColour trackColors[15] = {
-			wxColour(255, 100, 100),  // Red
-			wxColour(100, 255, 100),  // Green
-			wxColour(100, 100, 255),  // Blue
-			wxColour(255, 255, 100),  // Yellow
-			wxColour(255, 100, 255),  // Magenta
-			wxColour(100, 255, 255),  // Cyan
-			wxColour(255, 150, 100),  // Orange
-			wxColour(150, 100, 255),  // Purple
-			wxColour(255, 200, 100),  // Light Orange
-			wxColour(100, 255, 200),  // Mint
-			wxColour(200, 100, 255),  // Violet
-			wxColour(255, 100, 200),  // Pink
-			wxColour(200, 255, 100),  // Lime
-			wxColour(100, 200, 255),  // Sky Blue
-			wxColour(255, 255, 200)   // Light Yellow
-		};
-
-		// Draw notes from all tracks
-		for (int trackIndex = 0; trackIndex < 15; trackIndex++)
-		{
-			Track& track = mTrackSet.GetTrack(trackIndex);
-			if (track.empty()) continue;
-
-			// Set color for this track
-			gc->SetBrush(wxBrush(trackColors[trackIndex]));
-
-			size_t end = track.size();
-			for (size_t i = 0; i < end; i++)
-			{
-				const TimedMidiEvent& noteOn = track[i];
-				if (noteOn.mm.getEventType() != MidiEvent::NOTE_ON) continue;
-				for (size_t j = i + 1; j < end; j++)
-				{
-					const TimedMidiEvent& noteOff = track[j];
-					if (noteOff.mm.getEventType() != MidiEvent::NOTE_OFF ||
-						noteOff.mm.mData[1] != noteOn.mm.mData[1]) continue;
-
-					int x = noteOn.tick / mTicksPerPixel + mOriginOffset.x;
-					int y = Flip(noteOn.mm.mData[1] * mNoteHeight) + mOriginOffset.y;
-					int w = (noteOff.tick - noteOn.tick) / mTicksPerPixel;
-					gc->DrawRectangle(x, y, w, mNoteHeight);
-					break;
-				}
-			}
-		}
-
-		// Draw recording buffer (semi-transparent red/orange for in-progress recording)
-		if (!mRecordingBuffer.empty())
-		{
-			wxColour recordingColor(255, 100, 50, 180);  // Red-orange, semi-transparent
-			gc->SetBrush(wxBrush(recordingColor));
-
-			size_t end = mRecordingBuffer.size();
-			for (size_t i = 0; i < end; i++)
-			{
-				const TimedMidiEvent& noteOn = mRecordingBuffer[i];
-				if (noteOn.mm.getEventType() != MidiEvent::NOTE_ON) continue;
-
-				// Find corresponding note off
-				for (size_t j = i + 1; j < end; j++)
-				{
-					const TimedMidiEvent& noteOff = mRecordingBuffer[j];
-					if (noteOff.mm.getEventType() != MidiEvent::NOTE_OFF ||
-						noteOff.mm.mData[1] != noteOn.mm.mData[1]) continue;
-
-					int x = noteOn.tick / mTicksPerPixel + mOriginOffset.x;
-					int y = Flip(noteOn.mm.mData[1] * mNoteHeight) + mOriginOffset.y;
-					int w = (noteOff.tick - noteOn.tick) / mTicksPerPixel;
-					gc->DrawRectangle(x, y, w, mNoteHeight);
-					break;
-				}
-			}
-		}
-
-		// Draw playhead (vertical line at current tick)
-		uint64_t currentTick = mTransport.GetCurrentTick();
-		int playheadX = currentTick / mTicksPerPixel + mOriginOffset.x;
-		int canvasHeight = GetSize().GetHeight();
-
-		gc->SetPen(wxPen(*wxRED, 2)); // Red line, 2 pixels wide
-		gc->StrokeLine(playheadX, 0, playheadX, canvasHeight);
-
-		delete gc;
-	}
-
-	void DrawGrid(wxGraphicsContext* gc)
-	{
-		int canvasWidth = GetSize().GetWidth();
-		int canvasHeight = GetSize().GetHeight();
-
-		// Constants for MIDI and timing
-		const int TICKS_PER_QUARTER_NOTE = 960;
-		const int BEATS_PER_MEASURE = 4;
-		const int TICKS_PER_MEASURE = TICKS_PER_QUARTER_NOTE * BEATS_PER_MEASURE;
-		const int NOTES_PER_OCTAVE = 12;
-		const int MIN_MIDI_NOTE = 0;
-		const int MAX_MIDI_NOTE = 127;
-
-		// Grid colors
-		wxColour beatLineColor(220, 220, 220);      // Light gray for beats
-		wxColour measureLineColor(180, 180, 180);   // Darker gray for measures
-		wxColour noteLineColor(240, 240, 240);      // Very light gray for notes
-		wxColour octaveLineColor(200, 200, 200);    // Light gray for octaves
-
-		// Draw vertical lines (time grid: beats and measures)
-		int startTick = -mOriginOffset.x * mTicksPerPixel;
-		int endTick = startTick + (canvasWidth * mTicksPerPixel);
-
-		// Round to nearest beat
-		startTick = (startTick / TICKS_PER_QUARTER_NOTE) * TICKS_PER_QUARTER_NOTE;
-
-		for (int tick = startTick; tick <= endTick; tick += TICKS_PER_QUARTER_NOTE)
-		{
-			if (tick < 0) continue;
-
-			int x = tick / mTicksPerPixel + mOriginOffset.x;
-			if (x < 0 || x > canvasWidth) continue;
-
-			bool isMeasure = (tick % TICKS_PER_MEASURE) == 0;
-			if (isMeasure)
-			{
-				gc->SetPen(wxPen(measureLineColor, 2));
-			}
-			else
-			{
-				gc->SetPen(wxPen(beatLineColor, 1));
-			}
-			gc->StrokeLine(x, 0, x, canvasHeight);
-		}
-
-		// Draw horizontal lines (pitch grid: notes and octaves)
-		for (int midiNote = MIN_MIDI_NOTE; midiNote <= MAX_MIDI_NOTE; midiNote++)
-		{
-			int y = Flip(midiNote * mNoteHeight) + mOriginOffset.y;
-			if (y < 0 || y > canvasHeight) continue;
-
-			bool isOctave = (midiNote % NOTES_PER_OCTAVE) == 0;
-			if (isOctave)
-			{
-				gc->SetPen(wxPen(octaveLineColor, 2));
-			}
-			else
-			{
-				gc->SetPen(wxPen(noteLineColor, 1));
-			}
-			gc->StrokeLine(0, y, canvasWidth, y);
-		}
-	}
-
-	int Flip(int y) { return GetSize().GetHeight() - y; }
+	// Drawing
+	void Draw(wxPaintEvent&);
+	void DrawGrid(wxGraphicsContext* gc);
+	int Flip(int y);
 
 	// Coordinate conversion helpers
-	uint64_t ScreenXToTick(int screenX)
-	{
-		int x = screenX - mOriginOffset.x;
-		return x * mTicksPerPixel;
-	}
+	uint64_t ScreenXToTick(int screenX);
+	uint8_t ScreenYToPitch(int screenY);
+	int TickToScreenX(uint64_t tick);
+	int PitchToScreenY(uint8_t pitch);
 
-	uint8_t ScreenYToPitch(int screenY)
-	{
-		int y = screenY - mOriginOffset.y;
-		int flippedY = GetSize().GetHeight() - y;
-		int pitch = flippedY / mNoteHeight;
-		return std::clamp(pitch, 0, 127);
-	}
+	// Audio preview
+	void PlayPreviewNote(uint8_t pitch);
+	void StopPreviewNote();
 
-	int TickToScreenX(uint64_t tick)
-	{
-		return tick / mTicksPerPixel + mOriginOffset.x;
-	}
+	// UI helpers
+	uint64_t GetSelectedDuration() const;
+	uint64_t ApplyGridSnap(uint64_t tick) const;
 
-	int PitchToScreenY(uint8_t pitch)
-	{
-		return Flip(pitch * mNoteHeight) + mOriginOffset.y;
-	}
+	// Note finding
+	NoteInfo FindNoteAtPosition(int screenX, int screenY);
+	bool IsOnResizeEdge(int screenX, const NoteInfo& note);
 
-	void ClampOffset()
-	{
-		int canvasWidth = GetSize().GetWidth();
-		int canvasHeight = GetSize().GetHeight();
+	// View management
+	void ClampOffset();
 
-		// Constants
-		const int MAX_MEASURES = 100;  // Allow scrolling to 100 measures
-		const int TICKS_PER_MEASURE = 960 * 4;  // 960 ticks/quarter * 4 beats
-		const int MAX_TICK = MAX_MEASURES * TICKS_PER_MEASURE;
-		const int MIDI_NOTE_COUNT = 128;
-		const int MAX_MIDI_NOTE = 127;
-
-		// Horizontal limits (time axis)
-		// When offset.x = 0, tick 0 is at left edge
-		// When offset.x < 0, we've scrolled right (tick 0 is off-screen left)
-
-		// Right boundary: can scroll right to see up to MAX_TICK
-		// When MAX_TICK is at right edge: canvasWidth = MAX_TICK / ticksPerPixel + offset.x
-		int minOffsetX = canvasWidth - (MAX_TICK / mTicksPerPixel);
-
-		// Left boundary: can't scroll left past tick 0
-		int maxOffsetX = 0;
-
-		// Clamp horizontal offset
-		mOriginOffset.x = std::max(minOffsetX, std::min(mOriginOffset.x, maxOffsetX));
-
-		// Vertical limits (pitch axis)
-		// Calculate total height needed for all MIDI notes
-		int totalMidiHeight = MIDI_NOTE_COUNT * mNoteHeight;
-
-		// If all notes fit on screen, no vertical scrolling allowed
-		if (totalMidiHeight <= canvasHeight)
-		{
-			mOriginOffset.y = 0;
-		}
-		else
-		{
-			// Notes don't fit - allow scrolling within range
-			// Top boundary: note 127 should be visible at top (y = 0)
-			// 0 = canvasHeight - (127 * noteHeight) + offset.y
-			// offset.y = 127 * noteHeight - canvasHeight
-			int minOffsetY = MAX_MIDI_NOTE * mNoteHeight - canvasHeight;
-
-			// Bottom boundary: note 0 should stay at bottom
-			int maxOffsetY = 0;
-
-			// Clamp vertical offset
-			mOriginOffset.y = std::max(minOffsetY, std::min(mOriginOffset.y, maxOffsetY));
-		}
-	}
-
-	void OnMouseWheel(wxMouseEvent& event)
-	{
-		int rotation = event.GetWheelRotation();     // positive = scroll up, negative = scroll down
-		int delta = event.GetWheelDelta();           // usually 120
-		int lines = rotation / delta;
-
-		if (lines > 0)
-			mTicksPerPixel = std::max(1, mTicksPerPixel - lines); // zoom in
-		else if (lines < 0)
-			mTicksPerPixel += -lines;                             // zoom out
-
-		ClampOffset(); // Apply boundaries after zoom
-
-		wxString msg = wxString::Format("Ticks Per Pixel: %d", mTicksPerPixel);
-		mDebugMessage->SetLabelText(msg);
-		Refresh(); // trigger redraw
-
-	}
-	void OnLeftDown(wxMouseEvent& event)
-	{
-		wxPoint pos = event.GetPosition();
-		uint64_t tick = ScreenXToTick(pos.x);
-		uint8_t pitch = ScreenYToPitch(pos.y);
-
-		// For now, add a quarter note (960 ticks duration)
-		const uint64_t DEFAULT_NOTE_DURATION = 960;
-		const uint8_t DEFAULT_VELOCITY = 100;
-
-		// Create note-on and note-off events (pitch, velocity, channel)
-		MidiMessage noteOn = MidiMessage::NoteOn(pitch, DEFAULT_VELOCITY, mCurrentEditTrack);
-		MidiMessage noteOff = MidiMessage::NoteOff(pitch, mCurrentEditTrack);
-
-		TimedMidiEvent timedNoteOn{noteOn, tick};
-		TimedMidiEvent timedNoteOff{noteOff, tick + DEFAULT_NOTE_DURATION};
-
-		// Get the track we're editing
-		Track& track = mTrackSet.GetTrack(mCurrentEditTrack);
-
-		// Create and execute command
-		auto cmd = std::make_unique<AddNoteCommand>(track, timedNoteOn, timedNoteOff);
-		mAppModel->ExecuteCommand(std::move(cmd));
-
-		// Update displays
-		Refresh();
-		// TODO: Also update undo history panel
-	}
-
-	void OnLeftUp(wxMouseEvent& event)
-	{
-		// For now, just reset mode
-		mMouseMode = MouseMode::Idle;
-	}
-
-	void OnRightDown(wxMouseEvent& event)
-	{
-		mIsDragging = true;
-		mLastMouse = event.GetPosition();
-	}
-	void OnRightUp(wxMouseEvent& event)
-	{
-		mIsDragging = false;
-	}
-	void OnMouseMove(wxMouseEvent& event)
-	{
-		if (!mIsDragging) return;
-
-		wxPoint pos = event.GetPosition();
-		wxPoint delta = pos - mLastMouse;
-		mOriginOffset += delta;
-		ClampOffset(); // Apply boundaries after panning
-		mLastMouse = pos;
-		Refresh();
-	}
-
-	void OnSize(wxSizeEvent& event)
-	{
-		const int MIDI_NOTE_COUNT = 128;  // MIDI notes 0-127
-		const int MAX_MIDI_NOTE = 127;
-		int canvasHeight = GetSize().GetHeight();
-
-		// Calculate minimum note height (fully zoomed out = all notes visible)
-		mMinNoteHeight = std::max(1, canvasHeight / MIDI_NOTE_COUNT);
-
-		// Initialize to minimum zoom (fully zoomed out)
-		mNoteHeight = mMinNoteHeight;
-
-		// At minimum zoom, all notes fit exactly, so no vertical offset needed
-		mOriginOffset.y = 0;
-
-		ClampOffset(); // Ensure we're within valid bounds
-		event.Skip(); // Allow default handling
-	}
+	// Event handlers
+	void OnMouseWheel(wxMouseEvent& event);
+	void OnLeftDown(wxMouseEvent& event);
+	void OnLeftUp(wxMouseEvent& event);
+	void OnMiddleDown(wxMouseEvent& event);
+	void OnRightDown(wxMouseEvent& event);
+	void OnRightUp(wxMouseEvent& event);
+	void OnMouseMove(wxMouseEvent& event);
+	void OnSize(wxSizeEvent& event);
+	void OnMouseLeave(wxMouseEvent& event);
 };

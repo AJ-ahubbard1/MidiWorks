@@ -3,10 +3,11 @@
 #include <vector>
 #include "RtMidiWrapper/MidiMessage/MidiMessage.h"
 
+using namespace MidiInterface;
 
 struct TimedMidiEvent
 {
-	MidiInterface::MidiMessage mm;
+	MidiMessage mm;
 	uint64_t	tick;
 };
 

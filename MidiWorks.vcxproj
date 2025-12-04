@@ -141,6 +141,7 @@
   <ItemGroup>
     <ClCompile Include="src\App.cpp" />
     <ClCompile Include="src\MainFrame\MainFrame.cpp" />
+    <ClCompile Include="src\Panels\MidiCanvas.cpp" />
     <ClCompile Include="src\RtMidiWrapper\RtMidi\RtMidi.cpp" />
   </ItemGroup>
   <ItemGroup>
