@@ -32,6 +32,11 @@ namespace MidiInterface
             mPlayer->closePort();
             delete mPlayer;
         }
+           
+        ubyte getCurrentPort()
+        {
+            return mPortNum;
+        }
 
         void changePort(ubyte p)
         {

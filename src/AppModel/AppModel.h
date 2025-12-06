@@ -4,6 +4,7 @@
 #include <memory>
 #include <chrono>
 #include <vector>
+#include <functional>
 #include "SoundBank.h"
 #include "Transport.h"
 #include "TrackSet.h"
@@ -13,28 +14,36 @@ class AppModel
 {
 
 public:
-	std::shared_ptr<MidiIn> mMidiIn;
-	TimedMidiEvent			mLogMessage{MidiMessage::NoteOff(0), 0};
-	bool					mUpdateLog = false;
-	bool					mMetronomeEnabled = true;  // Metronome on by default
-
 	AppModel();
 	void InitializeMetronome();
 	// Called inside of MainFrame::OnTimer event
 	void Update();
-	/*  Checks for Midi In Messages
+
+	/*  Checks for Messages from Midi In device
 		If a SoundBank Channel is active, the message will playback.
 		If a SoundBank Channel is set to record: the message will be pushed to the mRecordingBuffer.
-		This buffer is used to temporarily store the midi messages during recording, 
-		when finished recording, the buffer is added to the track and sorted by timestamp. 
-	*/
+		This buffer is used to temporarily store the midi messages during recording,
+		when finished recording, the buffer is added to the track and sorted by timestamp. */
 	void CheckMidiInQueue();
-	
-    SoundBank& GetSoundBank(); 
-	Transport& GetTransport(); 
-	TrackSet& GetTrackSet(); 
-	Track& GetRecordingBuffer(); 
-	Track& GetTrack(ubyte c); 
+
+    SoundBank& GetSoundBank();
+	Transport& GetTransport();
+	TrackSet& GetTrackSet();
+	Track& GetRecordingBuffer();
+	Track& GetTrack(ubyte c);
+
+	// MIDI Input port management
+	std::vector<std::string> GetMidiInputPortNames() const;
+	void SetMidiInputPort(int portIndex);
+	int GetCurrentMidiInputPort() const;
+
+	// Logging system (callback pattern)
+	using LogCallback = std::function<void(const TimedMidiEvent&)>;
+	void SetLogCallback(LogCallback callback);
+
+	// Metronome settings
+	bool IsMetronomeEnabled() const;
+	void SetMetronomeEnabled(bool enabled); 
 
 	// Command Pattern - Undo/Redo System
 	void ExecuteCommand(std::unique_ptr<Command> cmd);
@@ -53,6 +62,15 @@ private:
 	Transport	mTransport;
 	TrackSet	mTrackSet;
 	Track		mRecordingBuffer;
+
+	// MIDI Input
+	std::shared_ptr<MidiIn> mMidiIn;
+
+	// Logging
+	LogCallback mLogCallback;
+
+	// Metronome
+	bool mMetronomeEnabled = true;  // Metronome on by default
 
 	// Command Pattern - Undo/Redo stacks
 	std::vector<std::unique_ptr<Command>> mUndoStack;

@@ -111,8 +111,13 @@ void AppModel::CheckMidiInQueue()
 	auto currentTick = mTransport.GetCurrentTick();
 	auto channels = mSoundBank.GetAllChannels();
 	bool solosFound = mSoundBank.SolosFound();
-	mLogMessage = {mm, currentTick}; // logging midi in messages 
-	mUpdateLog = true;
+
+	// Notify callback of MIDI event (if registered)
+	if (mLogCallback)
+	{
+		mLogCallback({mm, currentTick});
+	}
+
 	for (MidiChannel& c : channels)
 	{
 		bool shouldPlay = solosFound ? c.solo : (c.record && !c.mute);
@@ -135,6 +140,39 @@ Transport& AppModel::GetTransport() { return mTransport; }
 TrackSet& AppModel::GetTrackSet() { return mTrackSet; }
 Track& AppModel::GetRecordingBuffer() { return mRecordingBuffer; }
 Track& AppModel::GetTrack(ubyte c) { return mTrackSet.GetTrack(c); }
+
+// MIDI Input port management
+std::vector<std::string> AppModel::GetMidiInputPortNames() const
+{
+	return mMidiIn->getPortNames();
+}
+
+void AppModel::SetMidiInputPort(int portIndex)
+{
+	mMidiIn->changePort(portIndex);
+}
+
+int AppModel::GetCurrentMidiInputPort() const
+{
+	return mMidiIn->getCurrentPort();
+}
+
+// Logging system
+void AppModel::SetLogCallback(LogCallback callback)
+{
+	mLogCallback = callback;
+}
+
+// Metronome settings
+bool AppModel::IsMetronomeEnabled() const
+{
+	return mMetronomeEnabled;
+}
+
+void AppModel::SetMetronomeEnabled(bool enabled)
+{
+	mMetronomeEnabled = enabled;
+}
 
 // Command Pattern - Undo/Redo System
 void AppModel::ExecuteCommand(std::unique_ptr<Command> cmd)

@@ -24,7 +24,7 @@ private:
 	{
 		wxFont mainFont(wxFontInfo(wxSize(0, 12)));
 
-		auto& inPorts = mAppModel->mMidiIn->getPortNames();
+		auto inPorts = mAppModel->GetMidiInputPortNames();
 
 		mInPortList = new wxRadioBox(this, wxID_ANY, wxT("Midi In Port"),
 			wxDefaultPosition, wxDefaultSize, inPorts, 1, wxRA_SPECIFY_COLS);
@@ -51,6 +51,6 @@ private:
 	void OnInPortClicked(wxCommandEvent& evt)
 	{
 		unsigned int p = evt.GetSelection();
-		mAppModel->mMidiIn->changePort(p);
+		mAppModel->SetMidiInputPort(p);
 	}
 };

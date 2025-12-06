@@ -13,16 +13,18 @@ public:
     MainFrame();
 
 private:
-    wxAuiManager mAuiManager;
     std::shared_ptr<AppModel> mAppModel;
+    wxAuiManager mAuiManager;
     wxTimer mTimer;
+
+    // Panel Pointers
+	std::unordered_map<int, PanelInfo> mPanels;
     MidiSettingsPanel* mMidiSettingsPanel;
     SoundBankPanel* mSoundBankPanel;
     TransportPanel* mTransportPanel;
     MidiCanvasPanel* mMidiCanvasPanel;
     LogPanel* mLogPanel;
     UndoHistoryPanel* mUndoHistoryPanel;
-	std::unordered_map<int, PanelInfo> mPanels;
 
     void CreateDockablePanes();
     void RegisterPanel(const PanelInfo& info);

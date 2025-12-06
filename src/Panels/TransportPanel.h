@@ -62,7 +62,7 @@ private:
 
 		// Metronome checkbox (renamed to "Click")
 		mMetronomeCheckBox = new wxCheckBox(this, wxID_ANY, "Click");
-		mMetronomeCheckBox->SetValue(mModel->mMetronomeEnabled);
+		mMetronomeCheckBox->SetValue(mModel->IsMetronomeEnabled());
 	} 
 	
 	void SetupSizers()
@@ -172,7 +172,7 @@ private:
 
 	void OnMetronomeToggle(wxCommandEvent& event)
 	{
-		mModel->mMetronomeEnabled = mMetronomeCheckBox->GetValue();
+		mModel->SetMetronomeEnabled(mMetronomeCheckBox->GetValue());
 	}
 };
 

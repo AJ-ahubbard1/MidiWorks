@@ -74,6 +74,13 @@ void MainFrame::CreateDockablePanes()
 	RegisterPanel(midiCanvasInfo);
 	RegisterPanel(logPanelInfo);
 	RegisterPanel(undoHistoryPanelInfo);
+
+	// Register log callback for MIDI event logging
+	mAppModel->SetLogCallback([this](const TimedMidiEvent& event) {
+		if (mLogPanel) {
+			mLogPanel->LogMidiEvent(event);
+		}
+	});
 }
 
 // Add Panels to map, used to toggle visibility
@@ -170,11 +177,7 @@ void MainFrame::OnTimer(wxTimerEvent&)
 	// @TODO: If needed later on, make a MainFrame::Update function for the multiple panes
 	mTransportPanel->UpdateDisplay();
 	mMidiCanvasPanel->Update();
-	if (mAppModel->mUpdateLog)
-	{
-		mLogPanel->LogMidiEvent(mAppModel->mLogMessage);
-		mAppModel->mUpdateLog = false;
-	}
+	// Note: Logging now handled via callback - no polling needed
 }
 
 // Debug Tool for layout, when docked panes are resized, the dimensions are shown in controlbar

@@ -141,6 +141,7 @@
   <ItemGroup>
     <ClCompile Include="src\App.cpp" />
     <ClCompile Include="src\AppModel\AppModel.cpp" />
+    <ClCompile Include="src\Commands\NoteEditCommands.cpp" />
     <ClCompile Include="src\MainFrame\MainFrame.cpp" />
     <ClCompile Include="src\Panels\MidiCanvas.cpp" />
     <ClCompile Include="src\RtMidiWrapper\RtMidi\RtMidi.cpp" />
@@ -167,6 +168,7 @@
     <ClInclude Include="src\Panels\Panels.h" />
     <ClInclude Include="src\Panels\SoundBankPanel.h" />
     <ClInclude Include="src\Panels\TransportPanel.h" />
+    <ClInclude Include="src\Panels\UndoHistoryPanel.h" />
     <ClInclude Include="src\RtMidiWrapper\MidiDevice\MidiError.h" />
     <ClInclude Include="src\RtMidiWrapper\MidiDevice\MidiIn.h" />
     <ClInclude Include="src\RtMidiWrapper\MidiDevice\MidiInCallback.h" />

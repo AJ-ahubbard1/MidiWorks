@@ -34,6 +34,11 @@ namespace MidiInterface
 			std::cout << "MidiIn deleted\n";
 		}
 
+		ubyte getCurrentPort()
+		{
+			return mPortNum;
+		}
+
 		void changePort(ubyte p)
 		{
 			mInstrument->closePort();
@@ -64,6 +69,7 @@ namespace MidiInterface
 			}
 			return false;
 		}
+
 		MidiMessage& getMessage()
 		{
 			return mMessage;
@@ -78,6 +84,7 @@ namespace MidiInterface
 		{
 			mInstrument->cancelCallback();
 		}
+
 	private:
 		ubyte mPortNum{0};
 		RtMidiIn* mInstrument;
