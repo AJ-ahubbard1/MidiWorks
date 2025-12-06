@@ -2,7 +2,7 @@
 #include <array>
 #include <vector>
 #include "RtMidiWrapper/MidiMessage/MidiMessage.h"
-
+#include <algorithm>
 using namespace MidiInterface;
 
 struct TimedMidiEvent

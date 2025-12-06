@@ -1,5 +1,5 @@
 #pragma once
-
+#include "wx/string.h"
 // Channel 16 (index 15) is reserved for metronome
 static constexpr unsigned char METRONOME_CHANNEL = 15;
 
@@ -112,6 +112,6 @@ private:
 	int				mTicksPerQuarter = 960;
 	const double	DEFAULT_SHIFT_SPEED = 5.0f;
 	double			mShiftSpeed = DEFAULT_SHIFT_SPEED;
-	float			mShiftAccel = 1.01;
+	double			mShiftAccel = 1.01f;
 };
 

@@ -140,6 +140,7 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="src\App.cpp" />
+    <ClCompile Include="src\AppModel\AppModel.cpp" />
     <ClCompile Include="src\MainFrame\MainFrame.cpp" />
     <ClCompile Include="src\Panels\MidiCanvas.cpp" />
     <ClCompile Include="src\RtMidiWrapper\RtMidi\RtMidi.cpp" />
@@ -148,6 +149,7 @@
     <ClInclude Include="src\AppModel\AppModel.h" />
     <ClInclude Include="src\Commands\Command.h" />
     <ClInclude Include="src\Commands\NoteEditCommands.h" />
+    <ClInclude Include="src\External\json.hpp" />
     <ClInclude Include="src\MainFrame\PaneInfo.h" />
     <ClInclude Include="src\AppModel\SoundBank.h" />
     <ClInclude Include="src\AppModel\TrackSet.h" />
