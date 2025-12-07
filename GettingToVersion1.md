@@ -8,7 +8,7 @@
 
 ---
 
-## Current State (v0.3)
+## Current State (v0.4)
 
 **What Works:**
 - ✅ MIDI input/output
@@ -20,33 +20,34 @@
 - ✅ **Undo/Redo system** (Ctrl+Z, Ctrl+Y with command history panel)
 - ✅ **Metronome** (channel 16, woodblock sound, downbeat detection)
 - ✅ **Grid snap** with duration selector (whole/half/quarter/eighth/sixteenth notes)
+- ✅ **Save/Load projects** (.mwp JSON format with File menu)
 - ✅ Dockable panel system
 - ✅ Visual feedback (grid lines, playhead cursor, note hovering, preview notes)
 - ✅ Zoom and pan (mouse wheel, shift+wheel, right-click drag)
 - ✅ MIDI event logging panel
 - ✅ Undo history panel
+- ✅ Dirty flag tracking with unsaved changes prompts
 
 **What's Missing:**
-- ❌ Can't save/load projects
 - ❌ No quantize
 - ❌ Can't loop sections
 - ❌ No copy/paste
-- ❌ Limited keyboard shortcuts (only Ctrl+Z/Y implemented)
+- ❌ Limited keyboard shortcuts (File operations + Ctrl+Z/Y implemented)
 
 ---
 
 ## Progress Summary
 
 ### Phase 1: Critical MVP Features (Sprint 1-2)
-**Status: 3/5 Complete (60%)**
+**Status: 4/5 Complete (80%)** ⬆️ +20%
 
 | Feature | Status | Priority | Notes |
 |---------|--------|----------|-------|
 | 1.1 Piano Roll Editing | ✅ DONE | ⭐⭐⭐ | Core editing complete! Multi-select still TODO |
-| 1.2 Save/Load Projects | ❌ TODO | ⭐⭐⭐ | **Next critical feature** |
+| 1.2 Save/Load Projects | ✅ DONE | ⭐⭐⭐ | **JSON format with dirty flag tracking!** |
 | 1.3 Metronome | ✅ DONE | ⭐⭐⭐ | Fully functional with downbeat |
 | 1.4 Undo/Redo | ✅ DONE | ⭐⭐ | Complete with UI panel |
-| 1.5 Loop Playback | ❌ TODO | ⭐⭐ | Not started |
+| 1.5 Loop Playback | ❌ TODO | ⭐⭐ | **Next priority feature** |
 
 ### Phase 2: Important Features (Sprint 2-3)
 **Status: 2/5 Complete (40%)**
@@ -70,21 +71,22 @@
 | 3.4 Velocity Editing | ❌ TODO | - | Not started |
 | 3.5 MIDI Import/Export | ❌ TODO | - | Not started |
 
-### Overall Progress: ~45% to MVP
+### Overall Progress: ~65% to MVP ⬆️ +20%
 **Major Accomplishments:**
 - ✅ Full piano roll editing with undo/redo
 - ✅ Professional-grade visual feedback and UI
 - ✅ Metronome with downbeat detection
 - ✅ Grid snap and zoom/pan navigation
+- ✅ **Complete save/load system with dirty flag tracking!** 🎉
 
 **Critical Path to v1.0:**
-1. **Save/Load Projects** (2-3 days) - HIGHEST PRIORITY
-2. **Loop Playback** (1-2 days)
+1. ~~**Save/Load Projects**~~ ✅ DONE!
+2. **Loop Playback** (1-2 days) - HIGHEST PRIORITY
 3. **Quantize** (1 day)
 4. **Copy/Paste** (1 day)
 5. **Complete Keyboard Shortcuts** (1 day)
 
-**Estimated Time to MVP:** 2-3 weeks of focused work
+**Estimated Time to MVP:** 1-2 weeks of focused work
 
 ---
 
@@ -116,49 +118,67 @@ Without this, you can't fix mistakes or compose directly in the DAW.
 
 ---
 
-### 1.2 Save/Load Projects ⭐⭐⭐ HIGHEST PRIORITY
-Without this, all work is lost on close.
+### 1.2 Save/Load Projects ⭐⭐⭐ ✅ COMPLETED!
+Complete save/load system with JSON format and dirty flag tracking.
 
 **Tasks:**
-- [ ] **Define project file format** (suggest JSON for simplicity)
-  - Track data (notes with tick, pitch, velocity, duration)
-  - Tempo
-  - Channel settings (program, volume, mute state)
-  - Project metadata (name, created date)
-- [ ] **Implement Save** (File → Save / Save As)
-- [ ] **Implement Load** (File → Open)
-- [ ] **New Project** (File → New, clears all tracks)
-- [ ] **Mark project as "dirty"** when edited (add * to title bar)
-- [ ] **Prompt to save on close** if unsaved changes
+- [x] **Define project file format** (JSON with nlohmann/json)
+  - Track data (MIDI events with tick and 3 data bytes)
+  - Transport (tempo, time signature, current tick)
+  - Channel settings (program, volume, mute, solo, record state)
+  - Project metadata (version, app version)
+- [x] **Implement Save** (File → Save / Save As)
+- [x] **Implement Load** (File → Open)
+- [x] **New Project** (File → New, clears all tracks)
+- [x] **Mark project as "dirty"** when edited (mIsDirty flag)
+- [x] **Prompt to save on close** if unsaved changes
+- [x] **File menu with keyboard shortcuts** (Ctrl+N, Ctrl+O, Ctrl+S, Ctrl+Shift+S)
 
-**Why Critical:** Can't compose anything serious if you lose work.
+**Status:** ✅ FULLY IMPLEMENTED!
 
-**Estimated Effort:** 2-3 days
-
-**Implementation Notes:**
-- Use JSON library (nlohmann/json or similar)
+**Implementation Details:**
+- Uses nlohmann/json library (single-header, stored in src/external/)
 - File extension: `.mwp` (MidiWorks Project)
-- Save to `Documents/MidiWorks/` by default
-- Consider auto-save every 5 minutes (simple background timer)
+- Pretty-printed JSON with 4-space indent for human readability
+- Saves Transport, SoundBank (15 channels), and TrackSet (15 tracks)
+- Dirty flag tracked automatically via ExecuteCommand()
+- Unsaved changes prompt on New/Open/Exit
+- Window title shows current project path
+- ClearUndoHistory() called after load
+- ApplyChannelSettings() called after load to restore MIDI device state
 
-**Example JSON Structure:**
+**Actual JSON Structure:**
 ```json
 {
   "version": "1.0",
-  "tempo": 120,
-  "timeSignature": [4, 4],
-  "tracks": [
+  "appVersion": "0.4",
+  "transport": {
+    "tempo": 120.0,
+    "timeSignature": [4, 4],
+    "currentTick": 0
+  },
+  "channels": [
     {
-      "channel": 0,
-      "program": 0,
+      "channelNumber": 0,
+      "programNumber": 0,
       "volume": 100,
       "mute": false,
       "solo": false,
-      "notes": [
-        {"tick": 0, "pitch": 60, "velocity": 100, "duration": 480},
-        {"tick": 480, "pitch": 62, "velocity": 90, "duration": 480}
+      "record": false
+    }
+    // ... 14 more channels
+  ],
+  "tracks": [
+    {
+      "channel": 0,
+      "events": [
+        {
+          "tick": 0,
+          "midiData": [144, 60, 100]  // [status, data1, data2]
+        }
       ]
     }
+    // ... 14 more tracks
   ]
 }
 ```
@@ -344,9 +364,10 @@ Speed up workflow dramatically.
 **Tasks:**
 - [ ] **Implement common shortcuts:**
   - [ ] `Space` - Play/Pause toggle - TODO
-  - [ ] `Ctrl+S` - Save - TODO (no save yet)
-  - [ ] `Ctrl+O` - Open - TODO (no load yet)
-  - [ ] `Ctrl+N` - New Project - TODO
+  - [x] `Ctrl+S` - Save ✅ IMPLEMENTED
+  - [x] `Ctrl+O` - Open ✅ IMPLEMENTED
+  - [x] `Ctrl+N` - New Project ✅ IMPLEMENTED
+  - [x] `Ctrl+Shift+S` - Save As ✅ IMPLEMENTED
   - [x] `Ctrl+Z` - Undo ✅ IMPLEMENTED
   - [x] `Ctrl+Y` - Redo ✅ IMPLEMENTED
   - [ ] `Ctrl+C` - Copy - TODO
@@ -355,17 +376,18 @@ Speed up workflow dramatically.
   - [ ] `Ctrl+A` - Select all notes - TODO
   - [ ] `Home` - Jump to start - TODO
   - [ ] `L` - Toggle loop - TODO
-- [x] **Display shortcuts in menus** (Undo/Redo show shortcuts in Edit menu)
+- [x] **Display shortcuts in menus** (File and Edit menus show shortcuts)
 
-**Status:** ⚠️ Only undo/redo shortcuts implemented so far.
+**Status:** ⚠️ File operations + Undo/Redo complete (7/12 shortcuts done!)
 
 **Implementation Details:**
-- Undo/Redo in Edit menu with "\tCtrl+Z" and "\tCtrl+Y" (MainFrame.cpp:104-105)
-- Bound to OnUndo/OnRedo handlers (MainFrame.cpp:106-107)
-- Other shortcuts need wxAcceleratorTable setup
+- File menu shortcuts: Ctrl+N, Ctrl+O, Ctrl+S, Ctrl+Shift+S (MainFrame.cpp:111-114)
+- Edit menu shortcuts: Ctrl+Z, Ctrl+Y (MainFrame.cpp:128-129)
+- Bound to OnNew/OnOpen/OnSave/OnSaveAs/OnUndo/OnRedo handlers
+- All shortcuts displayed in menu bar
 
 **Next Steps:**
-- Add wxAcceleratorTable to MainFrame
+- Add wxAcceleratorTable for non-menu shortcuts (Space, Delete, Home, L)
 - Implement Space for play/pause toggle
 - Add Delete key handler to MidiCanvasPanel
 
@@ -493,12 +515,12 @@ Speed up workflow dramatically.
 
 ## Recommended Implementation Order
 
-### ✅ Sprint 1: "Make It Editable" (1-2 weeks) - COMPLETED!
+### ✅ Sprint 1: "Make It Editable" (1-2 weeks) - COMPLETED! 🎉
 1. ✅ Piano roll editing (add/delete/move notes)
-2. ❌ Save/Load projects - **IN PROGRESS**
+2. ✅ Save/Load projects - **COMPLETE!**
 3. ✅ Undo/Redo
 
-**Status:** 2/3 complete - Save/Load is the last critical piece!
+**Status:** 3/3 complete - All critical editing features done!
 
 ---
 
@@ -556,14 +578,14 @@ Speed up workflow dramatically.
 - Metronome with downbeat detection
 - Grid snap and zoom/pan navigation
 
-### Remaining Work to MVP: ~2-3 weeks
+### Remaining Work to MVP: ~1-2 weeks
 **Week 1: Critical Features**
-- Save/Load projects (2-3 days)
-- Loop playback (1-2 days)
+- ~~Save/Load projects~~ ✅ DONE!
+- Loop playback (1-2 days) - **HIGHEST PRIORITY**
 - Quantize (1 day)
+- Copy/Paste (1 day)
 
 **Week 2: Workflow Features**
-- Copy/Paste (1 day)
 - Keyboard shortcuts (Space, Delete, Ctrl+A, Home) (1 day)
 - Tempo UI control (0.5 days)
 - Bug fixes (2-3 days)
@@ -574,10 +596,10 @@ Speed up workflow dramatically.
 - Documentation (2-3 days)
 
 **Realistic Timeline:**
-- Part-time (10-15 hrs/week): ~1.5-2 months to MVP
-- Full-time (40 hrs/week): ~2-3 weeks to MVP
+- Part-time (10-15 hrs/week): ~3-4 weeks to MVP
+- Full-time (40 hrs/week): ~1-2 weeks to MVP
 
-**You're 60% of the way to MVP!** The hard architectural work is done. Focus on save/load next, then iterate quickly on the remaining workflow features.
+**You're 65% of the way to MVP!** 🎉 Save/load is complete! The hard architectural work is done. Focus on loop playback next, then quantize and copy/paste.
 
 ---
 

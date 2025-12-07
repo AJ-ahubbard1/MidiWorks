@@ -25,6 +25,15 @@ public:
 		mTimeDisplay->SetLabel(mTransport.GetFormattedTime());
 	}
 
+	/// <summary>
+	/// Updates the tempo control to reflect current Transport tempo.
+	/// Called after loading a project to sync UI with loaded tempo value.
+	/// </summary>
+	void UpdateTempoDisplay()
+	{
+		mTempoControl->SetValue(mTransport.mTempo);
+	}
+
 private:
 	std::shared_ptr<AppModel> mModel;
 	Transport& mTransport;

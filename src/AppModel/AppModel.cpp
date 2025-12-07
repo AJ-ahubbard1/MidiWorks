@@ -1,5 +1,10 @@
 // AppModel.cpp
 #include "AppModel.h"
+#include <fstream>
+#include "external/json.hpp"
+#include "Commands/RecordCommand.h"
+
+using json = nlohmann::json;
 
 AppModel::AppModel()
 {
@@ -25,7 +30,15 @@ void AppModel::Update()
 		case Transport::State::StopRecording:
 			mTransport.Stop();
 			mTransport.mState = Transport::State::Stopped;
-			mTrackSet.FinalizeRecording(mRecordingBuffer);
+
+			// Create RecordCommand to make recording undoable
+			if (!mRecordingBuffer.empty())
+			{
+				auto cmd = std::make_unique<RecordCommand>(mTrackSet, mRecordingBuffer);
+				ExecuteCommand(std::move(cmd));
+				mRecordingBuffer.clear();
+			}
+
 			SilenceAllChannels();
 			break;
 
@@ -113,9 +126,9 @@ void AppModel::CheckMidiInQueue()
 	bool solosFound = mSoundBank.SolosFound();
 
 	// Notify callback of MIDI event (if registered)
-	if (mLogCallback)
+	if (mMidiLogCallback)
 	{
-		mLogCallback({mm, currentTick});
+		mMidiLogCallback({mm, currentTick});
 	}
 
 	for (MidiChannel& c : channels)
@@ -158,9 +171,15 @@ int AppModel::GetCurrentMidiInputPort() const
 }
 
 // Logging system
-void AppModel::SetLogCallback(LogCallback callback)
+void AppModel::SetLogCallback(MidiLogCallback callback)
 {
-	mLogCallback = callback;
+	mMidiLogCallback = callback;
+}
+
+// Dirty state notification
+void AppModel::SetDirtyStateCallback(DirtyStateCallback callback)
+{
+	mDirtyStateCallback = callback;
 }
 
 // Metronome settings
@@ -182,6 +201,9 @@ void AppModel::ExecuteCommand(std::unique_ptr<Command> cmd)
 
 	// Clear redo stack - can't redo after new action
 	mRedoStack.clear();
+
+	// Mark project as dirty (has unsaved changes)
+	MarkDirty();
 
 	// Limit stack size to prevent unbounded memory growth
 	if (mUndoStack.size() > MAX_UNDO_STACK_SIZE)
@@ -290,5 +312,242 @@ void AppModel::SilenceAllChannels()
 	{
 		player->sendMessage(MidiMessage::AllNotesOff(c));
 	}
+}
+
+// Save/Load Project
+bool AppModel::SaveProject(const std::string& filepath)
+{
+	try {
+		json project;
+
+		// Metadata
+		project["version"] = "1.0";
+		project["appVersion"] = "0.3";
+
+		// 1. Transport
+		project["transport"] = {
+			{"tempo", mTransport.mTempo},
+			{"timeSignature", {
+				mTransport.mTimeSignatureNumerator,
+				mTransport.mTimeSignatureDenominator
+			}},
+			{"currentTick", mTransport.GetCurrentTick()}
+		};
+
+		// 2. Channels (15 channels, 0-14)
+		project["channels"] = json::array();
+		auto channels = mSoundBank.GetAllChannels();
+		for (const auto& ch : channels) {
+			project["channels"].push_back({
+				{"channelNumber", ch.channelNumber},
+				{"programNumber", ch.programNumber},
+				{"volume", ch.volume},
+				{"mute", ch.mute},
+				{"solo", ch.solo},
+				{"record", ch.record}
+			});
+		}
+
+		// 3. Tracks (15 tracks, one per channel)
+		project["tracks"] = json::array();
+		for (int i = 0; i < 15; i++) {
+			Track& track = mTrackSet.GetTrack(i);
+			json trackJson;
+			trackJson["channel"] = i;
+			trackJson["events"] = json::array();
+
+			for (const auto& event : track) {
+				trackJson["events"].push_back({
+					{"tick", event.tick},
+					{"midiData", {
+						event.mm.mData[0],
+						event.mm.mData[1],
+						event.mm.mData[2]
+					}}
+				});
+			}
+
+			project["tracks"].push_back(trackJson);
+		}
+
+		// Write to file (pretty-printed with 4-space indent)
+		std::ofstream file(filepath);
+		if (!file.is_open()) {
+			return false;
+		}
+
+		file << project.dump(4);
+		file.close();
+
+		// Update state
+		mCurrentProjectPath = filepath;
+		mIsDirty = false;
+
+		return true;
+	}
+	catch (const std::exception& e) {
+		// Log error or show dialog
+		return false;
+	}
+}
+
+bool AppModel::LoadProject(const std::string& filepath)
+{
+	try {
+		// Read file
+		std::ifstream file(filepath);
+		if (!file.is_open()) {
+			return false;
+		}
+
+		json project = json::parse(file);
+		file.close();
+
+		// Check version compatibility
+		std::string version = project.value("version", "1.0");
+		// TODO: Handle different versions if needed
+
+		// 1. Transport
+		mTransport.mTempo = project["transport"]["tempo"];
+		mTransport.mTimeSignatureNumerator = project["transport"]["timeSignature"][0];
+		mTransport.mTimeSignatureDenominator = project["transport"]["timeSignature"][1];
+
+		// Optional: Restore playback position
+		if (project["transport"].contains("currentTick")) {
+			uint64_t tick = project["transport"]["currentTick"];
+			mTransport.Reset();  // Reset to tick 0 for now
+			// Note: If you want to restore position, you'll need to add a setter
+		}
+
+		// 2. Channels
+		int channelIdx = 0;
+		for (const auto& chJson : project["channels"]) {
+			auto& ch = mSoundBank.GetChannel(channelIdx++);
+			ch.programNumber = chJson["programNumber"];
+			ch.volume = chJson["volume"];
+			ch.mute = chJson["mute"];
+			ch.solo = chJson["solo"];
+			ch.record = chJson["record"];
+		}
+
+		// IMPORTANT: Apply channel settings to MIDI device
+		mSoundBank.ApplyChannelSettings();
+
+		// 3. Tracks
+		for (const auto& trackJson : project["tracks"]) {
+			int channel = trackJson["channel"];
+			Track& track = mTrackSet.GetTrack(channel);
+			track.clear();
+
+			for (const auto& eventJson : trackJson["events"]) {
+				TimedMidiEvent event;
+				event.tick = eventJson["tick"];
+				event.mm.mData[0] = eventJson["midiData"][0];
+				event.mm.mData[1] = eventJson["midiData"][1];
+				event.mm.mData[2] = eventJson["midiData"][2];
+				track.push_back(event);
+			}
+		}
+
+		// Clear undo/redo history (don't restore edit history)
+		ClearUndoHistory();
+
+		// Update state
+		mCurrentProjectPath = filepath;
+		mIsDirty = false;
+
+		return true;
+	}
+	catch (json::parse_error& e) {
+		// Invalid JSON
+		return false;
+	}
+	catch (json::type_error& e) {
+		// Wrong data type (e.g., expected number, got string)
+		return false;
+	}
+	catch (json::out_of_range& e) {
+		// Missing required field
+		return false;
+	}
+	catch (const std::exception& e) {
+		// Other errors
+		return false;
+	}
+}
+
+void AppModel::ClearProject()
+{
+	// Stop playback
+	mTransport.Stop();
+	mTransport.mState = Transport::State::Stopped;
+
+	// Reset transport to defaults
+	mTransport.mTempo = 120.0;
+	mTransport.Reset();
+
+	// Clear all tracks
+	for (int i = 0; i < 15; i++) {
+		mTrackSet.GetTrack(i).clear();
+	}
+
+	// Clear recording buffer
+	mRecordingBuffer.clear();
+
+	// Reset channels to defaults
+	for (int i = 0; i < 15; i++) {
+		auto& ch = mSoundBank.GetChannel(i);
+		ch.programNumber = 0;
+		ch.volume = 100;
+		ch.mute = false;
+		ch.solo = false;
+		ch.record = false;
+	}
+	mSoundBank.ApplyChannelSettings();
+
+	// Silence all channels
+	SilenceAllChannels();
+
+	// Clear undo/redo
+	ClearUndoHistory();
+
+	// Reset project state
+	mCurrentProjectPath.clear();
+	mIsDirty = false;
+}
+
+// Project state methods
+bool AppModel::IsProjectDirty() const
+{
+	return mIsDirty;
+}
+
+void AppModel::MarkDirty()
+{
+	if (!mIsDirty)  // Only update if state actually changes
+	{
+		mIsDirty = true;
+		if (mDirtyStateCallback)
+		{
+			mDirtyStateCallback(true);
+		}
+	}
+}
+
+void AppModel::MarkClean()
+{
+	if (mIsDirty)  // Only update if state actually changes
+	{
+		mIsDirty = false;
+		if (mDirtyStateCallback)
+		{
+			mDirtyStateCallback(false);
+		}
+	}
+}
+
+const std::string& AppModel::GetCurrentProjectPath() const
+{
+	return mCurrentProjectPath;
 }
 

@@ -25,6 +25,7 @@ private:
     MidiCanvasPanel* mMidiCanvasPanel;
     LogPanel* mLogPanel;
     UndoHistoryPanel* mUndoHistoryPanel;
+    ShortcutsPanel* mShortcutsPanel;
 
     void CreateDockablePanes();
     void RegisterPanel(const PanelInfo& info);
@@ -39,5 +40,13 @@ private:
     void OnAuiRender(wxAuiManagerEvent& event);
     void OnUndo(wxCommandEvent& event);
     void OnRedo(wxCommandEvent& event);
+    void OnNew(wxCommandEvent& event);
+    void OnOpen(wxCommandEvent& event);
+    void OnSave(wxCommandEvent& event);
+    void OnSaveAs(wxCommandEvent& event);
+    void OnExit(wxCommandEvent& event);
+    void OnTogglePlay(wxCommandEvent& event);
+    void OnStartRecord(wxCommandEvent& event);
+    void UpdateTitle();
     uint64_t GetDeltaTimeMs();
 };

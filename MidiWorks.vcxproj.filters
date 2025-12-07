@@ -119,10 +119,16 @@
     <ClInclude Include="src\Commands\NoteEditCommands.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="src\Commands\RecordCommand.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
     <ClInclude Include="src\External\json.hpp">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="src\Panels\UndoHistoryPanel.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="src\Panels\ShortcutsPanel.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>

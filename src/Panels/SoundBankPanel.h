@@ -16,6 +16,18 @@ public:
 		BindEventHandlers();
 	}
 
+	/// <summary>
+	/// Updates all channel control panels to reflect current SoundBank data.
+	/// Called after loading a project to sync UI with loaded channel settings.
+	/// </summary>
+	void UpdateFromModel()
+	{
+		// Update all 15 channel control panels
+		for (auto& channelPanel : mChannelControls)
+		{
+			channelPanel->UpdateFromModel();
+		}
+	}
 
 private:
 	SoundBank& mSoundBank;

@@ -150,6 +150,7 @@
     <ClInclude Include="src\AppModel\AppModel.h" />
     <ClInclude Include="src\Commands\Command.h" />
     <ClInclude Include="src\Commands\NoteEditCommands.h" />
+    <ClInclude Include="src\Commands\RecordCommand.h" />
     <ClInclude Include="src\External\json.hpp" />
     <ClInclude Include="src\MainFrame\PaneInfo.h" />
     <ClInclude Include="src\AppModel\SoundBank.h" />
@@ -169,6 +170,7 @@
     <ClInclude Include="src\Panels\SoundBankPanel.h" />
     <ClInclude Include="src\Panels\TransportPanel.h" />
     <ClInclude Include="src\Panels\UndoHistoryPanel.h" />
+    <ClInclude Include="src\Panels\ShortcutsPanel.h" />
     <ClInclude Include="src\RtMidiWrapper\MidiDevice\MidiError.h" />
     <ClInclude Include="src\RtMidiWrapper\MidiDevice\MidiIn.h" />
     <ClInclude Include="src\RtMidiWrapper\MidiDevice\MidiInCallback.h" />

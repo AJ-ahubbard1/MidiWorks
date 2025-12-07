@@ -38,12 +38,27 @@ public:
 	int GetCurrentMidiInputPort() const;
 
 	// Logging system (callback pattern)
-	using LogCallback = std::function<void(const TimedMidiEvent&)>;
-	void SetLogCallback(LogCallback callback);
+	using MidiLogCallback = std::function<void(const TimedMidiEvent&)>;
+	void SetLogCallback(MidiLogCallback callback);
+
+	// Dirty state change notification (callback pattern)
+	using DirtyStateCallback = std::function<void(bool isDirty)>;
+	void SetDirtyStateCallback(DirtyStateCallback callback);
 
 	// Metronome settings
 	bool IsMetronomeEnabled() const;
-	void SetMetronomeEnabled(bool enabled); 
+	void SetMetronomeEnabled(bool enabled);
+
+	// Save/Load Project
+	bool SaveProject(const std::string& filepath);
+	bool LoadProject(const std::string& filepath);
+	void ClearProject();
+
+	// Project state
+	bool IsProjectDirty() const;
+	void MarkDirty();
+	void MarkClean();
+	const std::string& GetCurrentProjectPath() const;
 
 	// Command Pattern - Undo/Redo System
 	void ExecuteCommand(std::unique_ptr<Command> cmd);
@@ -67,10 +82,17 @@ private:
 	std::shared_ptr<MidiIn> mMidiIn;
 
 	// Logging
-	LogCallback mLogCallback;
+	MidiLogCallback mMidiLogCallback;
+
+	// Dirty state notification
+	DirtyStateCallback mDirtyStateCallback;
 
 	// Metronome
 	bool mMetronomeEnabled = true;  // Metronome on by default
+
+	// Project state
+	bool mIsDirty = false;
+	std::string mCurrentProjectPath;
 
 	// Command Pattern - Undo/Redo stacks
 	std::vector<std::unique_ptr<Command>> mUndoStack;

@@ -7,3 +7,4 @@
 #include "MidiCanvas.h"
 #include "Log.h"
 #include "UndoHistoryPanel.h"
+#include "ShortcutsPanel.h"

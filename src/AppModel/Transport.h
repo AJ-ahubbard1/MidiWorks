@@ -58,6 +58,12 @@ public:
 		mCurrentTick = static_cast<uint64_t>(beats * mTicksPerQuarter);
 
 	}
+	
+	void ShiftToTick(uint64_t newTick)
+	{
+		mCurrentTick = newTick;
+		mCurrentTimeMs = (1.0f * newTick / mTicksPerQuarter) * (60000.0 / mTempo);
+	}
 
 	void Stop()
 	{

@@ -15,6 +15,19 @@ public:
 		BindEvents();
 	}
 
+	/// <summary>
+	/// Updates all UI controls to reflect current channel data.
+	/// Called after loading a project to sync UI with loaded values.
+	/// </summary>
+	void UpdateFromModel()
+	{
+		mPatchChoice->SetSelection(mChannel.programNumber);
+		mVolumeSlider->SetValue(mChannel.volume);
+		mMuteCheck->SetValue(mChannel.mute);
+		mSoloCheck->SetValue(mChannel.solo);
+		mRecordCheck->SetValue(mChannel.record);
+	}
+
 private:
 	MidiChannel& mChannel;
 	std::shared_ptr<MidiOut> mMidiOut;

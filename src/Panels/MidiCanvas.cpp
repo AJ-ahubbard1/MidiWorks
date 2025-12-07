@@ -60,6 +60,26 @@ MidiCanvasPanel::MidiCanvasPanel(wxWindow* parent, std::shared_ptr<AppModel> app
 
 void MidiCanvasPanel::Update()
 {
+	// Auto-scroll during playback/recording to keep playhead visible
+	if (mTransport.mState == Transport::State::Playing ||
+	    mTransport.mState == Transport::State::Recording)
+	{
+		wxSize clientSize = GetClientSize();
+		int canvasWidth = clientSize.GetWidth();
+
+		uint64_t currentTick = mTransport.GetCurrentTick();
+		int playheadX = TickToScreenX(currentTick);
+
+		// If playhead exceeds 80% of screen width, scroll to keep it at 20%
+		int scrollThreshold = canvasWidth * 0.8;
+		if (playheadX > scrollThreshold)
+		{
+			int targetPlayheadX = canvasWidth * 0.2;  // Keep playhead at 20% from left
+			mOriginOffset.x = targetPlayheadX - (currentTick / mTicksPerPixel);
+			ClampOffset();
+		}
+	}
+
 	Refresh();
 }
 
@@ -540,6 +560,12 @@ void MidiCanvasPanel::OnLeftDown(wxMouseEvent& event)
 		uint64_t tick = ScreenXToTick(pos.x);
 		uint8_t pitch = ScreenYToPitch(pos.y);
 
+		// Ignore notes above pitch 120 (extreme high range, rarely used)
+		if (pitch > 120)
+		{
+			return;
+		}
+
 		// Start preview playback on record-enabled channels
 		PlayPreviewNote(pitch);
 
@@ -574,7 +600,7 @@ void MidiCanvasPanel::OnLeftUp(wxMouseEvent& event)
 				MidiMessage noteOff = MidiMessage::NoteOff(mPreviewPitch, channel.channelNumber);
 
 				TimedMidiEvent timedNoteOn{noteOn, snappedTick};
-				TimedMidiEvent timedNoteOff{noteOff, snappedTick + duration};
+				TimedMidiEvent timedNoteOff{noteOff, snappedTick + duration - 1};  // -1 to prevent overlap with next note
 
 				// Get the track for this channel
 				Track& track = mTrackSet.GetTrack(channel.channelNumber);
@@ -669,6 +695,14 @@ void MidiCanvasPanel::OnMiddleDown(wxMouseEvent& event)
 		}
 
 		Refresh();
+	} 
+	// If mouse isn't on a note, move playhead to mouse click
+	else
+	{
+		// Take the mouse position and convert that to ticks 
+		uint64_t newTick = ScreenXToTick(pos.x);
+		// set transport to new tick
+		mTransport.ShiftToTick(newTick);
 	}
 }
 

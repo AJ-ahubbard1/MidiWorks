@@ -17,6 +17,16 @@ MainFrame::MainFrame()
 	Bind(wxEVT_AUI_PANE_CLOSE, &MainFrame::OnPaneClosed, this);
 	mTimer.Bind(wxEVT_TIMER, &MainFrame::OnTimer, this);
 
+	// Set up keyboard shortcuts for transport control
+	wxAcceleratorEntry entries[2];
+	entries[0].Set(wxACCEL_NORMAL, WXK_SPACE, wxID_HIGHEST + 1000);  // Spacebar = Toggle Play
+	entries[1].Set(wxACCEL_NORMAL, 'R', wxID_HIGHEST + 1001);        // R = Record
+	wxAcceleratorTable accelTable(2, entries);
+	SetAcceleratorTable(accelTable);
+
+	Bind(wxEVT_MENU, &MainFrame::OnTogglePlay, this, wxID_HIGHEST + 1000);
+	Bind(wxEVT_MENU, &MainFrame::OnStartRecord, this, wxID_HIGHEST + 1001);
+
 	mAuiManager.Update();
 	mTimer.Start(2);
 	Bind(wxEVT_AUI_RENDER, &MainFrame::OnAuiRender, this);
@@ -36,6 +46,7 @@ void MainFrame::CreateDockablePanes()
 	mMidiCanvasPanel = new MidiCanvasPanel(this, mAppModel, "Canvas");
 	mLogPanel = new LogPanel(this);
 	mUndoHistoryPanel = new UndoHistoryPanel(this, mAppModel);
+	mShortcutsPanel = new ShortcutsPanel(this, *wxLIGHT_GREY, "Shortcuts");
 
 	// Define layout metadata and register each panel
 	PanelInfo soundBankInfo
@@ -67,6 +78,11 @@ void MainFrame::CreateDockablePanes()
 		"Undo History", mUndoHistoryPanel, idBase++,
 		PanePosition::Right, wxSize(247, -1)
 	};
+	PanelInfo shortcutsPanelInfo
+	{
+		"Shortcuts", mShortcutsPanel, idBase++,
+		PanePosition::Right, wxSize(347, -1)
+	};
 
 	RegisterPanel(soundBankInfo);
 	RegisterPanel(midiSettingsPanelInfo);
@@ -74,12 +90,18 @@ void MainFrame::CreateDockablePanes()
 	RegisterPanel(midiCanvasInfo);
 	RegisterPanel(logPanelInfo);
 	RegisterPanel(undoHistoryPanelInfo);
+	RegisterPanel(shortcutsPanelInfo);
 
 	// Register log callback for MIDI event logging
 	mAppModel->SetLogCallback([this](const TimedMidiEvent& event) {
 		if (mLogPanel) {
 			mLogPanel->LogMidiEvent(event);
 		}
+	});
+
+	// Register dirty state callback for title bar updates
+	mAppModel->SetDirtyStateCallback([this](bool isDirty) {
+		UpdateTitle();
 	});
 }
 
@@ -105,6 +127,23 @@ void MainFrame::SetPanelVisibility(int id, bool vis)
 void MainFrame::CreateMenuBar()
 {
 	auto* menuBar = new wxMenuBar();
+
+	// File Menu
+	auto* fileMenu = new wxMenu();
+	fileMenu->Append(wxID_NEW, "&New Project\tCtrl+N", "Create a new project");
+	fileMenu->Append(wxID_OPEN, "&Open...\tCtrl+O", "Open a project");
+	fileMenu->Append(wxID_SAVE, "&Save\tCtrl+S", "Save the current project");
+	fileMenu->Append(wxID_SAVEAS, "Save &As...\tCtrl+Shift+S", "Save project with a new name");
+	fileMenu->AppendSeparator();
+	fileMenu->Append(wxID_EXIT, "E&xit\tAlt+F4", "Exit MidiWorks");
+
+	Bind(wxEVT_MENU, &MainFrame::OnNew, this, wxID_NEW);
+	Bind(wxEVT_MENU, &MainFrame::OnOpen, this, wxID_OPEN);
+	Bind(wxEVT_MENU, &MainFrame::OnSave, this, wxID_SAVE);
+	Bind(wxEVT_MENU, &MainFrame::OnSaveAs, this, wxID_SAVEAS);
+	Bind(wxEVT_MENU, &MainFrame::OnExit, this, wxID_EXIT);
+
+	menuBar->Append(fileMenu, "&File");
 
 	// Edit Menu - Undo/Redo
 	auto* editMenu = new wxMenu();
@@ -216,4 +255,204 @@ void MainFrame::OnRedo(wxCommandEvent& event)
 	mAppModel->Redo();
 	mUndoHistoryPanel->UpdateDisplay();  // Update command history display
 	Refresh();  // Redraw canvas to show changes
+}
+
+// File Menu Handlers
+void MainFrame::OnNew(wxCommandEvent& event)
+{
+	// Check for unsaved changes
+	if (mAppModel->IsProjectDirty()) {
+		int result = wxMessageBox(
+			"Do you want to save changes to the current project?",
+			"Unsaved Changes",
+			wxYES_NO | wxCANCEL | wxICON_QUESTION);
+
+		if (result == wxYES) {
+			OnSave(event);
+		}
+		else if (result == wxCANCEL) {
+			return;
+		}
+	}
+
+	// Clear all data
+	mAppModel->ClearProject();
+
+	// Update UI controls to reflect cleared state
+	mSoundBankPanel->UpdateFromModel();
+	mTransportPanel->UpdateTempoDisplay();
+
+	UpdateTitle();
+	Refresh();
+}
+
+void MainFrame::OnOpen(wxCommandEvent& event)
+{
+	// Check for unsaved changes
+	if (mAppModel->IsProjectDirty()) {
+		int result = wxMessageBox(
+			"Do you want to save changes to the current project?",
+			"Unsaved Changes",
+			wxYES_NO | wxCANCEL | wxICON_QUESTION);
+
+		if (result == wxYES) {
+			OnSave(event);
+		}
+		else if (result == wxCANCEL) {
+			return;
+		}
+	}
+
+	wxFileDialog openDialog(this,
+		"Open MidiWorks Project",
+		wxEmptyString,
+		wxEmptyString,
+		"MidiWorks Projects (*.mwp)|*.mwp",
+		wxFD_OPEN | wxFD_FILE_MUST_EXIST);
+
+	if (openDialog.ShowModal() == wxID_CANCEL) {
+		return;
+	}
+
+	std::string path = openDialog.GetPath().ToStdString();
+	if (mAppModel->LoadProject(path)) {
+		// Update UI controls to reflect loaded data
+		mSoundBankPanel->UpdateFromModel();
+		mTransportPanel->UpdateTempoDisplay();
+
+		UpdateTitle();
+		Refresh();  // Redraw canvas with loaded data
+	}
+	else {
+		wxMessageBox("Failed to load project", "Error", wxOK | wxICON_ERROR);
+	}
+}
+
+void MainFrame::OnSave(wxCommandEvent& event)
+{
+	if (mAppModel->GetCurrentProjectPath().empty()) {
+		// No path yet, use Save As
+		OnSaveAs(event);
+		return;
+	}
+
+	if (mAppModel->SaveProject(mAppModel->GetCurrentProjectPath())) {
+		UpdateTitle();  // Title updates automatically via callback, but ensure it's current
+	}
+	else {
+		wxMessageBox("Failed to save project", "Error", wxOK | wxICON_ERROR);
+	}
+}
+
+void MainFrame::OnSaveAs(wxCommandEvent& event)
+{
+	wxFileDialog saveDialog(this,
+		"Save MidiWorks Project",
+		wxEmptyString,
+		wxEmptyString,
+		"MidiWorks Projects (*.mwp)|*.mwp",
+		wxFD_SAVE | wxFD_OVERWRITE_PROMPT);
+
+	if (saveDialog.ShowModal() == wxID_CANCEL) {
+		return;
+	}
+
+	std::string path = saveDialog.GetPath().ToStdString();
+	if (mAppModel->SaveProject(path)) {
+		UpdateTitle();  // Title updates automatically via callback, but ensure it's current
+	}
+	else {
+		wxMessageBox("Failed to save project", "Error", wxOK | wxICON_ERROR);
+	}
+}
+
+void MainFrame::OnExit(wxCommandEvent& event)
+{
+	// Check for unsaved changes
+	if (mAppModel->IsProjectDirty()) {
+		int result = wxMessageBox(
+			"Do you want to save changes before exiting?",
+			"Unsaved Changes",
+			wxYES_NO | wxCANCEL | wxICON_QUESTION);
+
+		if (result == wxYES) {
+			OnSave(event);
+		}
+		else if (result == wxCANCEL) {
+			return;
+		}
+	}
+
+	Close(true);
+}
+
+void MainFrame::UpdateTitle()
+{
+	std::string title = "MidiWorks - ";
+	std::string path = mAppModel->GetCurrentProjectPath();
+
+	if (path.empty()) {
+		title += "Untitled";
+	}
+	else {
+		// Extract filename from full path
+		size_t lastSlash = path.find_last_of("/\\");
+		if (lastSlash != std::string::npos) {
+			title += path.substr(lastSlash + 1);
+		}
+		else {
+			title += path;
+		}
+	}
+
+	// Add asterisk if dirty
+	if (mAppModel->IsProjectDirty()) {
+		title += " *";
+	}
+
+	SetTitle(title);
+}
+
+// Transport keyboard shortcuts
+void MainFrame::OnTogglePlay(wxCommandEvent& event)
+{
+	auto& transport = mAppModel->GetTransport();
+
+	switch (transport.mState)
+	{
+	case Transport::State::Stopped:
+		// Start playing
+		transport.mState = Transport::State::ClickedPlay;
+		break;
+
+	case Transport::State::Playing:
+		// Stop playing
+		transport.mState = Transport::State::StopPlaying;
+		break;
+
+	case Transport::State::Recording:
+		// Stop recording
+		transport.mState = Transport::State::StopRecording;
+		break;
+
+	default:
+		// For other states (ClickedPlay, ClickedRecord, etc.), do nothing
+		break;
+	}
+}
+
+void MainFrame::OnStartRecord(wxCommandEvent& event)
+{
+	auto& transport = mAppModel->GetTransport();
+
+	// Start recording if not already in a recording-related state
+	if (transport.mState == Transport::State::Stopped)
+	{
+		transport.mState = Transport::State::ClickedRecord;
+	}
+	else if (transport.mState == Transport::State::Recording)
+	{
+		// Toggle: stop recording if already recording
+		transport.mState = Transport::State::StopRecording;
+	}
 }
