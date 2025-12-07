@@ -60,6 +60,10 @@ public:
 		for (const auto& event : mRecordedNotes)
 		{
 			ubyte channel = event.mm.getChannel();
+
+			// Skip if channel is out of bounds (should not happen, but safety check)
+			if (channel >= 15) continue;
+
 			auto& track = mTrackSet.GetTrack(channel);
 
 			// Find and remove this event by matching tick and MIDI data

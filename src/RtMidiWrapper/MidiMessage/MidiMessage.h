@@ -76,11 +76,21 @@ namespace MidiInterface
 			timestamp = ts;
 		}
 
+		bool isNoteOn() const
+		{
+			return getEventType() == MidiEvent::NOTE_ON;
+		}
+
 		static MidiMessage NoteOn(ubyte keyNumber, ubyte velocity, ubyte channel = 0)
 		{
 			return MidiMessage(MidiEvent::NOTE_ON | channel, keyNumber, velocity);
 		}
-
+		
+		bool isNoteOff() const
+		{
+			return getEventType() == MidiEvent::NOTE_OFF;
+		} 
+		
 		static MidiMessage NoteOff(ubyte keyNumber, ubyte channel = 0)
 		{
 			return MidiMessage(MidiEvent::NOTE_OFF | channel, keyNumber, 0);
@@ -129,6 +139,11 @@ namespace MidiInterface
 		ubyte getChannel() const
 		{
 			return static_cast<ubyte>(mData[0] & 0x0F);
+		}
+
+		ubyte getPitch() const
+		{
+			return mData[1];
 		}
 	};
 }

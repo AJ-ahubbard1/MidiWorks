@@ -1,6 +1,7 @@
 // MainFrame.cpp
 #include "MainFrame.h"
 #include <wx/string.h>
+#include "Commands/QuantizeCommand.h"
 
 
 MainFrame::MainFrame()
@@ -18,10 +19,11 @@ MainFrame::MainFrame()
 	mTimer.Bind(wxEVT_TIMER, &MainFrame::OnTimer, this);
 
 	// Set up keyboard shortcuts for transport control
-	wxAcceleratorEntry entries[2];
+	wxAcceleratorEntry entries[3];
 	entries[0].Set(wxACCEL_NORMAL, WXK_SPACE, wxID_HIGHEST + 1000);  // Spacebar = Toggle Play
 	entries[1].Set(wxACCEL_NORMAL, 'R', wxID_HIGHEST + 1001);        // R = Record
-	wxAcceleratorTable accelTable(2, entries);
+	entries[2].Set(wxACCEL_NORMAL, 'Q', wxID_HIGHEST + 1002);        // Q = Quantize
+	wxAcceleratorTable accelTable(3, entries);
 	SetAcceleratorTable(accelTable);
 
 	Bind(wxEVT_MENU, &MainFrame::OnTogglePlay, this, wxID_HIGHEST + 1000);
@@ -149,8 +151,11 @@ void MainFrame::CreateMenuBar()
 	auto* editMenu = new wxMenu();
 	editMenu->Append(wxID_UNDO, "Undo\tCtrl+Z", "Undo last action");
 	editMenu->Append(wxID_REDO, "Redo\tCtrl+Y", "Redo last undone action");
+	editMenu->AppendSeparator();
+	editMenu->Append(wxID_HIGHEST + 1002, "Quantize to Grid\tQ", "Snap all notes to nearest grid division");
 	Bind(wxEVT_MENU, &MainFrame::OnUndo, this, wxID_UNDO);
 	Bind(wxEVT_MENU, &MainFrame::OnRedo, this, wxID_REDO);
+	Bind(wxEVT_MENU, &MainFrame::OnQuantize, this, wxID_HIGHEST + 1002);
 	menuBar->Append(editMenu, "Edit");
 
 	// View Menu - Dockable Panels
@@ -244,6 +249,18 @@ void MainFrame::SyncMenuChecks()
 // Undo last action (Ctrl+Z)
 void MainFrame::OnUndo(wxCommandEvent& event)
 {
+	// Stop playback/recording to prevent iterator invalidation
+	// (can't modify tracks while they're being iterated during playback)
+	auto& transport = mAppModel->GetTransport();
+	if (transport.mState == Transport::State::Playing)
+	{
+		transport.mState = Transport::State::StopPlaying;
+	}
+	else if (transport.mState == Transport::State::Recording)
+	{
+		transport.mState = Transport::State::StopRecording;
+	}
+
 	mAppModel->Undo();
 	mUndoHistoryPanel->UpdateDisplay();  // Update command history display
 	Refresh();  // Redraw canvas to show changes
@@ -252,7 +269,53 @@ void MainFrame::OnUndo(wxCommandEvent& event)
 // Redo last undone action (Ctrl+Y)
 void MainFrame::OnRedo(wxCommandEvent& event)
 {
+	// Stop playback/recording to prevent iterator invalidation
+	// (can't modify tracks while they're being iterated during playback)
+	auto& transport = mAppModel->GetTransport();
+	if (transport.mState == Transport::State::Playing)
+	{
+		transport.mState = Transport::State::StopPlaying;
+	}
+	else if (transport.mState == Transport::State::Recording)
+	{
+		transport.mState = Transport::State::StopRecording;
+	}
+
 	mAppModel->Redo();
+	mUndoHistoryPanel->UpdateDisplay();  // Update command history display
+	Refresh();  // Redraw canvas to show changes
+}
+
+// Quantize all tracks to grid (Q)
+void MainFrame::OnQuantize(wxCommandEvent& event)
+{
+	// Stop playback/recording to prevent iterator invalidation
+	auto& transport = mAppModel->GetTransport();
+	if (transport.mState == Transport::State::Playing)
+	{
+		transport.mState = Transport::State::StopPlaying;
+	}
+	else if (transport.mState == Transport::State::Recording)
+	{
+		transport.mState = Transport::State::StopRecording;
+	}
+
+	// Get grid size from MidiCanvas duration selector
+	// This way, users can choose quantize resolution by changing the dropdown
+	uint64_t gridSize = mMidiCanvasPanel->GetGridSize();
+
+	// Quantize all non-empty tracks
+	auto& trackSet = mAppModel->GetTrackSet();
+	for (int i = 0; i < 15; i++)
+	{
+		Track& track = trackSet.GetTrack(i);
+		if (!track.empty())
+		{
+			auto cmd = std::make_unique<QuantizeCommand>(track, gridSize);
+			mAppModel->ExecuteCommand(std::move(cmd));
+		}
+	}
+
 	mUndoHistoryPanel->UpdateDisplay();  // Update command history display
 	Refresh();  // Redraw canvas to show changes
 }

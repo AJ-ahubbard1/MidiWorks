@@ -22,6 +22,11 @@ public:
 	int			mTimeSignatureNumerator = 4;    // Top number (beats per measure)
 	int			mTimeSignatureDenominator = 4;  // Bottom number (note value)
 
+	// Loop settings
+	bool		mLoopEnabled = false;
+	uint64_t	mLoopStartTick = 0;
+	uint64_t	mLoopEndTick = 15360;  // 4 bars (960 * 4 * 4) as default
+
 	Transport() { }
 
 	uint64_t StartPlayBack()

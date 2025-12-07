@@ -48,6 +48,7 @@ private:
 	wxStaticText* mTempoLabel;
 	wxSpinCtrlDouble* mTempoControl;
 	wxCheckBox* mMetronomeCheckBox;
+	wxCheckBox* mLoopCheckBox;
 	Transport::State mPreviousState;
 
 	void CreateControls()
@@ -72,6 +73,10 @@ private:
 		// Metronome checkbox (renamed to "Click")
 		mMetronomeCheckBox = new wxCheckBox(this, wxID_ANY, "Click");
 		mMetronomeCheckBox->SetValue(mModel->IsMetronomeEnabled());
+
+		// Loop checkbox
+		mLoopCheckBox = new wxCheckBox(this, wxID_ANY, "Loop");
+		mLoopCheckBox->SetValue(mTransport.mLoopEnabled);
 	} 
 	
 	void SetupSizers()
@@ -103,6 +108,8 @@ private:
 		sizer->AddSpacer(buttonSpace);
 		sizer->Add(mMetronomeCheckBox, flags);
 		sizer->AddSpacer(buttonSpace);
+		sizer->Add(mLoopCheckBox, flags);
+		sizer->AddSpacer(buttonSpace);
 		SetSizer(sizer);
 	}
 
@@ -118,6 +125,7 @@ private:
 		mRecordButton->Bind(wxEVT_BUTTON, &TransportPanel::OnRecord, this);
 		mTempoControl->Bind(wxEVT_SPINCTRLDOUBLE, &TransportPanel::OnTempoChange, this);
 		mMetronomeCheckBox->Bind(wxEVT_CHECKBOX, &TransportPanel::OnMetronomeToggle, this);
+		mLoopCheckBox->Bind(wxEVT_CHECKBOX, &TransportPanel::OnLoopToggle, this);
 	}
 
 	void OnStop(wxCommandEvent&)
@@ -182,6 +190,11 @@ private:
 	void OnMetronomeToggle(wxCommandEvent& event)
 	{
 		mModel->SetMetronomeEnabled(mMetronomeCheckBox->GetValue());
+	}
+
+	void OnLoopToggle(wxCommandEvent& event)
+	{
+		mTransport.mLoopEnabled = mLoopCheckBox->GetValue();
 	}
 };
 

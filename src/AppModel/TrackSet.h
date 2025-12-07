@@ -39,13 +39,20 @@ public:
 			if (iterators[t] == -1) continue;
 
 			auto& track = GetTrack(t);
-			auto& timedMidi = track.at(iterators[t]);
-			if (currentTick >= timedMidi.tick)
-			{
-				scheduledMessages.push_back(timedMidi.mm);
-				iterators[t] = (++iterators[t] < track.size()) ? iterators[t] : -1;
-			}
 
+			// Process all events at or before currentTick
+			while (iterators[t] != -1 &&
+			       iterators[t] < track.size() &&
+			       track[iterators[t]].tick <= currentTick)
+			{
+				scheduledMessages.push_back(track[iterators[t]].mm);
+				iterators[t]++;
+				if (iterators[t] >= track.size())
+				{
+					iterators[t] = -1;
+					break;
+				}
+			}
 		}
 		return scheduledMessages;
 	}

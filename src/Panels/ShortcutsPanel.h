@@ -52,6 +52,20 @@ private:
 		AddSection("Edit Operations");
 		AddShortcut("Ctrl+Z", "Undo");
 		AddShortcut("Ctrl+Y", "Redo");
+		AddShortcut("Q", "Quantize notes to grid");
+		AddShortcut("Ctrl+C", "Copy selected notes");
+		AddShortcut("Ctrl+V", "Paste notes at playhead");
+		AddShortcut("Ctrl+X", "Cut selected notes");
+
+		mMainSizer->AddSpacer(10);
+
+		// Piano Roll - Selection Section
+		AddSection("Piano Roll - Selection");
+		AddShortcut("Shift+Drag", "Rectangle selection");
+		AddShortcut("Ctrl+A", "Select all notes");
+		AddShortcut("Escape", "Clear selection");
+		AddShortcut("Delete", "Delete selected notes");
+		AddInfo("Selected notes have yellow borders");
 
 		mMainSizer->AddSpacer(10);
 
@@ -103,6 +117,8 @@ private:
 		AddSection("Tips");
 		AddTip("Recording is undoable! Press Ctrl+Z to remove a bad take.");
 		AddTip("All edits are undoable with full history (up to 50 actions).");
+		AddTip("Quantize (Q) snaps all notes to the selected grid size.");
+		AddTip("Use Shift+Drag to select multiple notes, then copy/paste them!");
 		AddTip("Solo mode: When any channel is solo'd, only solo channels play.");
 		AddTip("Metronome uses channel 16 and plays woodblock sound.");
 		AddTip("Grid lines: Light gray = beats, darker gray = measures.");

@@ -1,6 +1,7 @@
 // AppModel.cpp
 #include "AppModel.h"
 #include <fstream>
+#include <algorithm>
 #include "external/json.hpp"
 #include "Commands/RecordCommand.h"
 
@@ -39,6 +40,10 @@ void AppModel::Update()
 				mRecordingBuffer.clear();
 			}
 
+			// Reset recording buffer iterator and clear active notes
+			mRecordingBufferIterator = -1;
+			mActiveNotes.clear();
+
 			SilenceAllChannels();
 			break;
 
@@ -63,6 +68,14 @@ void AppModel::Update()
 			mTransport.UpdatePlayBack(GetDeltaTimeMs());
 			uint64_t currentTick = mTransport.GetCurrentTick();
 
+			// Loop-back logic (check BEFORE metronome to avoid double-click at loop boundary)
+			if (mTransport.mLoopEnabled && currentTick >= mTransport.mLoopEndTick - 1)
+			{
+				mTransport.ShiftToTick(mTransport.mLoopStartTick);
+				mTrackSet.FindStart(mTransport.mLoopStartTick);
+				currentTick = mTransport.GetCurrentTick();  // Update currentTick after loop-back
+			}
+
 			// Metronome
 			if (mMetronomeEnabled)
 			{
@@ -75,11 +88,30 @@ void AppModel::Update()
 
 			messages = mTrackSet.PlayBack(currentTick);
 			PlayMessages(messages);
+
 			break;
 		}
 		case Transport::State::ClickedRecord:
 	    	GetDeltaTimeMs();
 			mTrackSet.FindStart(mTransport.StartPlayBack());
+
+			// Initialize recording buffer iterator for loop playback
+			// Find first event >= current position
+			if (mTransport.mLoopEnabled && !mRecordingBuffer.empty())
+			{
+				uint64_t startTick = mTransport.GetCurrentTick();
+				int i = 0;
+				while (i < mRecordingBuffer.size() && mRecordingBuffer[i].tick < startTick)
+				{
+					i++;
+				}
+				mRecordingBufferIterator = (i < mRecordingBuffer.size()) ? i : -1;
+			}
+			else
+			{
+				mRecordingBufferIterator = -1;
+			}
+
 			mTransport.mState= Transport::State::Recording;
 			break;
 		case Transport::State::Recording:
@@ -88,6 +120,43 @@ void AppModel::Update()
 			mTransport.UpdatePlayBack(GetDeltaTimeMs());
 			uint64_t currentTick = mTransport.GetCurrentTick();
 
+			// Loop-back logic (check BEFORE metronome to avoid double-click at loop boundary)
+			if (mTransport.mLoopEnabled && currentTick >= mTransport.mLoopEndTick - 1)
+			{
+				// Auto-close any notes still held at loop end to prevent stuck notes
+				uint64_t loopEndTick = mTransport.mLoopEndTick - 1;
+				for (const auto& note : mActiveNotes)
+				{
+					// Create NoteOff message for this active note
+					MidiMessage noteOff = MidiMessage::NoteOff(note.pitch, note.channel);
+					mRecordingBuffer.push_back({noteOff, loopEndTick});
+				}
+				// Clear active notes since we just closed them all
+				mActiveNotes.clear();
+
+				// Merge overlapping notes before jumping back
+				MergeOverlappingNotes(mRecordingBuffer);
+
+				mTransport.ShiftToTick(mTransport.mLoopStartTick);
+				mTrackSet.FindStart(mTransport.mLoopStartTick);
+				currentTick = mTransport.GetCurrentTick();  // Update currentTick after loop-back
+
+				// Reset recording buffer iterator to loop start position
+				if (!mRecordingBuffer.empty())
+				{
+					int i = 0;
+					while (i < mRecordingBuffer.size() && mRecordingBuffer[i].tick < mTransport.mLoopStartTick)
+					{
+						i++;
+					}
+					mRecordingBufferIterator = (i < mRecordingBuffer.size()) ? i : -1;
+				}
+				else
+				{
+					mRecordingBufferIterator = -1;
+				}
+			}
+
 			// Metronome
 			if (mMetronomeEnabled)
 			{
@@ -99,7 +168,29 @@ void AppModel::Update()
 			}
 
 			messages = mTrackSet.PlayBack(currentTick);
+
+			// During loop recording, also play back the recording buffer
+			// so you can hear what you recorded in previous loop iterations
+			// Use iterator-based approach (same as TrackSet) for efficiency
+			// Process all events at or before currentTick
+			if (mTransport.mLoopEnabled)
+			{
+				while (mRecordingBufferIterator != -1 &&
+				       mRecordingBufferIterator < mRecordingBuffer.size() &&
+				       mRecordingBuffer[mRecordingBufferIterator].tick <= currentTick)
+				{
+					messages.push_back(mRecordingBuffer[mRecordingBufferIterator].mm);
+					mRecordingBufferIterator++;
+					if (mRecordingBufferIterator >= mRecordingBuffer.size())
+					{
+						mRecordingBufferIterator = -1;
+						break;
+					}
+				}
+			}
+
 			PlayMessages(messages);
+
 			break;
 		}
 		case Transport::State::FastForwarding:
@@ -143,6 +234,25 @@ void AppModel::CheckMidiInQueue()
 			if (c.record && IsMusicalMessage(routed) && mTransport.mState == Transport::State::Recording)
 			{
 				mRecordingBuffer.push_back({routed, currentTick});
+
+				// Track active notes for loop recording
+				ubyte status = routed.mData[0] & 0xF0;
+				ubyte pitch = routed.getPitch();
+				ubyte channel = routed.getChannel();
+
+				if (status == 0x90 && routed.mData[2] > 0)  // NoteOn with velocity > 0
+				{
+					mActiveNotes.push_back({pitch, channel, currentTick});
+				}
+				else if (status == 0x80 || (status == 0x90 && routed.mData[2] == 0))  // NoteOff
+				{
+					// Remove from active notes
+					auto it = std::remove_if(mActiveNotes.begin(), mActiveNotes.end(),
+						[pitch, channel](const ActiveNote& note) {
+							return note.pitch == pitch && note.channel == channel;
+						});
+					mActiveNotes.erase(it, mActiveNotes.end());
+				}
 			}
 		}
 	}
@@ -252,6 +362,27 @@ void AppModel::ClearUndoHistory()
 {
 	mUndoStack.clear();
 	mRedoStack.clear();
+}
+
+// Clipboard operations
+void AppModel::CopyToClipboard(const std::vector<ClipboardNote>& notes)
+{
+	mClipboard = notes;
+}
+
+const std::vector<AppModel::ClipboardNote>& AppModel::GetClipboard() const
+{
+	return mClipboard;
+}
+
+bool AppModel::HasClipboardData() const
+{
+	return !mClipboard.empty();
+}
+
+void AppModel::ClearClipboard()
+{
+	mClipboard.clear();
 }
 
 uint64_t AppModel::GetDeltaTimeMs()
@@ -549,5 +680,67 @@ void AppModel::MarkClean()
 const std::string& AppModel::GetCurrentProjectPath() const
 {
 	return mCurrentProjectPath;
+}
+
+// Merge overlapping notes during loop recording
+// When consecutive NoteOn messages of same pitch/channel occur,
+// merge them into a single note (first NoteOn + last NoteOff)
+void AppModel::MergeOverlappingNotes(Track& buffer)
+{
+	if (buffer.size() < 2) return;
+
+	// Sort by tick to ensure chronological order
+	std::sort(buffer.begin(), buffer.end(),
+		[](const TimedMidiEvent& a, const TimedMidiEvent& b) {
+			return a.tick < b.tick;
+		});
+
+	std::vector<size_t> indicesToRemove;
+
+	// Scan for consecutive NoteOns of same pitch/channel
+	for (size_t i = 0; i < buffer.size() - 1; i++)
+	{
+		const auto& event1 = buffer[i];
+
+		// Skip if already marked for removal or not a NoteOn
+		if (std::find(indicesToRemove.begin(), indicesToRemove.end(), i) != indicesToRemove.end())
+			continue;
+		if (!event1.mm.isNoteOn())
+			continue;
+
+		uint8_t pitch1 = event1.mm.getPitch();
+		uint8_t channel1 = event1.mm.getChannel();
+
+		// Check if next event is also NoteOn with same pitch/channel
+		const auto& event2 = buffer[i + 1];
+		if (event2.mm.isNoteOn() &&
+		    event2.mm.mData[1] == pitch1 &&
+		    event2.mm.getChannel() == channel1)
+		{
+			// Consecutive NoteOns found! Mark second NoteOn for removal
+			indicesToRemove.push_back(i + 1);
+
+			// Find and remove the first NoteOff (keep last NoteOff)
+			for (size_t j = i + 2; j < buffer.size(); j++)
+			{
+				const auto& eventJ = buffer[j];
+				if (eventJ.mm.isNoteOff() &&
+				    eventJ.mm.getPitch() == pitch1 &&
+				    eventJ.mm.getChannel() == channel1)
+				{
+					// Found first NoteOff, mark for removal
+					indicesToRemove.push_back(j);
+					break;  // Only remove the first NoteOff
+				}
+			}
+		}
+	}
+
+	// Remove marked events in reverse order to maintain indices
+	std::sort(indicesToRemove.begin(), indicesToRemove.end(), std::greater<size_t>());
+	for (size_t idx : indicesToRemove)
+	{
+		buffer.erase(buffer.begin() + idx);
+	}
 }
 

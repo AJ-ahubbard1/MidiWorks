@@ -2,11 +2,14 @@
 #include <wx/wx.h>
 #include <wx/dcbuffer.h>
 #include <wx/graphics.h>
+#include <wx/spinctrl.h>
 #include "RtMidiWrapper/RtMidiWrapper.h"
 #include "AppModel/Transport.h"
 #include "AppModel/TrackSet.h"
 #include "AppModel/AppModel.h"
 #include "Commands/NoteEditCommands.h"
+#include "Commands/PasteCommand.h"
+#include "Commands/DeleteMultipleNotesCommand.h"
 
 using namespace MidiInterface;
 
@@ -25,6 +28,7 @@ private:
 	wxStaticText* mDebugMessage;
 	wxCheckBox* mGridSnapCheckbox;
 	wxChoice* mDurationChoice;
+	wxSpinCtrl* mCustomTicksCtrl;
 	int mNoteHeight = 5;  // Current note height in pixels (pixels per MIDI note)
 	int mMinNoteHeight = 1;  // Minimum zoom: canvasHeight / 128 (all notes visible)
 	int mMaxNoteHeight = 50;  // Maximum zoom: 50 pixels per note
@@ -39,7 +43,9 @@ private:
 		Idle,
 		Adding,
 		MovingNote,
-		ResizingNote
+		ResizingNote,
+		DraggingLoopStart,
+		DraggingLoopEnd
 	};
 	MouseMode mMouseMode = MouseMode::Idle;
 	size_t mSelectedNoteOnIndex = 0;
@@ -60,9 +66,22 @@ private:
 		uint64_t endTick = 0;
 		uint8_t pitch = 0;
 		bool valid = false;
+
+		// Equality operator for finding notes in selection
+		bool operator==(const NoteInfo& other) const {
+			return trackIndex == other.trackIndex &&
+			       noteOnIndex == other.noteOnIndex &&
+			       noteOffIndex == other.noteOffIndex;
+		}
 	};
 	NoteInfo mHoveredNote;
 	NoteInfo mSelectedNote;
+
+	// Multi-selection state
+	std::vector<NoteInfo> mSelectedNotes;  // Multiple selected notes
+	bool mIsSelecting = false;             // Currently dragging selection rectangle
+	wxPoint mSelectionStart;               // Where selection drag started
+	wxPoint mSelectionEnd;                 // Current mouse position during drag
 
 	// For move/resize operations
 	uint64_t mOriginalStartTick = 0;
@@ -89,9 +108,22 @@ private:
 	uint64_t GetSelectedDuration() const;
 	uint64_t ApplyGridSnap(uint64_t tick) const;
 
+public:
+	// Public accessor for MainFrame to get grid size for quantize
+	uint64_t GetGridSize() const { return GetSelectedDuration(); }
+
 	// Note finding
 	NoteInfo FindNoteAtPosition(int screenX, int screenY);
 	bool IsOnResizeEdge(int screenX, const NoteInfo& note);
+
+	// Multi-selection
+	std::vector<NoteInfo> FindNotesInRectangle(wxPoint start, wxPoint end);
+	void ClearSelection();
+	bool IsNoteSelected(const NoteInfo& note) const;
+
+	// Loop edge detection
+	bool IsNearLoopStart(int screenX);
+	bool IsNearLoopEnd(int screenX);
 
 	// View management
 	void ClampOffset();
@@ -106,4 +138,5 @@ private:
 	void OnMouseMove(wxMouseEvent& event);
 	void OnSize(wxSizeEvent& event);
 	void OnMouseLeave(wxMouseEvent& event);
+	void OnKeyDown(wxKeyEvent& event);
 };

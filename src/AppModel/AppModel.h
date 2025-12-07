@@ -64,11 +64,24 @@ public:
 	void ExecuteCommand(std::unique_ptr<Command> cmd);
 	void Undo();
 	void Redo();
-	bool CanUndo() const; 
-	bool CanRedo() const; 
-	const std::vector<std::unique_ptr<Command>>& GetUndoStack() const; 
-	const std::vector<std::unique_ptr<Command>>& GetRedoStack() const; 
+	bool CanUndo() const;
+	bool CanRedo() const;
+	const std::vector<std::unique_ptr<Command>>& GetUndoStack() const;
+	const std::vector<std::unique_ptr<Command>>& GetRedoStack() const;
 	void ClearUndoHistory();
+
+	// Clipboard for copy/paste
+	struct ClipboardNote {
+		uint64_t relativeStartTick;  // Relative to first note in selection
+		uint64_t duration;
+		uint8_t pitch;
+		uint8_t velocity;
+		int trackIndex;  // Which track it came from
+	};
+	void CopyToClipboard(const std::vector<ClipboardNote>& notes);
+	const std::vector<ClipboardNote>& GetClipboard() const;
+	bool HasClipboardData() const;
+	void ClearClipboard();
 
 private:
 	static const size_t MAX_UNDO_STACK_SIZE = 50;  // Limit to last 50 actions
@@ -77,6 +90,15 @@ private:
 	Transport	mTransport;
 	TrackSet	mTrackSet;
 	Track		mRecordingBuffer;
+	int			mRecordingBufferIterator = -1;  // Iterator for efficient recording buffer playback during loops
+
+	// Active note tracking for loop recording (to auto-close held notes at loop end)
+	struct ActiveNote {
+		ubyte pitch;
+		ubyte channel;
+		uint64_t startTick;
+	};
+	std::vector<ActiveNote> mActiveNotes;
 
 	// MIDI Input
 	std::shared_ptr<MidiIn> mMidiIn;
@@ -98,10 +120,14 @@ private:
 	std::vector<std::unique_ptr<Command>> mUndoStack;
 	std::vector<std::unique_ptr<Command>> mRedoStack;
 
+	// Clipboard
+	std::vector<ClipboardNote> mClipboard;
+
 	uint64_t GetDeltaTimeMs();
 	bool IsMusicalMessage(const MidiMessage& msg);
 	void PlayMessages(std::vector<MidiMessage> msgs);
 	void PlayMetronomeClick(bool isDownbeat);
 	void SilenceAllChannels();
+	void MergeOverlappingNotes(Track& buffer);
 };
 
