@@ -4,7 +4,7 @@
 #include "ChannelControls.h"
 #include "SoundBankPanel.h"
 #include "TransportPanel.h"
-#include "MidiCanvas.h"
+#include "MidiCanvas/MidiCanvas.h"
 #include "Log.h"
 #include "UndoHistoryPanel.h"
 #include "ShortcutsPanel.h"

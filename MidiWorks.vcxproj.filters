@@ -24,13 +24,19 @@
     <ClCompile Include="src\RtMidiWrapper\RtMidi\RtMidi.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="src\Panels\MidiCanvas.cpp">
+    <ClCompile Include="src\Panels\MidiCanvas\MidiCanvas.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="src\AppModel\AppModel.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="src\Commands\NoteEditCommands.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="src\AppModel\TrackSet\TrackSet.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="src\AppModel\SoundBank\SoundBank.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>
@@ -89,7 +95,7 @@
     <ClInclude Include="src\MainFrame\PaneInfo.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="src\AppModel\SoundBank.h">
+    <ClInclude Include="src\AppModel\SoundBank\SoundBank.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="src\Panels\ChannelControls.h">
@@ -104,10 +110,10 @@
     <ClInclude Include="src\Panels\TransportPanel.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="src\AppModel\TrackSet.h">
+    <ClInclude Include="src\AppModel\TrackSet\TrackSet.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="src\Panels\MidiCanvas.h">
+    <ClInclude Include="src\Panels\MidiCanvas\MidiCanvas.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="src\Panels\ChannelTrackRow.h">

@@ -5,11 +5,12 @@
 #include <wx/spinctrl.h>
 #include "RtMidiWrapper/RtMidiWrapper.h"
 #include "AppModel/Transport.h"
-#include "AppModel/TrackSet.h"
+#include "AppModel/TrackSet/TrackSet.h"
 #include "AppModel/AppModel.h"
 #include "Commands/NoteEditCommands.h"
 #include "Commands/PasteCommand.h"
 #include "Commands/DeleteMultipleNotesCommand.h"
+#include "MidiConstants.h"
 
 using namespace MidiInterface;
 
@@ -19,6 +20,7 @@ public:
 	MidiCanvasPanel(wxWindow* parent, std::shared_ptr<AppModel> appModel, const wxString& label);
 
 	void Update();
+	uint64_t GetGridSize() const { return GetSelectedDuration(); }
 
 private:
 	std::shared_ptr<AppModel> mAppModel;
@@ -30,7 +32,7 @@ private:
 	wxChoice* mDurationChoice;
 	wxSpinCtrl* mCustomTicksCtrl;
 	int mNoteHeight = 5;  // Current note height in pixels (pixels per MIDI note)
-	int mMinNoteHeight = 1;  // Minimum zoom: canvasHeight / 128 (all notes visible)
+	int mMinNoteHeight = 1;  // Minimum zoom: canvasHeight / MIDI_NOTE_COUNT (all notes visible)
 	int mMaxNoteHeight = 50;  // Maximum zoom: 50 pixels per note
 	int mTicksPerPixel = 30;
 	bool mIsDragging = false;  // Right-click dragging (panning)
@@ -51,34 +53,12 @@ private:
 	size_t mSelectedNoteOnIndex = 0;
 	size_t mSelectedNoteOffIndex = 0;
 
-	// Preview note state (for pitch auditioning)
-	bool mIsPreviewingNote = false;
-	uint8_t mPreviewPitch = 0;
-	uint64_t mPreviewStartTick = 0;
-	std::vector<uint8_t> mPreviewChannels;  // Channels currently playing preview
-
 	// Note selection/hover state
-	struct NoteInfo {
-		int trackIndex = -1;
-		size_t noteOnIndex = 0;
-		size_t noteOffIndex = 0;
-		uint64_t startTick = 0;
-		uint64_t endTick = 0;
-		uint8_t pitch = 0;
-		bool valid = false;
-
-		// Equality operator for finding notes in selection
-		bool operator==(const NoteInfo& other) const {
-			return trackIndex == other.trackIndex &&
-			       noteOnIndex == other.noteOnIndex &&
-			       noteOffIndex == other.noteOffIndex;
-		}
-	};
-	NoteInfo mHoveredNote;
-	NoteInfo mSelectedNote;
+	NoteLocation mHoveredNote;
+	NoteLocation mSelectedNote;
 
 	// Multi-selection state
-	std::vector<NoteInfo> mSelectedNotes;  // Multiple selected notes
+	std::vector<NoteLocation> mSelectedNotes;  // Multiple selected notes
 	bool mIsSelecting = false;             // Currently dragging selection rectangle
 	wxPoint mSelectionStart;               // Where selection drag started
 	wxPoint mSelectionEnd;                 // Current mouse position during drag
@@ -86,8 +66,11 @@ private:
 	// For move/resize operations
 	uint64_t mOriginalStartTick = 0;
 	uint64_t mOriginalEndTick = 0;
-	uint8_t mOriginalPitch = 0;
+	ubyte mOriginalPitch = 0;
 	wxPoint mDragStartPos;
+
+	// Note creation preview (UI state for visual feedback during drag)
+	uint64_t mPreviewStartTick = 0;
 
 	// Drawing
 	void Draw(wxPaintEvent&);
@@ -96,30 +79,30 @@ private:
 
 	// Coordinate conversion helpers
 	uint64_t ScreenXToTick(int screenX);
-	uint8_t ScreenYToPitch(int screenY);
+	ubyte ScreenYToPitch(int screenY);
 	int TickToScreenX(uint64_t tick);
-	int PitchToScreenY(uint8_t pitch);
+	int PitchToScreenY(ubyte pitch);
 
 	// Audio preview
-	void PlayPreviewNote(uint8_t pitch);
+	void PlayPreviewNote(ubyte pitch);
 	void StopPreviewNote();
 
 	// UI helpers
 	uint64_t GetSelectedDuration() const;
 	uint64_t ApplyGridSnap(uint64_t tick) const;
 
-public:
-	// Public accessor for MainFrame to get grid size for quantize
-	uint64_t GetGridSize() const { return GetSelectedDuration(); }
-
 	// Note finding
-	NoteInfo FindNoteAtPosition(int screenX, int screenY);
-	bool IsOnResizeEdge(int screenX, const NoteInfo& note);
+	NoteLocation FindNoteAtPosition(int screenX, int screenY);
+	bool IsOnResizeEdge(int screenX, const NoteLocation& note);
 
 	// Multi-selection
-	std::vector<NoteInfo> FindNotesInRectangle(wxPoint start, wxPoint end);
+	std::vector<NoteLocation> FindNotesInRectangle(wxPoint start, wxPoint end);
 	void ClearSelection();
-	bool IsNoteSelected(const NoteInfo& note) const;
+	bool IsNoteSelected(const NoteLocation& note) const;
+
+	// Helper methods to eliminate duplication
+	void CopySelectedNotesToClipboard();
+	void DeleteSelectedNotes();
 
 	// Loop edge detection
 	bool IsNearLoopStart(int screenX);

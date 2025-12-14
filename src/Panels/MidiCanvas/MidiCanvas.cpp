@@ -27,7 +27,7 @@ MidiCanvasPanel::MidiCanvasPanel(wxWindow* parent, std::shared_ptr<AppModel> app
 	mDurationChoice = new wxChoice(this, wxID_ANY);
 	mDurationChoice->Append("Whole Note (3840)", (void*)(intptr_t)3840);
 	mDurationChoice->Append("Half Note (1920)", (void*)(intptr_t)1920);
-	mDurationChoice->Append("Quarter Note (960)", (void*)(intptr_t)960);
+	mDurationChoice->Append("Quarter Note (960)", (void*)(intptr_t)MidiConstants::TICKS_PER_QUARTER);
 	mDurationChoice->Append("Quarter Triplet (640)", (void*)(intptr_t)640);
 	mDurationChoice->Append("Eighth Note (480)", (void*)(intptr_t)480);
 	mDurationChoice->Append("Eighth Triplet (320)", (void*)(intptr_t)320);
@@ -44,7 +44,7 @@ MidiCanvasPanel::MidiCanvasPanel(wxWindow* parent, std::shared_ptr<AppModel> app
 	controlsSizer->Add(new wxStaticText(this, wxID_ANY, "Ticks:"), 0, wxALL | wxALIGN_CENTER_VERTICAL, 5);
 	mCustomTicksCtrl = new wxSpinCtrl(this, wxID_ANY, "960", wxDefaultPosition, wxSize(80, -1));
 	mCustomTicksCtrl->SetRange(1, 10000);
-	mCustomTicksCtrl->SetValue(960);
+	mCustomTicksCtrl->SetValue(MidiConstants::TICKS_PER_QUARTER);
 	mCustomTicksCtrl->Show(false);  // Hidden by default
 	controlsSizer->Add(mCustomTicksCtrl, 0, wxALL | wxALIGN_CENTER_VERTICAL, 5);
 
@@ -97,8 +97,7 @@ void MidiCanvasPanel::Update()
 		ClampOffset();
 	}
 	// Auto-scroll during playback/recording to keep playhead visible
-	else if (mTransport.mState == Transport::State::Playing ||
-	         mTransport.mState == Transport::State::Recording)
+	else if (mTransport.IsPlaying() || mTransport.IsRecording())
 	{
 		wxSize clientSize = GetClientSize();
 		int canvasWidth = clientSize.GetWidth();
@@ -142,10 +141,10 @@ void MidiCanvasPanel::Draw(wxPaintEvent&)
 	DrawGrid(gc);
 
 	// Draw loop region rectangle
-	if (mTransport.mLoopEnabled || mTransport.mLoopStartTick != 0 || mTransport.mLoopEndTick != 15360)
+	if (mTransport.mLoopEnabled || mTransport.GetLoopStart() != 0 || mTransport.GetLoopEnd() != MidiConstants::DEFAULT_LOOP_END)
 	{
-		int loopStartX = TickToScreenX(mTransport.mLoopStartTick);
-		int loopEndX = TickToScreenX(mTransport.mLoopEndTick);
+		int loopStartX = TickToScreenX(mTransport.GetLoopStart());
+		int loopEndX = TickToScreenX(mTransport.GetLoopEnd());
 		int canvasHeight = clientSize.GetHeight() - controlBarHeight;
 
 		// Use semi-transparent blue when enabled, dimmed gray when disabled
@@ -235,7 +234,7 @@ void MidiCanvasPanel::Draw(wxPaintEvent&)
 	}
 
 	// Draw preview note (semi-transparent green for note being added)
-	if (mIsPreviewingNote && mMouseMode == MouseMode::Adding)
+	if (mAppModel->IsPreviewingNote() && mMouseMode == MouseMode::Adding)
 	{
 		wxColour previewColor(100, 255, 100, 180);  // Green, semi-transparent
 		gc->SetBrush(wxBrush(previewColor));
@@ -245,7 +244,7 @@ void MidiCanvasPanel::Draw(wxPaintEvent&)
 		uint64_t duration = GetSelectedDuration();
 
 		int x = snappedTick / mTicksPerPixel + mOriginOffset.x;
-		int y = Flip(mPreviewPitch * mNoteHeight) + mOriginOffset.y;
+		int y = Flip(mAppModel->GetPreviewPitch() * mNoteHeight) + mOriginOffset.y;
 		int w = duration / mTicksPerPixel;
 
 		gc->DrawRectangle(x, y, w, mNoteHeight);
@@ -267,7 +266,7 @@ void MidiCanvasPanel::Draw(wxPaintEvent&)
 	}
 
 	// Draw white border around hovered note (if not selected)
-	if (mHoveredNote.valid && !IsNoteSelected(mHoveredNote))
+	if (mHoveredNote.found && !IsNoteSelected(mHoveredNote))
 	{
 		gc->SetBrush(*wxTRANSPARENT_BRUSH);
 		gc->SetPen(wxPen(*wxWHITE, 2));
@@ -309,13 +308,13 @@ void MidiCanvasPanel::DrawGrid(wxGraphicsContext* gc)
 	int canvasWidth = GetSize().GetWidth();
 	int canvasHeight = GetSize().GetHeight();
 
-	// Constants for MIDI and timing
-	const int TICKS_PER_QUARTER_NOTE = 960;
-	const int BEATS_PER_MEASURE = 4;
-	const int TICKS_PER_MEASURE = TICKS_PER_QUARTER_NOTE * BEATS_PER_MEASURE;
+
+	// Dynamic grid based on time signature
+	int ticksPerBeat = mTransport.GetTicksPerBeat();
+	int ticksPerMeasure = mTransport.GetTicksPerMeasure();
 	const int NOTES_PER_OCTAVE = 12;
 	const int MIN_MIDI_NOTE = 0;
-	const int MAX_MIDI_NOTE = 127;
+	const int MAX_MIDI_NOTE = MidiConstants::MAX_MIDI_NOTE;
 
 	// Grid colors
 	wxColour beatLineColor(220, 220, 220);      // Light gray for beats
@@ -328,16 +327,16 @@ void MidiCanvasPanel::DrawGrid(wxGraphicsContext* gc)
 	int endTick = startTick + (canvasWidth * mTicksPerPixel);
 
 	// Round to nearest beat
-	startTick = (startTick / TICKS_PER_QUARTER_NOTE) * TICKS_PER_QUARTER_NOTE;
+	startTick = (startTick / ticksPerBeat) * ticksPerBeat;
 
-	for (int tick = startTick; tick <= endTick; tick += TICKS_PER_QUARTER_NOTE)
+	for (int tick = startTick; tick <= endTick; tick += ticksPerBeat)
 	{
 		if (tick < 0) continue;
 
 		int x = tick / mTicksPerPixel + mOriginOffset.x;
 		if (x < 0 || x > canvasWidth) continue;
 
-		bool isMeasure = (tick % TICKS_PER_MEASURE) == 0;
+		bool isMeasure = (tick % ticksPerMeasure) == 0;
 		if (isMeasure)
 		{
 			gc->SetPen(wxPen(measureLineColor, 2));
@@ -379,12 +378,12 @@ uint64_t MidiCanvasPanel::ScreenXToTick(int screenX)
 	return x * mTicksPerPixel;
 }
 
-uint8_t MidiCanvasPanel::ScreenYToPitch(int screenY)
+ubyte MidiCanvasPanel::ScreenYToPitch(int screenY)
 {
 	int y = screenY - mOriginOffset.y;
 	int flippedY = GetSize().GetHeight() - y;
 	int pitch = flippedY / mNoteHeight + 1;
-	return std::clamp(pitch, 0, 127);
+	return std::clamp(pitch, 0, MidiConstants::MAX_MIDI_NOTE);
 }
 
 int MidiCanvasPanel::TickToScreenX(uint64_t tick)
@@ -392,58 +391,26 @@ int MidiCanvasPanel::TickToScreenX(uint64_t tick)
 	return tick / mTicksPerPixel + mOriginOffset.x;
 }
 
-int MidiCanvasPanel::PitchToScreenY(uint8_t pitch)
+int MidiCanvasPanel::PitchToScreenY(ubyte pitch)
 {
 	// Center the note on the pitch line (offset by half note height upward)
 	return Flip(pitch * mNoteHeight) + mOriginOffset.y - (mNoteHeight / 2);
 }
 
-void MidiCanvasPanel::PlayPreviewNote(uint8_t pitch)
+void MidiCanvasPanel::PlayPreviewNote(ubyte pitch)
 {
-	const uint8_t PREVIEW_VELOCITY = 100;
-	auto& soundBank = mAppModel->GetSoundBank();
-	auto midiOut = soundBank.GetMidiOutDevice();
-	auto channels = soundBank.GetAllChannels();
-
-	// Clear previous preview channels list
-	mPreviewChannels.clear();
-
-	// Send note on to all record-enabled channels
-	for (const MidiChannel& channel : channels)
-	{
-		if (channel.record)
-		{
-			MidiMessage noteOn = MidiMessage::NoteOn(pitch, PREVIEW_VELOCITY, channel.channelNumber);
-			midiOut->sendMessage(noteOn);
-			mPreviewChannels.push_back(channel.channelNumber);
-		}
-	}
-
-	mIsPreviewingNote = true;
-	mPreviewPitch = pitch;
+	mAppModel->PlayPreviewNote(pitch);
 }
 
 void MidiCanvasPanel::StopPreviewNote()
 {
-	if (!mIsPreviewingNote) return;
-
-	auto midiOut = mAppModel->GetSoundBank().GetMidiOutDevice();
-
-	// Send note off to all channels that are playing the preview
-	for (uint8_t channelNum : mPreviewChannels)
-	{
-		MidiMessage noteOff = MidiMessage::NoteOff(mPreviewPitch, channelNum);
-		midiOut->sendMessage(noteOff);
-	}
-
-	mIsPreviewingNote = false;
-	mPreviewChannels.clear();
+	mAppModel->StopPreviewNote();
 }
 
 uint64_t MidiCanvasPanel::GetSelectedDuration() const
 {
 	int selection = mDurationChoice->GetSelection();
-	if (selection == wxNOT_FOUND) return 960;  // Default to quarter note
+	if (selection == wxNOT_FOUND) return MidiConstants::TICKS_PER_QUARTER;  // Default to quarter note
 
 	intptr_t duration = (intptr_t)mDurationChoice->GetClientData(selection);
 
@@ -464,66 +431,16 @@ uint64_t MidiCanvasPanel::ApplyGridSnap(uint64_t tick) const
 	return (tick / duration) * duration;  // Round down to nearest multiple
 }
 
-MidiCanvasPanel::NoteInfo MidiCanvasPanel::FindNoteAtPosition(int screenX, int screenY)
+NoteLocation MidiCanvasPanel::FindNoteAtPosition(int screenX, int screenY)
 {
-	NoteInfo result;
-	result.valid = false;
-
 	uint64_t clickTick = ScreenXToTick(screenX);
-	uint8_t clickPitch = ScreenYToPitch(screenY);
+	ubyte clickPitch = ScreenYToPitch(screenY);
 
-	// Search through all tracks
-	for (int trackIndex = 0; trackIndex < 15; trackIndex++)
-	{
-		Track& track = mTrackSet.GetTrack(trackIndex);
-		if (track.empty()) continue;
-
-		size_t end = track.size();
-		for (size_t i = 0; i < end; i++)
-		{
-			const TimedMidiEvent& noteOn = track[i];
-			if (noteOn.mm.getEventType() != MidiEvent::NOTE_ON) continue;
-
-			// Find corresponding note off
-			for (size_t j = i + 1; j < end; j++)
-			{
-				const TimedMidiEvent& noteOff = track[j];
-				if (noteOff.mm.getEventType() != MidiEvent::NOTE_OFF ||
-					noteOff.mm.mData[1] != noteOn.mm.mData[1]) continue;
-
-				// Check if click is within this note's bounds
-				uint8_t notePitch = noteOn.mm.mData[1];
-				uint64_t noteStartTick = noteOn.tick;
-				uint64_t noteEndTick = noteOff.tick;
-
-				// Check pitch match (with some tolerance for note height)
-				if (clickPitch == notePitch)
-				{
-					// Check tick range
-					if (clickTick >= noteStartTick && clickTick <= noteEndTick)
-					{
-						result.valid = true;
-						result.trackIndex = trackIndex;
-						result.noteOnIndex = i;
-						result.noteOffIndex = j;
-						result.startTick = noteStartTick;
-						result.endTick = noteEndTick;
-						result.pitch = notePitch;
-						return result;  // Return first match
-					}
-				}
-				break;  // Found the note off for this note on
-			}
-		}
-	}
-
-	return result;
+	return mTrackSet.FindNoteAt(clickTick, clickPitch);
 }
 
-std::vector<MidiCanvasPanel::NoteInfo> MidiCanvasPanel::FindNotesInRectangle(wxPoint start, wxPoint end)
+std::vector<NoteLocation> MidiCanvasPanel::FindNotesInRectangle(wxPoint start, wxPoint end)
 {
-	std::vector<NoteInfo> result;
-
 	// Normalize rectangle (ensure min/max regardless of drag direction)
 	int minX = std::min(start.x, end.x);
 	int maxX = std::max(start.x, end.x);
@@ -533,57 +450,11 @@ std::vector<MidiCanvasPanel::NoteInfo> MidiCanvasPanel::FindNotesInRectangle(wxP
 	// Convert screen coordinates to tick/pitch ranges
 	uint64_t minTick = ScreenXToTick(minX);
 	uint64_t maxTick = ScreenXToTick(maxX);
-	uint8_t minPitch = ScreenYToPitch(maxY);  // Y is flipped
-	uint8_t maxPitch = ScreenYToPitch(minY);  // Y is flipped
+	ubyte minPitch = ScreenYToPitch(maxY);  // Y is flipped
+	ubyte maxPitch = ScreenYToPitch(minY);  // Y is flipped
 
-	// Search through all tracks (notes are already sorted by tick)
-	for (int trackIndex = 0; trackIndex < 15; trackIndex++)
-	{
-		Track& track = mTrackSet.GetTrack(trackIndex);
-		if (track.empty()) continue;
-
-		size_t end = track.size();
-		for (size_t i = 0; i < end; i++)
-		{
-			const TimedMidiEvent& noteOn = track[i];
-			if (noteOn.mm.getEventType() != MidiEvent::NOTE_ON) continue;
-
-			// Find corresponding note off
-			for (size_t j = i + 1; j < end; j++)
-			{
-				const TimedMidiEvent& noteOff = track[j];
-				if (noteOff.mm.getEventType() != MidiEvent::NOTE_OFF ||
-					noteOff.mm.mData[1] != noteOn.mm.mData[1]) continue;
-
-				// Check if note is within the rectangle bounds
-				uint8_t notePitch = noteOn.mm.mData[1];
-				uint64_t noteStartTick = noteOn.tick;
-				uint64_t noteEndTick = noteOff.tick;
-
-				// Note overlaps rectangle if:
-				// - Pitch is within range
-				// - Note time range overlaps with selection time range
-				bool pitchInRange = (notePitch >= minPitch && notePitch <= maxPitch);
-				bool timeOverlaps = (noteStartTick <= maxTick && noteEndTick >= minTick);
-
-				if (pitchInRange && timeOverlaps)
-				{
-					NoteInfo note;
-					note.valid = true;
-					note.trackIndex = trackIndex;
-					note.noteOnIndex = i;
-					note.noteOffIndex = j;
-					note.startTick = noteStartTick;
-					note.endTick = noteEndTick;
-					note.pitch = notePitch;
-					result.push_back(note);
-				}
-				break;  // Found the note off for this note on
-			}
-		}
-	}
-
-	return result;
+	// Search through all tracks 
+	return mTrackSet.FindNotesInRegion(minTick, maxTick, minPitch, maxPitch);
 }
 
 void MidiCanvasPanel::ClearSelection()
@@ -591,7 +462,7 @@ void MidiCanvasPanel::ClearSelection()
 	mSelectedNotes.clear();
 }
 
-bool MidiCanvasPanel::IsNoteSelected(const NoteInfo& note) const
+bool MidiCanvasPanel::IsNoteSelected(const NoteLocation& note) const
 {
 	for (const auto& selected : mSelectedNotes)
 	{
@@ -601,9 +472,9 @@ bool MidiCanvasPanel::IsNoteSelected(const NoteInfo& note) const
 	return false;
 }
 
-bool MidiCanvasPanel::IsOnResizeEdge(int screenX, const NoteInfo& note)
+bool MidiCanvasPanel::IsOnResizeEdge(int screenX, const NoteLocation& note)
 {
-	if (!note.valid) return false;
+	if (!note.found) return false;
 
 	int noteEndX = TickToScreenX(note.endTick);
 	// Resize zone: 5 pixels left of edge, 2 pixels right of edge
@@ -612,14 +483,14 @@ bool MidiCanvasPanel::IsOnResizeEdge(int screenX, const NoteInfo& note)
 
 bool MidiCanvasPanel::IsNearLoopStart(int screenX)
 {
-	int loopStartX = TickToScreenX(mTransport.mLoopStartTick);
+	int loopStartX = TickToScreenX(mTransport.GetLoopStart());
 	// Detection zone: 5 pixels on each side of edge
 	return (screenX >= loopStartX - 5 && screenX <= loopStartX + 5);
 }
 
 bool MidiCanvasPanel::IsNearLoopEnd(int screenX)
 {
-	int loopEndX = TickToScreenX(mTransport.mLoopEndTick);
+	int loopEndX = TickToScreenX(mTransport.GetLoopEnd());
 	// Detection zone: 5 pixels on each side of edge
 	return (screenX >= loopEndX - 5 && screenX <= loopEndX + 5);
 }
@@ -631,10 +502,10 @@ void MidiCanvasPanel::ClampOffset()
 
 	// Constants
 	const int MAX_MEASURES = 100;  // Allow scrolling to 100 measures
-	const int TICKS_PER_MEASURE = 960 * 4;  // 960 ticks/quarter * 4 beats
+	const int TICKS_PER_MEASURE = MidiConstants::TICKS_PER_QUARTER * 4;  // Assumes 4/4 time
 	const int MAX_TICK = MAX_MEASURES * TICKS_PER_MEASURE;
-	const int MIDI_NOTE_COUNT = 128;
-	const int MAX_MIDI_NOTE = 127;
+	const int MIDI_NOTE_COUNT = MidiConstants::MIDI_NOTE_COUNT;
+	const int MAX_MIDI_NOTE = MidiConstants::MAX_MIDI_NOTE;
 
 	// Horizontal limits (time axis)
 	// When offset.x = 0, tick 0 is at left edge
@@ -727,9 +598,9 @@ void MidiCanvasPanel::OnLeftDown(wxMouseEvent& event)
 	}
 
 	// Check if we clicked on an existing note
-	NoteInfo clickedNote = FindNoteAtPosition(pos.x, pos.y);
+	NoteLocation clickedNote = FindNoteAtPosition(pos.x, pos.y);
 
-	if (clickedNote.valid)
+	if (clickedNote.found)
 	{
 		// Clicked on an existing note
 		mSelectedNote = clickedNote;
@@ -756,7 +627,7 @@ void MidiCanvasPanel::OnLeftDown(wxMouseEvent& event)
 	{
 		// Clicked on empty space
 		uint64_t tick = ScreenXToTick(pos.x);
-		uint8_t pitch = ScreenYToPitch(pos.y);
+		ubyte pitch = ScreenYToPitch(pos.y);
 
 		// Ignore notes above pitch 120 (extreme high range, rarely used)
 		if (pitch > 120)
@@ -800,7 +671,7 @@ void MidiCanvasPanel::OnLeftUp(wxMouseEvent& event)
 		return;
 	}
 
-	if (mMouseMode == MouseMode::Adding && mIsPreviewingNote)
+	if (mMouseMode == MouseMode::Adding && mAppModel->IsPreviewingNote())
 	{
 		// Stop the preview playback
 		StopPreviewNote();
@@ -808,40 +679,19 @@ void MidiCanvasPanel::OnLeftUp(wxMouseEvent& event)
 		// Apply grid snap to starting tick
 		uint64_t snappedTick = ApplyGridSnap(mPreviewStartTick);
 		uint64_t duration = GetSelectedDuration();
-		const uint8_t NOTE_VELOCITY = 100;
+		const ubyte NOTE_VELOCITY = MidiConstants::DEFAULT_VELOCITY;
 
 		// Add note to all record-enabled channels
-		auto& soundBank = mAppModel->GetSoundBank();
-		auto channels = soundBank.GetAllChannels();
-
-		for (const MidiChannel& channel : channels)
-		{
-			if (channel.record)
-			{
-				// Create note-on and note-off events
-				MidiMessage noteOn = MidiMessage::NoteOn(mPreviewPitch, NOTE_VELOCITY, channel.channelNumber);
-				MidiMessage noteOff = MidiMessage::NoteOff(mPreviewPitch, channel.channelNumber);
-
-				TimedMidiEvent timedNoteOn{noteOn, snappedTick};
-				TimedMidiEvent timedNoteOff{noteOff, snappedTick + duration - 1};  // -1 to prevent overlap with next note
-
-				// Get the track for this channel
-				Track& track = mTrackSet.GetTrack(channel.channelNumber);
-
-				// Create and execute command
-				auto cmd = std::make_unique<AddNoteCommand>(track, timedNoteOn, timedNoteOff);
-				mAppModel->ExecuteCommand(std::move(cmd));
-			}
-		}
+		mAppModel->AddNoteToRecordChannels(mAppModel->GetPreviewPitch(), snappedTick, duration);
 	}
-	else if (mMouseMode == MouseMode::MovingNote && mSelectedNote.valid)
+	else if (mMouseMode == MouseMode::MovingNote && mSelectedNote.found)
 	{
 		// Finalize move with command (for undo support)
 		Track& track = mTrackSet.GetTrack(mSelectedNote.trackIndex);
 
 		// Get current position (after dragging)
 		uint64_t currentTick = track[mSelectedNote.noteOnIndex].tick;
-		uint8_t currentPitch = track[mSelectedNote.noteOnIndex].mm.mData[1];
+		ubyte currentPitch = track[mSelectedNote.noteOnIndex].mm.mData[1];
 
 		// Restore original position first
 		uint64_t duration = mOriginalEndTick - mOriginalStartTick;
@@ -860,9 +710,9 @@ void MidiCanvasPanel::OnLeftUp(wxMouseEvent& event)
 			mAppModel->ExecuteCommand(std::move(cmd));
 		}
 
-		mSelectedNote.valid = false;
+		mSelectedNote.found = false;
 	}
-	else if (mMouseMode == MouseMode::ResizingNote && mSelectedNote.valid)
+	else if (mMouseMode == MouseMode::ResizingNote && mSelectedNote.found)
 	{
 		// Finalize resize with command (for undo support)
 		Track& track = mTrackSet.GetTrack(mSelectedNote.trackIndex);
@@ -886,7 +736,7 @@ void MidiCanvasPanel::OnLeftUp(wxMouseEvent& event)
 			mAppModel->ExecuteCommand(std::move(cmd));
 		}
 
-		mSelectedNote.valid = false;
+		mSelectedNote.found = false;
 	}
 
 	// Reset mode and refresh
@@ -899,9 +749,9 @@ void MidiCanvasPanel::OnMiddleDown(wxMouseEvent& event)
 	wxPoint pos = event.GetPosition();
 
 	// Check if we clicked on a note
-	NoteInfo clickedNote = FindNoteAtPosition(pos.x, pos.y);
+	NoteLocation clickedNote = FindNoteAtPosition(pos.x, pos.y);
 
-	if (clickedNote.valid)
+	if (clickedNote.found)
 	{
 		// Delete the note
 		Track& track = mTrackSet.GetTrack(clickedNote.trackIndex);
@@ -910,11 +760,11 @@ void MidiCanvasPanel::OnMiddleDown(wxMouseEvent& event)
 		mAppModel->ExecuteCommand(std::move(cmd));
 
 		// Clear hover state if we deleted the hovered note
-		if (mHoveredNote.valid &&
+		if (mHoveredNote.found &&
 		    mHoveredNote.trackIndex == clickedNote.trackIndex &&
 		    mHoveredNote.noteOnIndex == clickedNote.noteOnIndex)
 		{
-			mHoveredNote.valid = false;
+			mHoveredNote.found = false;
 		}
 
 		Refresh();
@@ -973,11 +823,7 @@ void MidiCanvasPanel::OnMouseMove(wxMouseEvent& event)
 	{
 		uint64_t newTick = ScreenXToTick(pos.x);
 		newTick = ApplyGridSnap(newTick);
-		// Ensure loop start is before loop end
-		if (newTick < mTransport.mLoopEndTick)
-		{
-			mTransport.mLoopStartTick = newTick;
-		}
+		mTransport.SetLoopStart(newTick);
 		Refresh();
 		return;
 	}
@@ -986,22 +832,18 @@ void MidiCanvasPanel::OnMouseMove(wxMouseEvent& event)
 	{
 		uint64_t newTick = ScreenXToTick(pos.x);
 		newTick = ApplyGridSnap(newTick);
-		// Ensure loop end is after loop start
-		if (newTick > mTransport.mLoopStartTick)
-		{
-			mTransport.mLoopEndTick = newTick;
-		}
+		mTransport.SetLoopEnd(newTick);
 		Refresh();
 		return;
 	}
 
 	// Handle note preview while adding (left button held)
-	if (mMouseMode == MouseMode::Adding && mIsPreviewingNote)
+	if (mMouseMode == MouseMode::Adding && mAppModel->IsPreviewingNote())
 	{
-		uint8_t newPitch = ScreenYToPitch(pos.y);
+		ubyte newPitch = ScreenYToPitch(pos.y);
 		uint64_t newTick = ScreenXToTick(pos.x);
 
-		bool pitchChanged = (newPitch != mPreviewPitch);
+		bool pitchChanged = (newPitch != mAppModel->GetPreviewPitch());
 		bool timingChanged = (newTick != mPreviewStartTick);
 
 		// If pitch changed, switch the preview note audio
@@ -1021,7 +863,7 @@ void MidiCanvasPanel::OnMouseMove(wxMouseEvent& event)
 	}
 
 	// Handle moving note
-	if (mMouseMode == MouseMode::MovingNote && mSelectedNote.valid)
+	if (mMouseMode == MouseMode::MovingNote && mSelectedNote.found)
 	{
 		// Calculate new position based on mouse delta
 		int deltaX = pos.x - mDragStartPos.x;
@@ -1029,7 +871,7 @@ void MidiCanvasPanel::OnMouseMove(wxMouseEvent& event)
 
 		uint64_t newTick = mOriginalStartTick + (deltaX * mTicksPerPixel);
 		int pitchDelta = -deltaY / mNoteHeight;  // Negative because Y is flipped
-		int newPitch = std::clamp(static_cast<int>(mOriginalPitch) + pitchDelta, 0, 127);
+		int newPitch = std::clamp(static_cast<int>(mOriginalPitch) + pitchDelta, 0, MidiConstants::MAX_MIDI_NOTE);
 
 		// Update the note in the track (temporary, will be finalized on mouse up)
 		Track& track = mTrackSet.GetTrack(mSelectedNote.trackIndex);
@@ -1045,7 +887,7 @@ void MidiCanvasPanel::OnMouseMove(wxMouseEvent& event)
 	}
 
 	// Handle resizing note
-	if (mMouseMode == MouseMode::ResizingNote && mSelectedNote.valid)
+	if (mMouseMode == MouseMode::ResizingNote && mSelectedNote.found)
 	{
 		// Calculate new end position based on mouse X
 		uint64_t newEndTick = ScreenXToTick(pos.x);
@@ -1063,9 +905,9 @@ void MidiCanvasPanel::OnMouseMove(wxMouseEvent& event)
 	// Update hover state when idle
 	if (mMouseMode == MouseMode::Idle)
 	{
-		NoteInfo newHover = FindNoteAtPosition(pos.x, pos.y);
-		if (newHover.valid != mHoveredNote.valid ||
-		    (newHover.valid && (newHover.trackIndex != mHoveredNote.trackIndex ||
+		NoteLocation newHover = FindNoteAtPosition(pos.x, pos.y);
+		if (newHover.found != mHoveredNote.found ||
+		    (newHover.found && (newHover.trackIndex != mHoveredNote.trackIndex ||
 		                        newHover.noteOnIndex != mHoveredNote.noteOnIndex)))
 		{
 			mHoveredNote = newHover;
@@ -1075,7 +917,7 @@ void MidiCanvasPanel::OnMouseMove(wxMouseEvent& event)
 
 	// Update debug message with mouse position
 	uint64_t tick = ScreenXToTick(pos.x);
-	uint8_t pitch = ScreenYToPitch(pos.y);
+	ubyte pitch = ScreenYToPitch(pos.y);
 	wxString msg = wxString::Format("Mouse: (%d, %d) | Tick: %llu, Pitch: %d",
 	                                 pos.x, pos.y, tick, pitch);
 	mDebugMessage->SetLabelText(msg);
@@ -1083,8 +925,8 @@ void MidiCanvasPanel::OnMouseMove(wxMouseEvent& event)
 
 void MidiCanvasPanel::OnSize(wxSizeEvent& event)
 {
-	const int MIDI_NOTE_COUNT = 128;  // MIDI notes 0-127
-	const int MAX_MIDI_NOTE = 127;
+	const int MIDI_NOTE_COUNT = MidiConstants::MIDI_NOTE_COUNT;
+	const int MAX_MIDI_NOTE = MidiConstants::MAX_MIDI_NOTE;
 	int canvasHeight = GetSize().GetHeight();
 
 	// Calculate minimum note height (fully zoomed out = all notes visible)
@@ -1104,11 +946,77 @@ void MidiCanvasPanel::OnMouseLeave(wxMouseEvent& event)
 {
 	// If we're previewing a note and the mouse leaves the window, stop the preview
 	// This prevents stuck notes if the mouse leaves while left button is held
-	if (mIsPreviewingNote && mMouseMode == MouseMode::Adding)
+	if (mAppModel->IsPreviewingNote() && mMouseMode == MouseMode::Adding)
 	{
 		StopPreviewNote();
 		mMouseMode = MouseMode::Idle;
 	}
+}
+
+void MidiCanvasPanel::CopySelectedNotesToClipboard()
+{
+	if (mSelectedNotes.empty()) return;
+
+	// Find the earliest start tick to use as reference (for relative timing)
+	uint64_t earliestTick = UINT64_MAX;
+	for (const auto& note : mSelectedNotes)
+	{
+		if (note.startTick < earliestTick)
+		{
+			earliestTick = note.startTick;
+		}
+	}
+
+	// Convert selected notes to clipboard format
+	std::vector<AppModel::ClipboardNote> clipboardNotes;
+	clipboardNotes.reserve(mSelectedNotes.size());
+
+	for (const auto& note : mSelectedNotes)
+	{
+		Track& track = mTrackSet.GetTrack(note.trackIndex);
+		const TimedMidiEvent& noteOnEvent = track[note.noteOnIndex];
+
+		AppModel::ClipboardNote clipNote;
+		clipNote.relativeStartTick = note.startTick - earliestTick;
+		clipNote.duration = note.endTick - note.startTick;
+		clipNote.pitch = note.pitch;
+		clipNote.velocity = noteOnEvent.mm.mData[2];  // Velocity is third byte
+		clipNote.trackIndex = note.trackIndex;
+
+		clipboardNotes.push_back(clipNote);
+	}
+
+	// Copy to AppModel clipboard
+	mAppModel->CopyToClipboard(clipboardNotes);
+}
+
+void MidiCanvasPanel::DeleteSelectedNotes()
+{
+	if (mSelectedNotes.empty()) return;
+
+	// Build list of notes to delete with their data (for undo)
+	std::vector<DeleteMultipleNotesCommand::NoteToDelete> notesToDelete;
+	notesToDelete.reserve(mSelectedNotes.size());
+
+	for (const auto& note : mSelectedNotes)
+	{
+		Track& track = mTrackSet.GetTrack(note.trackIndex);
+
+		DeleteMultipleNotesCommand::NoteToDelete noteData;
+		noteData.trackIndex = note.trackIndex;
+		noteData.noteOnIndex = note.noteOnIndex;
+		noteData.noteOffIndex = note.noteOffIndex;
+		noteData.noteOn = track[note.noteOnIndex];
+		noteData.noteOff = track[note.noteOffIndex];
+
+		notesToDelete.push_back(noteData);
+	}
+
+	// Execute single batch delete command
+	auto cmd = std::make_unique<DeleteMultipleNotesCommand>(mTrackSet, notesToDelete);
+	mAppModel->ExecuteCommand(std::move(cmd));
+
+	ClearSelection();
 }
 
 void MidiCanvasPanel::OnKeyDown(wxKeyEvent& event)
@@ -1118,29 +1026,7 @@ void MidiCanvasPanel::OnKeyDown(wxKeyEvent& event)
 	// Delete - Delete selected notes
 	if (keyCode == WXK_DELETE && !mSelectedNotes.empty())
 	{
-		// Build list of notes to delete with their data (for undo)
-		std::vector<DeleteMultipleNotesCommand::NoteToDelete> notesToDelete;
-		notesToDelete.reserve(mSelectedNotes.size());
-
-		for (const auto& note : mSelectedNotes)
-		{
-			Track& track = mTrackSet.GetTrack(note.trackIndex);
-
-			DeleteMultipleNotesCommand::NoteToDelete noteData;
-			noteData.trackIndex = note.trackIndex;
-			noteData.noteOnIndex = note.noteOnIndex;
-			noteData.noteOffIndex = note.noteOffIndex;
-			noteData.noteOn = track[note.noteOnIndex];
-			noteData.noteOff = track[note.noteOffIndex];
-
-			notesToDelete.push_back(noteData);
-		}
-
-		// Execute single batch delete command
-		auto cmd = std::make_unique<DeleteMultipleNotesCommand>(mTrackSet, notesToDelete);
-		mAppModel->ExecuteCommand(std::move(cmd));
-
-		ClearSelection();
+		DeleteSelectedNotes();
 		Refresh();
 		return;
 	}
@@ -1157,40 +1043,7 @@ void MidiCanvasPanel::OnKeyDown(wxKeyEvent& event)
 	if (event.ControlDown() && keyCode == 'A')
 	{
 		ClearSelection();
-
-		// Find all notes in all tracks
-		for (int trackIndex = 0; trackIndex < 15; trackIndex++)
-		{
-			Track& track = mTrackSet.GetTrack(trackIndex);
-			if (track.empty()) continue;
-
-			size_t end = track.size();
-			for (size_t i = 0; i < end; i++)
-			{
-				const TimedMidiEvent& noteOn = track[i];
-				if (noteOn.mm.getEventType() != MidiEvent::NOTE_ON) continue;
-
-				// Find corresponding note off
-				for (size_t j = i + 1; j < end; j++)
-				{
-					const TimedMidiEvent& noteOff = track[j];
-					if (noteOff.mm.getEventType() != MidiEvent::NOTE_OFF ||
-						noteOff.mm.mData[1] != noteOn.mm.mData[1]) continue;
-
-					NoteInfo note;
-					note.valid = true;
-					note.trackIndex = trackIndex;
-					note.noteOnIndex = i;
-					note.noteOffIndex = j;
-					note.startTick = noteOn.tick;
-					note.endTick = noteOff.tick;
-					note.pitch = noteOn.mm.mData[1];
-					mSelectedNotes.push_back(note);
-					break;
-				}
-			}
-		}
-
+		mSelectedNotes = mTrackSet.GetAllNotes();
 		Refresh();
 		return;
 	}
@@ -1198,38 +1051,7 @@ void MidiCanvasPanel::OnKeyDown(wxKeyEvent& event)
 	// Ctrl+C - Copy selected notes to clipboard
 	if (event.ControlDown() && keyCode == 'C' && !mSelectedNotes.empty())
 	{
-		// Find the earliest start tick to use as reference (for relative timing)
-		uint64_t earliestTick = UINT64_MAX;
-		for (const auto& note : mSelectedNotes)
-		{
-			if (note.startTick < earliestTick)
-			{
-				earliestTick = note.startTick;
-			}
-		}
-
-		// Convert selected notes to clipboard format
-		std::vector<AppModel::ClipboardNote> clipboardNotes;
-		clipboardNotes.reserve(mSelectedNotes.size());
-
-		for (const auto& note : mSelectedNotes)
-		{
-			Track& track = mTrackSet.GetTrack(note.trackIndex);
-			const TimedMidiEvent& noteOnEvent = track[note.noteOnIndex];
-
-			AppModel::ClipboardNote clipNote;
-			clipNote.relativeStartTick = note.startTick - earliestTick;
-			clipNote.duration = note.endTick - note.startTick;
-			clipNote.pitch = note.pitch;
-			clipNote.velocity = noteOnEvent.mm.mData[2];  // Velocity is third byte
-			clipNote.trackIndex = note.trackIndex;
-
-			clipboardNotes.push_back(clipNote);
-		}
-
-		// Copy to AppModel clipboard
-		mAppModel->CopyToClipboard(clipboardNotes);
-
+		CopySelectedNotesToClipboard();
 		return;
 	}
 
@@ -1255,59 +1077,8 @@ void MidiCanvasPanel::OnKeyDown(wxKeyEvent& event)
 	// Ctrl+X - Cut selected notes (copy + delete)
 	if (event.ControlDown() && keyCode == 'X' && !mSelectedNotes.empty())
 	{
-		// First, copy to clipboard (same as Ctrl+C)
-		uint64_t earliestTick = UINT64_MAX;
-		for (const auto& note : mSelectedNotes)
-		{
-			if (note.startTick < earliestTick)
-			{
-				earliestTick = note.startTick;
-			}
-		}
-
-		std::vector<AppModel::ClipboardNote> clipboardNotes;
-		clipboardNotes.reserve(mSelectedNotes.size());
-
-		for (const auto& note : mSelectedNotes)
-		{
-			Track& track = mTrackSet.GetTrack(note.trackIndex);
-			const TimedMidiEvent& noteOnEvent = track[note.noteOnIndex];
-
-			AppModel::ClipboardNote clipNote;
-			clipNote.relativeStartTick = note.startTick - earliestTick;
-			clipNote.duration = note.endTick - note.startTick;
-			clipNote.pitch = note.pitch;
-			clipNote.velocity = noteOnEvent.mm.mData[2];
-			clipNote.trackIndex = note.trackIndex;
-
-			clipboardNotes.push_back(clipNote);
-		}
-
-		mAppModel->CopyToClipboard(clipboardNotes);
-
-		// Then delete (same as Delete key) - use batch delete to avoid index issues
-		std::vector<DeleteMultipleNotesCommand::NoteToDelete> notesToDelete;
-		notesToDelete.reserve(mSelectedNotes.size());
-
-		for (const auto& note : mSelectedNotes)
-		{
-			Track& track = mTrackSet.GetTrack(note.trackIndex);
-
-			DeleteMultipleNotesCommand::NoteToDelete noteData;
-			noteData.trackIndex = note.trackIndex;
-			noteData.noteOnIndex = note.noteOnIndex;
-			noteData.noteOffIndex = note.noteOffIndex;
-			noteData.noteOn = track[note.noteOnIndex];
-			noteData.noteOff = track[note.noteOffIndex];
-
-			notesToDelete.push_back(noteData);
-		}
-
-		// Execute single batch delete command
-		auto cmd = std::make_unique<DeleteMultipleNotesCommand>(mTrackSet, notesToDelete);
-		mAppModel->ExecuteCommand(std::move(cmd));
-
-		ClearSelection();
+		CopySelectedNotesToClipboard();
+		DeleteSelectedNotes();
 		Refresh();
 		return;
 	}

@@ -251,15 +251,7 @@ void MainFrame::OnUndo(wxCommandEvent& event)
 {
 	// Stop playback/recording to prevent iterator invalidation
 	// (can't modify tracks while they're being iterated during playback)
-	auto& transport = mAppModel->GetTransport();
-	if (transport.mState == Transport::State::Playing)
-	{
-		transport.mState = Transport::State::StopPlaying;
-	}
-	else if (transport.mState == Transport::State::Recording)
-	{
-		transport.mState = Transport::State::StopRecording;
-	}
+	mAppModel->StopPlaybackIfActive();
 
 	mAppModel->Undo();
 	mUndoHistoryPanel->UpdateDisplay();  // Update command history display
@@ -271,16 +263,8 @@ void MainFrame::OnRedo(wxCommandEvent& event)
 {
 	// Stop playback/recording to prevent iterator invalidation
 	// (can't modify tracks while they're being iterated during playback)
-	auto& transport = mAppModel->GetTransport();
-	if (transport.mState == Transport::State::Playing)
-	{
-		transport.mState = Transport::State::StopPlaying;
-	}
-	else if (transport.mState == Transport::State::Recording)
-	{
-		transport.mState = Transport::State::StopRecording;
-	}
-
+	mAppModel->StopPlaybackIfActive();
+	
 	mAppModel->Redo();
 	mUndoHistoryPanel->UpdateDisplay();  // Update command history display
 	Refresh();  // Redraw canvas to show changes
@@ -289,35 +273,10 @@ void MainFrame::OnRedo(wxCommandEvent& event)
 // Quantize all tracks to grid (Q)
 void MainFrame::OnQuantize(wxCommandEvent& event)
 {
-	// Stop playback/recording to prevent iterator invalidation
-	auto& transport = mAppModel->GetTransport();
-	if (transport.mState == Transport::State::Playing)
-	{
-		transport.mState = Transport::State::StopPlaying;
-	}
-	else if (transport.mState == Transport::State::Recording)
-	{
-		transport.mState = Transport::State::StopRecording;
-	}
-
-	// Get grid size from MidiCanvas duration selector
-	// This way, users can choose quantize resolution by changing the dropdown
 	uint64_t gridSize = mMidiCanvasPanel->GetGridSize();
-
-	// Quantize all non-empty tracks
-	auto& trackSet = mAppModel->GetTrackSet();
-	for (int i = 0; i < 15; i++)
-	{
-		Track& track = trackSet.GetTrack(i);
-		if (!track.empty())
-		{
-			auto cmd = std::make_unique<QuantizeCommand>(track, gridSize);
-			mAppModel->ExecuteCommand(std::move(cmd));
-		}
-	}
-
-	mUndoHistoryPanel->UpdateDisplay();  // Update command history display
-	Refresh();  // Redraw canvas to show changes
+	mAppModel->QuantizeAllTracks(gridSize);
+	mUndoHistoryPanel->UpdateDisplay();
+	Refresh();
 }
 
 // File Menu Handlers
@@ -479,43 +438,10 @@ void MainFrame::UpdateTitle()
 // Transport keyboard shortcuts
 void MainFrame::OnTogglePlay(wxCommandEvent& event)
 {
-	auto& transport = mAppModel->GetTransport();
-
-	switch (transport.mState)
-	{
-	case Transport::State::Stopped:
-		// Start playing
-		transport.mState = Transport::State::ClickedPlay;
-		break;
-
-	case Transport::State::Playing:
-		// Stop playing
-		transport.mState = Transport::State::StopPlaying;
-		break;
-
-	case Transport::State::Recording:
-		// Stop recording
-		transport.mState = Transport::State::StopRecording;
-		break;
-
-	default:
-		// For other states (ClickedPlay, ClickedRecord, etc.), do nothing
-		break;
-	}
+	mAppModel->GetTransport().TogglePlay();
 }
 
 void MainFrame::OnStartRecord(wxCommandEvent& event)
 {
-	auto& transport = mAppModel->GetTransport();
-
-	// Start recording if not already in a recording-related state
-	if (transport.mState == Transport::State::Stopped)
-	{
-		transport.mState = Transport::State::ClickedRecord;
-	}
-	else if (transport.mState == Transport::State::Recording)
-	{
-		// Toggle: stop recording if already recording
-		transport.mState = Transport::State::StopRecording;
-	}
+	mAppModel->GetTransport().ToggleRecord();
 }

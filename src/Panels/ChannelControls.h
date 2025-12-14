@@ -1,7 +1,7 @@
 #pragma once
 #include <wx/panel.h>
 #include <wx/statline.h>
-#include "AppModel/SoundBank.h"
+#include "AppModel/SoundBank/SoundBank.h"
 
 class ChannelControlsPanel : public wxPanel
 {

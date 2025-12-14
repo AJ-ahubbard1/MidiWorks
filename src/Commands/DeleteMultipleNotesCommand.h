@@ -1,6 +1,6 @@
 #pragma once
 #include "Command.h"
-#include "AppModel/TrackSet.h"
+#include "AppModel/TrackSet/TrackSet.h"
 #include <algorithm>
 #include <vector>
 #include <map>
@@ -14,9 +14,9 @@ class DeleteMultipleNotesCommand : public Command
 {
 public:
 	struct NoteToDelete {
-		int trackIndex;
-		size_t noteOnIndex;
-		size_t noteOffIndex;
+		int trackIndex = 0;
+		size_t noteOnIndex = 0;
+		size_t noteOffIndex = 0;
 		TimedMidiEvent noteOn;
 		TimedMidiEvent noteOff;
 	};

@@ -141,9 +141,11 @@
   <ItemGroup>
     <ClCompile Include="src\App.cpp" />
     <ClCompile Include="src\AppModel\AppModel.cpp" />
+    <ClCompile Include="src\AppModel\SoundBank\SoundBank.cpp" />
+    <ClCompile Include="src\AppModel\TrackSet\TrackSet.cpp" />
     <ClCompile Include="src\Commands\NoteEditCommands.cpp" />
     <ClCompile Include="src\MainFrame\MainFrame.cpp" />
-    <ClCompile Include="src\Panels\MidiCanvas.cpp" />
+    <ClCompile Include="src\Panels\MidiCanvas\MidiCanvas.cpp" />
     <ClCompile Include="src\RtMidiWrapper\RtMidi\RtMidi.cpp" />
   </ItemGroup>
   <ItemGroup>
@@ -153,8 +155,8 @@
     <ClInclude Include="src\Commands\RecordCommand.h" />
     <ClInclude Include="src\External\json.hpp" />
     <ClInclude Include="src\MainFrame\PaneInfo.h" />
-    <ClInclude Include="src\AppModel\SoundBank.h" />
-    <ClInclude Include="src\AppModel\TrackSet.h" />
+    <ClInclude Include="src\AppModel\SoundBank\SoundBank.h" />
+    <ClInclude Include="src\AppModel\TrackSet\TrackSet.h" />
     <ClInclude Include="src\AppModel\Transport.h" />
     <ClInclude Include="src\MainFrame\MainFrame.h" />
     <ClInclude Include="src\Panels\ChannelControls.h" />
@@ -164,7 +166,7 @@
     <ClInclude Include="src\Panels\Instrument.h" />
     <ClInclude Include="src\Panels\Log.h" />
     <ClInclude Include="src\Panels\MainSynth.h" />
-    <ClInclude Include="src\Panels\MidiCanvas.h" />
+    <ClInclude Include="src\Panels\MidiCanvas\MidiCanvas.h" />
     <ClInclude Include="src\Panels\MidiSettings.h" />
     <ClInclude Include="src\Panels\Panels.h" />
     <ClInclude Include="src\Panels\SoundBankPanel.h" />

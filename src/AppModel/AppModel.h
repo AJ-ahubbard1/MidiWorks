@@ -5,47 +5,56 @@
 #include <chrono>
 #include <vector>
 #include <functional>
-#include "SoundBank.h"
+#include "SoundBank/SoundBank.h"
 #include "Transport.h"
-#include "TrackSet.h"
+#include "TrackSet/TrackSet.h"
 #include "Commands/Command.h"
+#include "MidiConstants.h"
 
 class AppModel
 {
-
 public:
 	AppModel();
-	void InitializeMetronome();
-	// Called inside of MainFrame::OnTimer event
 	void Update();
-
-	/*  Checks for Messages from Midi In device
-		If a SoundBank Channel is active, the message will playback.
-		If a SoundBank Channel is set to record: the message will be pushed to the mRecordingBuffer.
-		This buffer is used to temporarily store the midi messages during recording,
-		when finished recording, the buffer is added to the track and sorted by timestamp. */
 	void CheckMidiInQueue();
-
-    SoundBank& GetSoundBank();
+	
+	SoundBank& GetSoundBank();
 	Transport& GetTransport();
 	TrackSet& GetTrackSet();
 	Track& GetRecordingBuffer();
 	Track& GetTrack(ubyte c);
 
+	// Playback Helpers
+	void PlayNote(ubyte pitch, ubyte velocity, ubyte channel);
+	void StopNote(ubyte pitch, ubyte channel);
+
+	// Note preview for UI (keyboard/mouse hover)
+	void PlayPreviewNote(ubyte pitch);
+	void StopPreviewNote();
+	bool IsPreviewingNote() const { return mIsPreviewingNote; }
+	ubyte GetPreviewPitch() const { return mPreviewPitch; }
+	ubyte GetPreviewVelocity() const { return mPreviewVelocity; }
+	void SetPreviewVelocity(ubyte velocity) { mPreviewVelocity = velocity; }
+
+	// Change transport state to stop
+	void StopPlaybackIfActive();
+
+	// Track operations
+	void QuantizeAllTracks(uint64_t gridSize);
+	void AddNoteToRecordChannels(ubyte pitch, uint64_t startTick, uint64_t duration);
+
 	// MIDI Input port management
 	std::vector<std::string> GetMidiInputPortNames() const;
 	void SetMidiInputPort(int portIndex);
-	int GetCurrentMidiInputPort() const;
 
-	// Logging system (callback pattern)
+	// Callbacks
 	using MidiLogCallback = std::function<void(const TimedMidiEvent&)>;
 	void SetLogCallback(MidiLogCallback callback);
-
-	// Dirty state change notification (callback pattern)
 	using DirtyStateCallback = std::function<void(bool isDirty)>;
 	void SetDirtyStateCallback(DirtyStateCallback callback);
 
 	// Metronome settings
+	void InitializeMetronome();
 	bool IsMetronomeEnabled() const;
 	void SetMetronomeEnabled(bool enabled);
 
@@ -84,14 +93,18 @@ public:
 	void ClearClipboard();
 
 private:
-	static const size_t MAX_UNDO_STACK_SIZE = 50;  // Limit to last 50 actions
-	std::chrono::steady_clock::time_point mLastTick = std::chrono::steady_clock::now();
+	std::shared_ptr<MidiIn> mMidiIn;
+	std::chrono::steady_clock::time_point mLastTick; 
 	SoundBank	mSoundBank;
 	Transport	mTransport;
 	TrackSet	mTrackSet;
 	Track		mRecordingBuffer;
 	int			mRecordingBufferIterator = -1;  // Iterator for efficient recording buffer playback during loops
-
+	static const size_t MAX_UNDO_STACK_SIZE = 50;  // Limit to last 50 actions
+	std::vector<std::unique_ptr<Command>> mUndoStack;
+	std::vector<std::unique_ptr<Command>> mRedoStack;
+	std::vector<ClipboardNote> mClipboard;
+	
 	// Active note tracking for loop recording (to auto-close held notes at loop end)
 	struct ActiveNote {
 		ubyte pitch;
@@ -99,29 +112,17 @@ private:
 		uint64_t startTick;
 	};
 	std::vector<ActiveNote> mActiveNotes;
-
-	// MIDI Input
-	std::shared_ptr<MidiIn> mMidiIn;
-
-	// Logging
 	MidiLogCallback mMidiLogCallback;
-
-	// Dirty state notification
 	DirtyStateCallback mDirtyStateCallback;
-
-	// Metronome
 	bool mMetronomeEnabled = true;  // Metronome on by default
-
-	// Project state
 	bool mIsDirty = false;
 	std::string mCurrentProjectPath;
 
-	// Command Pattern - Undo/Redo stacks
-	std::vector<std::unique_ptr<Command>> mUndoStack;
-	std::vector<std::unique_ptr<Command>> mRedoStack;
-
-	// Clipboard
-	std::vector<ClipboardNote> mClipboard;
+	// Preview note state
+	ubyte mPreviewVelocity = MidiConstants::DEFAULT_VELOCITY;
+	bool mIsPreviewingNote = false;
+	ubyte mPreviewPitch = 0;
+	std::vector<ubyte> mPreviewChannels;
 
 	uint64_t GetDeltaTimeMs();
 	bool IsMusicalMessage(const MidiMessage& msg);

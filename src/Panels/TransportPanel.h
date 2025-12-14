@@ -130,39 +130,39 @@ private:
 
 	void OnStop(wxCommandEvent&)
 	{
-		if (mTransport.mState == Transport::State::Recording)
+		if (mTransport.IsRecording())
 		{
-			mTransport.mState = Transport::State::StopRecording;
+			mTransport.SetState(Transport::State::StopRecording);
 		}
 		else
 		{
-			mTransport.mState = Transport::State::StopPlaying;
+			mTransport.SetState(Transport::State::StopPlaying);
 		}
 	}
-	void OnPlay(wxCommandEvent&) { mTransport.mState = Transport::State::ClickedPlay; }
-	void OnReset(wxCommandEvent&) 
-	{ 
-		mTransport.Reset(); 
-		if (mTransport.mState == Transport::State::Playing)
+	void OnPlay(wxCommandEvent&) { mTransport.SetState(Transport::State::ClickedPlay); }
+	void OnReset(wxCommandEvent&)
+	{
+		mTransport.Reset();
+		if (mTransport.IsPlaying())
 		{
-			mTransport.mState = Transport::State::ClickedPlay;
-		} 
-		else if (mTransport.mState == Transport::State::Recording)
+			mTransport.SetState(Transport::State::ClickedPlay);
+		}
+		else if (mTransport.IsRecording())
 		{
-			mTransport.mState = Transport::State::ClickedRecord;
+			mTransport.SetState(Transport::State::ClickedRecord);
 		}
 	}
-	void OnRecord(wxCommandEvent&) { mTransport.mState = Transport::State::ClickedRecord; }
+	void OnRecord(wxCommandEvent&) { mTransport.SetState(Transport::State::ClickedRecord); }
 	void OnRewindDown(wxMouseEvent& event)
 	{
-		mPreviousState = mTransport.mState;
-		mTransport.mState = Transport::State::Rewinding;
+		mPreviousState = mTransport.GetState();
+		mTransport.SetState(Transport::State::Rewinding);
 		event.Skip();
 	}
 	void OnFastForwardDown(wxMouseEvent& event)
 	{
-		mPreviousState = mTransport.mState;
-		mTransport.mState = Transport::State::FastForwarding;
+		mPreviousState = mTransport.GetState();
+		mTransport.SetState(Transport::State::FastForwarding);
 		event.Skip();
 	}
 	void StopTransport(wxMouseEvent& event)
@@ -170,13 +170,13 @@ private:
 		switch (mPreviousState)
 		{
 		case Transport::State::Stopped:
-			mTransport.mState = Transport::State::Stopped;
+			mTransport.SetState(Transport::State::Stopped);
 			break;
 		case Transport::State::Playing:
-			mTransport.mState = Transport::State::ClickedPlay;
+			mTransport.SetState(Transport::State::ClickedPlay);
 			break;
 		case Transport::State::Recording:
-			mTransport.mState = Transport::State::ClickedRecord;
+			mTransport.SetState(Transport::State::ClickedRecord);
 			break;
 		}
 		event.Skip();

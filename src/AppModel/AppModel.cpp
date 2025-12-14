@@ -4,33 +4,27 @@
 #include <algorithm>
 #include "external/json.hpp"
 #include "Commands/RecordCommand.h"
+#include "Commands/QuantizeCommand.h"
+#include "Commands/NoteEditCommands.h"
 
 using json = nlohmann::json;
 
 AppModel::AppModel()
 {
 	mMidiIn = std::make_shared<MidiIn>();
+	mLastTick = std::chrono::steady_clock::now();
 	InitializeMetronome();
-}
-
-void AppModel::InitializeMetronome()
-{
-	// Set channel 16 to woodblock sound for metronome
-	// We're using channel 16 (index 15) to avoid conflicts with user channels
-	// Program 115 = Woodblock (percussive, short click sound)
-	auto player = mSoundBank.GetMidiOutDevice();
-	player->sendMessage(MidiMessage::ProgramChange(115, METRONOME_CHANNEL));
 }
 
 // Called inside of MainFrame::OnTimer event
 void AppModel::Update()
 {
 	static std::vector<MidiMessage> messages;
-	switch (mTransport.mState)
+	switch (mTransport.GetState())
 	{
 		case Transport::State::StopRecording:
 			mTransport.Stop();
-			mTransport.mState = Transport::State::Stopped;
+			mTransport.SetState(Transport::State::Stopped);
 
 			// Create RecordCommand to make recording undoable
 			if (!mRecordingBuffer.empty())
@@ -49,7 +43,7 @@ void AppModel::Update()
 
 		case Transport::State::StopPlaying:
 			mTransport.Stop();
-			mTransport.mState = Transport::State::Stopped;
+			mTransport.SetState(Transport::State::Stopped);
 			SilenceAllChannels();
 			break;
 
@@ -59,7 +53,7 @@ void AppModel::Update()
 		case Transport::State::ClickedPlay:
 			GetDeltaTimeMs();
 			mTrackSet.FindStart(mTransport.StartPlayBack());
-			mTransport.mState = Transport::State::Playing;
+			mTransport.SetState(Transport::State::Playing);
 			break;
 
 		case Transport::State::Playing:
@@ -112,7 +106,7 @@ void AppModel::Update()
 				mRecordingBufferIterator = -1;
 			}
 
-			mTransport.mState= Transport::State::Recording;
+			mTransport.SetState(Transport::State::Recording);
 			break;
 		case Transport::State::Recording:
 		{
@@ -224,14 +218,13 @@ void AppModel::CheckMidiInQueue()
 
 	for (MidiChannel& c : channels)
 	{
-		bool shouldPlay = solosFound ? c.solo : (c.record && !c.mute);
-		if (shouldPlay)
+		if (mSoundBank.ShouldChannelPlay(c, true))
 		{
 			MidiMessage routed = mm;
 			routed.setChannel(c.channelNumber);
 			mSoundBank.GetMidiOutDevice()->sendMessage(routed);
 
-			if (c.record && IsMusicalMessage(routed) && mTransport.mState == Transport::State::Recording)
+			if (c.record && IsMusicalMessage(routed) && mTransport.GetState() == Transport::State::Recording)
 			{
 				mRecordingBuffer.push_back({routed, currentTick});
 
@@ -264,6 +257,97 @@ TrackSet& AppModel::GetTrackSet() { return mTrackSet; }
 Track& AppModel::GetRecordingBuffer() { return mRecordingBuffer; }
 Track& AppModel::GetTrack(ubyte c) { return mTrackSet.GetTrack(c); }
 
+void AppModel::PlayNote(ubyte pitch, ubyte velocity, ubyte channel)
+{
+	auto midiOut = mSoundBank.GetMidiOutDevice();
+	midiOut->sendMessage(MidiMessage::NoteOn(pitch, velocity, channel));
+}
+
+void AppModel::StopNote(ubyte pitch, ubyte channel)
+{
+	auto midiOut = mSoundBank.GetMidiOutDevice();
+	midiOut->sendMessage(MidiMessage::NoteOff(pitch, channel));
+}
+
+void AppModel::PlayPreviewNote(ubyte pitch)
+{
+	// Clear previous preview
+	mPreviewChannels.clear();
+
+	// Get record-enabled channels
+	auto channels = mSoundBank.GetRecordEnabledChannels();
+
+	// Play note on each record-enabled channel
+	for (MidiChannel* channel : channels)
+	{
+		PlayNote(pitch, mPreviewVelocity, channel->channelNumber);
+		mPreviewChannels.push_back(channel->channelNumber);
+	}
+
+	mIsPreviewingNote = true;
+	mPreviewPitch = pitch;
+}
+
+void AppModel::StopPreviewNote()
+{
+	if (!mIsPreviewingNote) return;
+
+	// Stop note on all channels that are playing the preview
+	for (ubyte channelNum : mPreviewChannels)
+	{
+		StopNote(mPreviewPitch, channelNum);
+	}
+
+	mIsPreviewingNote = false;
+	mPreviewChannels.clear();
+}
+
+void AppModel::StopPlaybackIfActive()
+{
+	if (mTransport.GetState() == Transport::State::Playing)
+	{
+		mTransport.SetState(Transport::State::StopPlaying);
+	}
+	else if (mTransport.GetState() == Transport::State::Recording)
+	{
+		mTransport.SetState(Transport::State::StopRecording);
+	}
+}
+
+void AppModel::QuantizeAllTracks(uint64_t gridSize)
+{
+	StopPlaybackIfActive();
+
+	for (int i = 0; i < MidiConstants::CHANNEL_COUNT; i++)
+	{
+		Track& track = mTrackSet.GetTrack(i);
+		if (!track.empty())
+		{
+			auto cmd = std::make_unique<QuantizeCommand>(track, gridSize);
+			ExecuteCommand(std::move(cmd));
+		}
+	}
+}
+
+void AppModel::AddNoteToRecordChannels(ubyte pitch, uint64_t startTick, uint64_t duration)
+{
+	auto channels = mSoundBank.GetRecordEnabledChannels();
+	for (const MidiChannel* channel : channels)
+	{
+		// Create note-on and note-off events
+		MidiMessage noteOn = MidiMessage::NoteOn(pitch, mPreviewVelocity, channel->channelNumber);
+		MidiMessage noteOff = MidiMessage::NoteOff(pitch, channel->channelNumber);
+
+		TimedMidiEvent timedNoteOn{noteOn, startTick};
+		TimedMidiEvent timedNoteOff{noteOff, startTick + duration - 1};  // -1 to prevent overlap
+
+		// Get the track and add the note
+		Track& track = mTrackSet.GetTrack(channel->channelNumber);
+		auto cmd = std::make_unique<AddNoteCommand>(track, timedNoteOn, timedNoteOff);
+		ExecuteCommand(std::move(cmd));
+	}
+}
+
 // MIDI Input port management
 std::vector<std::string> AppModel::GetMidiInputPortNames() const
 {
@@ -273,11 +357,6 @@ std::vector<std::string> AppModel::GetMidiInputPortNames() const
 void AppModel::SetMidiInputPort(int portIndex)
 {
 	mMidiIn->changePort(portIndex);
-}
-
-int AppModel::GetCurrentMidiInputPort() const
-{
-	return mMidiIn->getCurrentPort();
 }
 
 // Logging system
@@ -292,6 +371,15 @@ void AppModel::SetDirtyStateCallback(DirtyStateCallback callback)
 	mDirtyStateCallback = callback;
 }
 
+void AppModel::InitializeMetronome()
+{
+	// Set channel 16 to woodblock sound for metronome
+	// We're using channel 16 (index METRONOME_CHANNEL) to avoid conflicts with user channels
+	// Program 115 = Woodblock (percussive, short click sound)
+	auto player = mSoundBank.GetMidiOutDevice();
+	player->sendMessage(MidiMessage::ProgramChange(115, MidiConstants::METRONOME_CHANNEL));
+}
+
 // Metronome settings
 bool AppModel::IsMetronomeEnabled() const
 {
@@ -301,148 +389,6 @@ bool AppModel::IsMetronomeEnabled() const
 void AppModel::SetMetronomeEnabled(bool enabled)
 {
 	mMetronomeEnabled = enabled;
-}
-
-// Command Pattern - Undo/Redo System
-void AppModel::ExecuteCommand(std::unique_ptr<Command> cmd)
-{
-	cmd->Execute();
-	mUndoStack.push_back(std::move(cmd));
-
-	// Clear redo stack - can't redo after new action
-	mRedoStack.clear();
-
-	// Mark project as dirty (has unsaved changes)
-	MarkDirty();
-
-	// Limit stack size to prevent unbounded memory growth
-	if (mUndoStack.size() > MAX_UNDO_STACK_SIZE)
-	{
-		mUndoStack.erase(mUndoStack.begin());
-	}
-}
-
-void AppModel::Undo()
-{
-	if (mUndoStack.empty()) return;
-
-	// Get command from undo stack
-	auto cmd = std::move(mUndoStack.back());
-	mUndoStack.pop_back();
-
-	// Undo the command
-	cmd->Undo();
-
-	// Move to redo stack
-	mRedoStack.push_back(std::move(cmd));
-}
-
-void AppModel::Redo()
-{
-	if (mRedoStack.empty()) return;
-
-	// Get command from redo stack
-	auto cmd = std::move(mRedoStack.back());
-	mRedoStack.pop_back();
-
-	// Re-execute the command
-	cmd->Execute();
-
-	// Move back to undo stack
-	mUndoStack.push_back(std::move(cmd));
-}
-
-bool AppModel::CanUndo() const { return !mUndoStack.empty(); }
-bool AppModel::CanRedo() const { return !mRedoStack.empty(); }
-
-const std::vector<std::unique_ptr<Command>>& AppModel::GetUndoStack() const { return mUndoStack; }
-const std::vector<std::unique_ptr<Command>>& AppModel::GetRedoStack() const { return mRedoStack; }
-
-void AppModel::ClearUndoHistory()
-{
-	mUndoStack.clear();
-	mRedoStack.clear();
-}
-
-// Clipboard operations
-void AppModel::CopyToClipboard(const std::vector<ClipboardNote>& notes)
-{
-	mClipboard = notes;
-}
-
-const std::vector<AppModel::ClipboardNote>& AppModel::GetClipboard() const
-{
-	return mClipboard;
-}
-
-bool AppModel::HasClipboardData() const
-{
-	return !mClipboard.empty();
-}
-
-void AppModel::ClearClipboard()
-{
-	mClipboard.clear();
-}
-
-uint64_t AppModel::GetDeltaTimeMs()
-{
-	auto now = std::chrono::steady_clock::now();
-	auto delta = std::chrono::duration_cast<std::chrono::milliseconds>(now - mLastTick).count();
-	mLastTick = now;
-	return static_cast<uint64_t>(delta);
-}
-
-bool AppModel::IsMusicalMessage(const MidiMessage& msg)
-{
-	using MidiInterface::MidiEvent;
-	auto event = msg.getEventType();
-
-	return (event >= NOTE_OFF && event <= PITCH_BEND && event != PROGRAM_CHANGE);
-
-}
-
-void AppModel::PlayMessages(std::vector<MidiMessage> msgs)
-{
-	auto player = mSoundBank.GetMidiOutDevice();
-	auto channels = mSoundBank.GetAllChannels();
-
-	bool solosFound = mSoundBank.SolosFound();
-
-	for (auto& mm : msgs)
-	{
-		ubyte c = mm.getChannel();
-		auto& channel = mSoundBank.GetChannel(c);
-		bool shouldPlay = solosFound ? channel.solo : !channel.mute;
-		if (shouldPlay)
-		{
-			player->sendMessage(mm);
-		}
-	}
-}
-
-void AppModel::PlayMetronomeClick(bool isDownbeat)
-{
-	auto player = mSoundBank.GetMidiOutDevice();
-
-	// Different pitches and velocities for downbeat vs other beats
-	ubyte note = isDownbeat ? 76 : 72;      // High E vs High C (woodblock sounds good high-pitched)
-	ubyte velocity = isDownbeat ? 127 : 90; // Downbeat louder
-
-	// Send note on metronome channel (channel 16)
-	player->sendMessage(MidiMessage::NoteOn(note, velocity, METRONOME_CHANNEL));
-
-	// Note: Woodblock has short natural decay, but could add explicit note-off if needed
-}
-
-void AppModel::SilenceAllChannels()
-{
-	auto player = mSoundBank.GetMidiOutDevice();
-
-	for (ubyte c = 0; c < 15; c++)
-	{
-		player->sendMessage(MidiMessage::AllNotesOff(c));
-	}
 }
 
 // Save/Load Project
@@ -465,7 +411,7 @@ bool AppModel::SaveProject(const std::string& filepath)
 			{"currentTick", mTransport.GetCurrentTick()}
 		};
 
-		// 2. Channels (15 channels, 0-14)
+		// 2. Channels (CHANNEL_COUNT channels, 0-14)
 		project["channels"] = json::array();
 		auto channels = mSoundBank.GetAllChannels();
 		for (const auto& ch : channels) {
@@ -479,9 +425,9 @@ bool AppModel::SaveProject(const std::string& filepath)
 			});
 		}
 
-		// 3. Tracks (15 tracks, one per channel)
+		// 3. Tracks (CHANNEL_COUNT tracks, one per channel)
 		project["tracks"] = json::array();
-		for (int i = 0; i < 15; i++) {
+		for (int i = 0; i < MidiConstants::CHANNEL_COUNT; i++) {
 			Track& track = mTrackSet.GetTrack(i);
 			json trackJson;
 			trackJson["channel"] = i;
@@ -611,14 +557,14 @@ void AppModel::ClearProject()
 {
 	// Stop playback
 	mTransport.Stop();
-	mTransport.mState = Transport::State::Stopped;
+	mTransport.SetState(Transport::State::Stopped);
 
 	// Reset transport to defaults
-	mTransport.mTempo = 120.0;
+	mTransport.mTempo = MidiConstants::DEFAULT_TEMPO;
 	mTransport.Reset();
 
 	// Clear all tracks
-	for (int i = 0; i < 15; i++) {
+	for (int i = 0; i < MidiConstants::CHANNEL_COUNT; i++) {
 		mTrackSet.GetTrack(i).clear();
 	}
 
@@ -626,10 +572,10 @@ void AppModel::ClearProject()
 	mRecordingBuffer.clear();
 
 	// Reset channels to defaults
-	for (int i = 0; i < 15; i++) {
+	for (int i = 0; i < MidiConstants::CHANNEL_COUNT; i++) {
 		auto& ch = mSoundBank.GetChannel(i);
 		ch.programNumber = 0;
-		ch.volume = 100;
+		ch.volume = MidiConstants::DEFAULT_VOLUME;
 		ch.mute = false;
 		ch.solo = false;
 		ch.record = false;
@@ -680,6 +626,148 @@ void AppModel::MarkClean()
 const std::string& AppModel::GetCurrentProjectPath() const
 {
 	return mCurrentProjectPath;
+}
+
+// Command Pattern - Undo/Redo System
+void AppModel::ExecuteCommand(std::unique_ptr<Command> cmd)
+{
+	cmd->Execute();
+	mUndoStack.push_back(std::move(cmd));
+
+	// Clear redo stack - can't redo after new action
+	mRedoStack.clear();
+
+	// Mark project as dirty (has unsaved changes)
+	MarkDirty();
+
+	// Limit stack size to prevent unbounded memory growth
+	if (mUndoStack.size() > MAX_UNDO_STACK_SIZE)
+	{
+		mUndoStack.erase(mUndoStack.begin());
+	}
+}
+
+void AppModel::Undo()
+{
+	if (mUndoStack.empty()) return;
+
+	// Get command from undo stack
+	auto cmd = std::move(mUndoStack.back());
+	mUndoStack.pop_back();
+
+	// Undo the command
+	cmd->Undo();
+
+	// Move to redo stack
+	mRedoStack.push_back(std::move(cmd));
+}
+
+void AppModel::Redo()
+{
+	if (mRedoStack.empty()) return;
+
+	// Get command from redo stack
+	auto cmd = std::move(mRedoStack.back());
+	mRedoStack.pop_back();
+
+	// Re-execute the command
+	cmd->Execute();
+
+	// Move back to undo stack
+	mUndoStack.push_back(std::move(cmd));
+}
+
+bool AppModel::CanUndo() const { return !mUndoStack.empty(); }
+bool AppModel::CanRedo() const { return !mRedoStack.empty(); }
+
+const std::vector<std::unique_ptr<Command>>& AppModel::GetUndoStack() const { return mUndoStack; }
+const std::vector<std::unique_ptr<Command>>& AppModel::GetRedoStack() const { return mRedoStack; }
+
+void AppModel::ClearUndoHistory()
+{
+	mUndoStack.clear();
+	mRedoStack.clear();
+}
+
+// Clipboard operations
+void AppModel::CopyToClipboard(const std::vector<ClipboardNote>& notes)
+{
+	mClipboard = notes;
+}
+
+const std::vector<AppModel::ClipboardNote>& AppModel::GetClipboard() const
+{
+	return mClipboard;
+}
+
+bool AppModel::HasClipboardData() const
+{
+	return !mClipboard.empty();
+}
+
+void AppModel::ClearClipboard()
+{
+	mClipboard.clear();
+}
+
+// Private Methods
+uint64_t AppModel::GetDeltaTimeMs()
+{
+	auto now = std::chrono::steady_clock::now();
+	auto delta = std::chrono::duration_cast<std::chrono::milliseconds>(now - mLastTick).count();
+	mLastTick = now;
+	return static_cast<uint64_t>(delta);
+}
+
+bool AppModel::IsMusicalMessage(const MidiMessage& msg)
+{
+	using MidiInterface::MidiEvent;
+	auto event = msg.getEventType();
+
+	return (event >= NOTE_OFF && event <= PITCH_BEND && event != PROGRAM_CHANGE);
+
+}
+
+void AppModel::PlayMessages(std::vector<MidiMessage> msgs)
+{
+	auto player = mSoundBank.GetMidiOutDevice();
+	auto channels = mSoundBank.GetAllChannels();
+
+	bool solosFound = mSoundBank.SolosFound();
+
+	for (auto& mm : msgs)
+	{
+		ubyte c = mm.getChannel();
+		auto& channel = mSoundBank.GetChannel(c);
+		if (mSoundBank.ShouldChannelPlay(channel, false))
+		{
+			player->sendMessage(mm);
+		}
+	}
+}
+
+void AppModel::PlayMetronomeClick(bool isDownbeat)
+{
+	auto player = mSoundBank.GetMidiOutDevice();
+
+	// Different pitches and velocities for downbeat vs other beats
+	ubyte note = isDownbeat ? 76 : 72;      // High E vs High C (woodblock sounds good high-pitched)
+	ubyte velocity = isDownbeat ? MidiConstants::MAX_MIDI_NOTE : 90; // Downbeat louder
+
+	// Send note on metronome channel (channel 16)
+	player->sendMessage(MidiMessage::NoteOn(note, velocity, MidiConstants::METRONOME_CHANNEL));
+
+	// Note: Woodblock has short natural decay, but could add explicit note-off if needed
+}
+
+void AppModel::SilenceAllChannels()
+{
+	auto player = mSoundBank.GetMidiOutDevice();
+
+	for (ubyte c = 0; c < MidiConstants::CHANNEL_COUNT; c++)
+	{
+		player->sendMessage(MidiMessage::AllNotesOff(c));
+	}
 }
 
 // Merge overlapping notes during loop recording

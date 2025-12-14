@@ -1,7 +1,6 @@
 #pragma once
 #include "wx/string.h"
-// Channel 16 (index 15) is reserved for metronome
-static constexpr unsigned char METRONOME_CHANNEL = 15;
+#include "MidiConstants.h"
 
 class Transport
 {
@@ -17,17 +16,76 @@ public:
 		bool isDownbeat = false;  // First beat of measure
 	};
 
-	State		mState = State::Stopped;
-	double		mTempo = 120.0;
-	int			mTimeSignatureNumerator = 4;    // Top number (beats per measure)
-	int			mTimeSignatureDenominator = 4;  // Bottom number (note value)
+	double		mTempo = MidiConstants::DEFAULT_TEMPO;
+	int			mTimeSignatureNumerator = MidiConstants::DEFAULT_TIME_SIGNATURE_NUMERATOR;
+	int			mTimeSignatureDenominator = MidiConstants::DEFAULT_TIME_SIGNATURE_DENOMINATOR;
 
 	// Loop settings
 	bool		mLoopEnabled = false;
 	uint64_t	mLoopStartTick = 0;
-	uint64_t	mLoopEndTick = 15360;  // 4 bars (960 * 4 * 4) as default
+	uint64_t	mLoopEndTick = MidiConstants::DEFAULT_LOOP_END;  // 4 bars in 4/4 time
 
 	Transport() { }
+
+	// State management
+	State GetState() const { return mState; }
+	void SetState(State state) { mState = state; }
+
+	// State queries
+	bool IsPlaying() const { return mState == State::Playing; }
+	bool IsRecording() const { return mState == State::Recording; }
+	bool IsStopped() const { return mState == State::Stopped; }
+
+	// State transitions
+	void TogglePlay()
+	{
+		switch (mState)
+		{
+		case State::Stopped:
+			mState = State::ClickedPlay;
+			break;
+		case State::Playing:
+			mState = State::StopPlaying;
+			break;
+		case State::Recording:
+			mState = State::StopRecording;
+			break;
+		default:
+			break;
+		}
+	}
+
+	void ToggleRecord()
+	{
+		if (mState == State::Stopped)
+		{
+			mState = State::ClickedRecord;
+		}
+		else if (mState == State::Recording)
+		{
+			mState = State::StopRecording;
+		}
+	}
+
+	// Loop control
+	void SetLoopStart(uint64_t tick)
+	{
+		if (tick < mLoopEndTick)
+		{
+			mLoopStartTick = tick;
+		}
+	}
+
+	void SetLoopEnd(uint64_t tick)
+	{
+		if (tick > mLoopStartTick)
+		{
+			mLoopEndTick = tick;
+		}
+	}
+
+	uint64_t GetLoopStart() const { return mLoopStartTick; }
+	uint64_t GetLoopEnd() const { return mLoopEndTick; }
 
 	uint64_t StartPlayBack()
 	{
@@ -96,10 +154,10 @@ public:
 		BeatInfo info;
 
 		// Calculate ticks per beat based on time signature
-		// Quarter note = mTicksPerQuarter (960)
-		// Whole note = 960 * 4 = 3840
+		// Quarter note = mTicksPerQuarter (TICKS_PER_QUARTER)
+		// Whole note = TICKS_PER_QUARTER * 4
 		// Time signature bottom number determines note value (4 = quarter note)
-		uint64_t ticksPerBeat = (mTicksPerQuarter * 4) / mTimeSignatureDenominator;
+		uint64_t ticksPerBeat = GetTicksPerBeat();
 
 		// Which beat are we on?
 		uint64_t lastBeat = lastTick / ticksPerBeat;
@@ -116,11 +174,24 @@ public:
 		return info;
 	}
 
+	uint64_t GetTicksPerBeat() const
+	{
+		return mTicksPerQuarter * 4 / mTimeSignatureDenominator;
+	}
+
+	uint64_t GetTicksPerMeasure() const
+	{
+		return GetTicksPerBeat() * mTimeSignatureNumerator;
+	}
+
+
+
 private:
+	State			mState = State::Stopped;
 	uint64_t		mCurrentTimeMs = 0;
 	uint64_t		mStartPlayBackTick = 0;
 	uint64_t		mCurrentTick = 0;
-	int				mTicksPerQuarter = 960;
+	int				mTicksPerQuarter = MidiConstants::TICKS_PER_QUARTER;
 	const double	DEFAULT_SHIFT_SPEED = 5.0f;
 	double			mShiftSpeed = DEFAULT_SHIFT_SPEED;
 	double			mShiftAccel = 1.01f;

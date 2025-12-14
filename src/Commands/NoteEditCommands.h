@@ -1,6 +1,6 @@
 #pragma once
 #include "Command.h"
-#include "AppModel/TrackSet.h"
+#include "AppModel/TrackSet/TrackSet.h"
 #include <algorithm>
 using namespace MidiInterface;
 

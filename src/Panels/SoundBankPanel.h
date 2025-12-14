@@ -1,6 +1,6 @@
 #pragma once
 #include <wx/wx.h>
-#include "AppModel/SoundBank.h"
+#include "AppModel/SoundBank/SoundBank.h"
 #include "ChannelControls.h"
 #include <array>
 
