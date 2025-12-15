@@ -4,7 +4,19 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-MidiWorks is a wxWidgets-based Digital Audio Workstation (DAW) written in C++20. It provides MIDI recording, playback, and sequencing capabilities with a dockable panel-based UI.
+MidiWorks is a wxWidgets-based Digital Audio Workstation (DAW) written in C++20. It provides comprehensive MIDI composition tools including piano roll editing, multi-track recording/playback, loop recording with overdub, quantization, and a complete undo/redo system.
+
+**Version:** 1.0 (MVP Complete - December 2025)
+
+**Key Features:**
+- Full piano roll editing with multi-selection, copy/paste, quantize
+- 15-track MIDI recording with loop recording and overdub note merging
+- Professional channel mixer with mute/solo/record controls
+- Complete undo/redo system with command history
+- Project save/load (.mwp JSON format)
+- Metronome with downbeat detection
+- Comprehensive keyboard shortcuts
+- Dockable panel-based UI
 
 ## Build System
 
@@ -102,6 +114,20 @@ Dockable UI components. Mostly header-only with minimal state.
 - **MidiCanvasPanel.h** - Piano roll visualization with zoom/pan
 - **Log.h** - Real-time MIDI event logging
 
+#### Commands (src/Commands/)
+Command pattern implementation for undo/redo system.
+- **Command.h** - Abstract base class with Execute/Undo/GetDescription
+- **NoteEditCommands.h** - Note editing commands:
+  - AddNoteCommand - Adds note-on and note-off events to track
+  - DeleteNoteCommand - Removes note pair, stores for undo
+  - MoveNoteCommand - Changes tick/pitch, maintains duration
+  - ResizeNoteCommand - Changes duration by moving note-off
+  - DeleteMultipleNotesCommand - Batch deletion with sorted index management
+- **QuantizeCommand.h** - Quantizes all notes in track to grid
+- **PasteCommand.h** - Pastes clipboard notes with relative timing
+
+All commands executed through `AppModel::ExecuteCommand()` which manages undo/redo stacks.
+
 #### RtMidiWrapper (src/RtMidiWrapper/)
 Thin abstraction layer over RtMidi library.
 - **MidiIn.h** - MIDI input interface (wraps RtMidiIn)
@@ -131,35 +157,50 @@ MainFrame::OnTimer()
 ```
 src/
 ├── App.cpp                          # Entry point (wxApp)
+├── MidiConstants.h                  # MIDI specification constants
 ├── MainFrame/
 │   ├── MainFrame.{h,cpp}           # Main window & AUI manager
 │   └── PaneInfo.h                  # Panel metadata
 ├── AppModel/                        # Business logic
-│   ├── AppModel.h                  # Central orchestrator
+│   ├── AppModel.{h,cpp}            # Central orchestrator
 │   ├── Transport.h                 # Playback state machine
 │   ├── SoundBank.h                 # 16 MIDI channels
-│   └── TrackSet.h                  # Track storage
-├── Panels/                          # UI components (header-only)
+│   └── TrackSet/
+│       ├── TrackSet.{h,cpp}        # Track storage & search
+│       └── Track.h                 # Track type definition
+├── Commands/                        # Undo/Redo system
+│   ├── Command.h                   # Base command class
+│   ├── NoteEditCommands.h          # Add/Delete/Move/Resize
+│   ├── DeleteMultipleNotesCommand.h # Batch deletion
+│   ├── QuantizeCommand.h           # Grid quantization
+│   └── PasteCommand.h              # Clipboard paste
+├── Panels/                          # UI components
 │   ├── Panels.h                    # Aggregation header
 │   ├── TransportPanel.h
 │   ├── SoundBankPanel.h
 │   ├── ChannelControls.h
 │   ├── MidiSettingsPanel.h
-│   ├── MidiCanvasPanel.h
+│   ├── MidiCanvas/
+│   │   ├── MidiCanvas.{h,cpp}      # Piano roll editor
+│   │   └── MidiCanvasConstants.h   # Canvas-specific constants
+│   ├── UndoHistoryPanel.h
+│   ├── ShortcutsPanel.h
 │   └── Log.h
-└── RtMidiWrapper/                   # MIDI abstraction
-    ├── RtMidiWrapper.h             # Main include
-    ├── RtMidi/
-    │   ├── RtMidi.h
-    │   └── RtMidi.cpp              # Third-party library
-    ├── MidiDevice/
-    │   ├── MidiIn.h
-    │   ├── MidiOut.h
-    │   ├── MidiError.h
-    │   └── MidiInCallback.h
-    └── MidiMessage/
-        ├── MidiMessage.h
-        └── SoundMaps.h
+├── RtMidiWrapper/                   # MIDI abstraction
+│   ├── RtMidiWrapper.h             # Main include
+│   ├── RtMidi/
+│   │   ├── RtMidi.h
+│   │   └── RtMidi.cpp              # Third-party library
+│   ├── MidiDevice/
+│   │   ├── MidiIn.h
+│   │   ├── MidiOut.h
+│   │   ├── MidiError.h
+│   │   └── MidiInCallback.h
+│   └── MidiMessage/
+│       ├── MidiMessage.h
+│       └── SoundMaps.h
+└── external/                        # Third-party headers
+    └── json.hpp                     # nlohmann/json library
 ```
 
 ## Important Patterns

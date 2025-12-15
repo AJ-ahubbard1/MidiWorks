@@ -43,6 +43,30 @@ public:
 	void QuantizeAllTracks(uint64_t gridSize);
 	void AddNoteToRecordChannels(ubyte pitch, uint64_t startTick, uint64_t duration);
 
+	// Note Editing - Deletion
+	void DeleteNote(const NoteLocation& note);
+	void DeleteNotes(const std::vector<NoteLocation>& notes);
+
+	// Note Editing - Move and Resize
+	void MoveNote(const NoteLocation& note, uint64_t newStartTick, ubyte newPitch);
+	void ResizeNote(const NoteLocation& note, uint64_t newDuration);
+
+	// Note Edit Preview (for drag operations)
+	struct NoteEditPreview
+	{
+		bool isActive = false;
+		NoteLocation originalNote;
+		uint64_t previewStartTick = 0;
+		uint64_t previewEndTick = 0;
+		ubyte previewPitch = 0;
+	};
+
+	void SetNoteMovePreview(const NoteLocation& note, uint64_t newStartTick, ubyte newPitch);
+	void SetNoteResizePreview(const NoteLocation& note, uint64_t newEndTick);
+	void ClearNoteEditPreview();
+	const NoteEditPreview& GetNoteEditPreview() const { return mNoteEditPreview; }
+	bool HasNoteEditPreview() const { return mNoteEditPreview.isActive; }
+
 	// MIDI Input port management
 	std::vector<std::string> GetMidiInputPortNames() const;
 	void SetMidiInputPort(int portIndex);
@@ -88,9 +112,14 @@ public:
 		int trackIndex;  // Which track it came from
 	};
 	void CopyToClipboard(const std::vector<ClipboardNote>& notes);
+	void CopyNotesToClipboard(const std::vector<NoteLocation>& notes);
+
 	const std::vector<ClipboardNote>& GetClipboard() const;
 	bool HasClipboardData() const;
 	void ClearClipboard();
+	void PasteNotes(uint64_t pasteTick = UINT64_MAX);
+
+	
 
 private:
 	std::shared_ptr<MidiIn> mMidiIn;
@@ -123,6 +152,9 @@ private:
 	bool mIsPreviewingNote = false;
 	ubyte mPreviewPitch = 0;
 	std::vector<ubyte> mPreviewChannels;
+
+	// Note edit preview state (for drag operations)
+	NoteEditPreview mNoteEditPreview;
 
 	uint64_t GetDeltaTimeMs();
 	bool IsMusicalMessage(const MidiMessage& msg);

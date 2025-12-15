@@ -152,6 +152,8 @@
     <ClInclude Include="src\AppModel\AppModel.h" />
     <ClInclude Include="src\Commands\Command.h" />
     <ClInclude Include="src\Commands\NoteEditCommands.h" />
+    <ClInclude Include="src\Commands\PasteCommand.h" />
+    <ClInclude Include="src\Commands\QuantizeCommand.h" />
     <ClInclude Include="src\Commands\RecordCommand.h" />
     <ClInclude Include="src\External\json.hpp" />
     <ClInclude Include="src\MainFrame\PaneInfo.h" />

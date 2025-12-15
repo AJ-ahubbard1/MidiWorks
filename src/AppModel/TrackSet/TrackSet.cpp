@@ -70,7 +70,7 @@ std::vector<NoteLocation> TrackSet::FindNotesInRegion(
 {
 	auto allNotes = GetAllNotes();
 	std::vector<NoteLocation> result;
-	
+
 	for (const NoteLocation& note : allNotes)
 	{
 		// Check if note overlaps region
@@ -85,6 +85,41 @@ std::vector<NoteLocation> TrackSet::FindNotesInRegion(
 	return result;
 }
 
+std::vector<NoteLocation> TrackSet::GetNotesFromTrack(const Track& track, int trackIndex)
+{
+	std::vector<NoteLocation> result;
+
+	if (track.empty()) return result;
+
+	size_t end = track.size();
+	for (size_t i = 0; i < end; i++)
+	{
+		const TimedMidiEvent& noteOn = track[i];
+		if (noteOn.mm.getEventType() != MidiEvent::NOTE_ON) continue;
+
+		// Find corresponding note off
+		for (size_t j = i + 1; j < end; j++)
+		{
+			const TimedMidiEvent& noteOff = track[j];
+			if (noteOff.mm.getEventType() != MidiEvent::NOTE_OFF ||
+				noteOff.mm.mData[1] != noteOn.mm.mData[1]) continue;
+
+			NoteLocation note;
+			note.found = true;
+			note.trackIndex = trackIndex;
+			note.noteOnIndex = i;
+			note.noteOffIndex = j;
+			note.startTick = noteOn.tick;
+			note.endTick = noteOff.tick;
+			note.pitch = noteOn.mm.mData[1];
+			result.push_back(note);
+			break;
+		}
+	}
+
+	return result;
+}
+
 std::vector<NoteLocation> TrackSet::GetAllNotes()
 {
 	std::vector<NoteLocation> result;
@@ -92,33 +127,8 @@ std::vector<NoteLocation> TrackSet::GetAllNotes()
 	for (int trackIndex = 0; trackIndex < MidiConstants::CHANNEL_COUNT; trackIndex++)
 	{
 		Track& track = mTracks[trackIndex];
-		if (track.empty()) continue;
-
-		size_t end = track.size();
-		for (size_t i = 0; i < end; i++)
-		{
-			const TimedMidiEvent& noteOn = track[i];
-			if (noteOn.mm.getEventType() != MidiEvent::NOTE_ON) continue;
-
-			// Find corresponding note off
-			for (size_t j = i + 1; j < end; j++)
-			{
-				const TimedMidiEvent& noteOff = track[j];
-				if (noteOff.mm.getEventType() != MidiEvent::NOTE_OFF ||
-					noteOff.mm.mData[1] != noteOn.mm.mData[1]) continue;
-
-				NoteLocation note;
-				note.found = true;
-				note.trackIndex = trackIndex;
-				note.noteOnIndex = i;
-				note.noteOffIndex = j;
-				note.startTick = noteOn.tick;
-				note.endTick = noteOff.tick;
-				note.pitch = noteOn.mm.mData[1];
-				result.push_back(note);
-				break;
-			}
-		}
+		std::vector<NoteLocation> trackNotes = GetNotesFromTrack(track, trackIndex);
+		result.insert(result.end(), trackNotes.begin(), trackNotes.end());
 	}
 
 	return result;
@@ -143,8 +153,8 @@ void TrackSet::Sort()
 		if (track.empty()) continue;
 
 		std::sort(track.begin(), track.end(), [](const TimedMidiEvent& a, const TimedMidiEvent& b)
-			{
-				return a.tick < b.tick;
-			});
+		{
+			return a.tick < b.tick;
+		});
 	}
 }

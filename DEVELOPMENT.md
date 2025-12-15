@@ -14,23 +14,45 @@ MidiWorks aims to make MIDI composition as easy and intuitive as possible. The f
 
 ---
 
-## Current Features
+## Version 1.0 Features
 
-### MIDI I/O
-- [x] MIDI input device selection
-- [x] MIDI output device selection
-- [x] Real-time MIDI input routing to channels
-- [x] MIDI event logging
+### Piano Roll Editing
+- [x] Add notes with mouse click
+- [x] Delete notes (middle-click or Delete key)
+- [x] Move notes with drag and drop
+- [x] Resize notes (duration editing)
+- [x] Multi-selection (Shift+Drag rectangle, Ctrl+A select all)
+- [x] Copy/Paste/Cut operations (Ctrl+C/V/X)
+- [x] Quantize to grid (Q key) with triplet support
+- [x] Grid snap with duration selector (whole/half/quarter/eighth/sixteenth + triplets)
+- [x] Visual feedback (note hovering, preview notes, selection highlighting)
+- [x] Zoom and pan (mouse wheel, shift+wheel, right-click drag)
 
 ### Recording & Playback
-- [x] Basic recording to 16 tracks (one per channel)
-- [x] Basic playback of recorded tracks
-- [x] Transport controls (Play, Stop, Record, Rewind, Fast Forward, Reset)
+- [x] 15-track MIDI recording (channel 16 reserved for metronome)
+- [x] Loop playback and recording with visual loop region
+- [x] Overdub note merging (automatic note collision handling)
+- [x] Metronome with downbeat detection (channel 16, woodblock sound)
+- [x] Transport controls with keyboard shortcuts (Spacebar, R)
+- [x] Tempo control (40-300 BPM with UI spinbox)
 - [x] Time display (ticks and MM:SS:mmm format)
+- [x] Auto-scroll during playback
 - [x] 960 PPQN (ticks per quarter note) resolution
 
+### Undo/Redo System
+- [x] Complete command pattern implementation
+- [x] Undo/Redo for all editing operations (Ctrl+Z, Ctrl+Y)
+- [x] Undo history panel with command descriptions
+- [x] 50-command stack size limit
+
+### Project Management
+- [x] Save/load projects (.mwp JSON format)
+- [x] File menu with keyboard shortcuts (Ctrl+N/O/S/Shift+S)
+- [x] Dirty flag tracking with asterisk in title bar
+- [x] Unsaved changes prompt on exit/new/open
+
 ### Mixing & Channels
-- [x] 16 MIDI channel support
+- [x] 16 MIDI channel support (15 usable + 1 metronome)
 - [x] Per-channel patch selection (128 General MIDI programs)
 - [x] Per-channel volume control (0-127)
 - [x] Per-channel mute/solo
@@ -39,12 +61,20 @@ MidiWorks aims to make MIDI composition as easy and intuitive as possible. The f
 
 ### User Interface
 - [x] Dockable panel system (wxAuiManager)
-- [x] Transport panel
-- [x] Sound bank/mixer panel
+- [x] Transport panel with tempo control
+- [x] Sound bank/mixer panel (16 channel controls)
 - [x] MIDI settings panel
-- [x] Piano roll visualization panel (basic)
-- [x] MIDI log panel
+- [x] Piano roll panel with full editing capabilities
+- [x] MIDI event log panel
+- [x] Undo history panel
+- [x] Shortcuts reference panel
 - [x] Resizable and rearrangeable panels
+
+### MIDI I/O
+- [x] MIDI input device selection
+- [x] MIDI output device selection
+- [x] Real-time MIDI input routing to record-enabled channels
+- [x] MIDI event logging with real-time display
 
 ---
 
@@ -194,38 +224,58 @@ MidiWorks aims to make MIDI composition as easy and intuitive as possible. The f
 
 ## Roadmap Timeline
 
-### Current Status (v0.1)
-Basic MIDI I/O, recording, playback, and mixing foundation complete.
+### Current Status: Version 1.0 - MVP Complete! 🎉
+**Released:** December 2025
 
-### Next Milestone: v0.2 - "Usable for Simple Compositions"
-**Target Features:**
-- Piano roll editing (add/move/delete notes)
-- Metronome
-- Quantize
-- Undo/redo
-- Save/load projects
-- Loop playback
+MidiWorks v1.0 provides a complete MIDI composition workflow with:
+- ✅ Full piano roll editing (add, move, resize, delete notes)
+- ✅ Multi-selection with rectangle drag and Ctrl+A
+- ✅ Copy/Paste/Cut operations with clipboard
+- ✅ Complete undo/redo system with history panel
+- ✅ Metronome with downbeat detection
+- ✅ Loop playback and recording with overdub note merging
+- ✅ Quantize with triplet and custom tick support
+- ✅ Save/load projects (.mwp JSON format)
+- ✅ Grid snap and duration selector
+- ✅ Tempo control (40-300 BPM)
+- ✅ 15-track MIDI recording and playback
+- ✅ Professional channel mixer (volume, mute, solo, record)
+- ✅ Comprehensive keyboard shortcuts
+- ✅ Visual feedback (grid, playhead, loop region, selection)
+- ✅ Auto-scroll during playback
+- ✅ Zoom and pan navigation
 
-**Goal:** Someone should be able to compose a simple 8-bar melody and save it.
+**Goal Achieved:** Composers can create, edit, and save complete MIDI compositions with professional workflow tools.
 
-### Future Milestone: v0.3 - "Daily Driver for Basic Compositions"
-**Target Features:**
-- All Phase 1 features complete
-- Keyboard shortcuts
-- Velocity editing
-- Transpose
-- Copy/paste
+### Next Milestone: v1.1 - "Polish & Performance"
+**Planned Features:**
+- Error handling improvements (MIDI device disconnect, file I/O errors)
+- Performance optimization (viewport culling, spatial indexing)
+- MidiCanvas refactoring (separation of drawing/input logic)
+- Command merging (cleaner undo history for drag operations)
+- Track management (naming, colors, show/hide)
 
-**Goal:** Comfortable for composing complete songs with multiple instruments.
+**Goal:** Production-ready stability and polish.
 
-### Future Milestone: v1.0 - "Professional Composition Tool"
-**Target Features:**
-- All Phase 1 & 2 features complete
-- MIDI file import/export
-- VST support
-- Stable and well-tested
+### Future Milestone: v1.2 - "Enhanced Editing"
+**Planned Features:**
+- Velocity editing UI
+- Transpose operations
+- Humanize (randomize timing/velocity)
+- Timeline improvements (click to seek, scrubbing)
+- Better transport controls
 
-**Goal:** Production-ready for professional composers.
+**Goal:** Advanced editing capabilities for detailed composition work.
+
+### Future Milestone: v2.0 - "Professional Integration"
+**Planned Features:**
+- MIDI file import/export (.mid format)
+- VST/VST3 plugin support
+- Advanced MIDI CC automation
+- Tempo automation
+- Marker and section support
+
+**Goal:** Full integration with professional audio production workflows.
 
 ---
 

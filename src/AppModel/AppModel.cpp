@@ -6,6 +6,8 @@
 #include "Commands/RecordCommand.h"
 #include "Commands/QuantizeCommand.h"
 #include "Commands/NoteEditCommands.h"
+#include "Commands/DeleteMultipleNotesCommand.h"
+#include "Commands/PasteCommand.h"
 
 using json = nlohmann::json;
 
@@ -346,6 +348,110 @@ void AppModel::AddNoteToRecordChannels(ubyte pitch, uint64_t startTick, uint64_t
 		auto cmd = std::make_unique<AddNoteCommand>(track, timedNoteOn, timedNoteOff);
 		ExecuteCommand(std::move(cmd));
 	}
+}
+
+void AppModel::DeleteNote(const NoteLocation& note)
+{
+	if (!note.found) return;
+
+	Track& track = mTrackSet.GetTrack(note.trackIndex);
+	auto cmd = std::make_unique<DeleteNoteCommand>(
+		track,
+		note.noteOnIndex,
+		note.noteOffIndex
+	);
+	ExecuteCommand(std::move(cmd));
+}
+
+void AppModel::DeleteNotes(const std::vector<NoteLocation>& notes)
+{
+	if (notes.empty()) return;
+
+	// Build deletion list
+	std::vector<DeleteMultipleNotesCommand::NoteToDelete> notesToDelete;
+	notesToDelete.reserve(notes.size());
+
+	for (const auto& note : notes)
+	{
+		Track& track = mTrackSet.GetTrack(note.trackIndex);
+
+		DeleteMultipleNotesCommand::NoteToDelete noteData;
+		noteData.trackIndex = note.trackIndex;
+		noteData.noteOnIndex = note.noteOnIndex;
+		noteData.noteOffIndex = note.noteOffIndex;
+		noteData.noteOn = track[note.noteOnIndex];
+		noteData.noteOff = track[note.noteOffIndex];
+
+		notesToDelete.push_back(noteData);
+	}
+
+	// Execute single batch command
+	auto cmd = std::make_unique<DeleteMultipleNotesCommand>(mTrackSet, notesToDelete);
+	ExecuteCommand(std::move(cmd));
+}
+
+void AppModel::MoveNote(const NoteLocation& note, uint64_t newStartTick, ubyte newPitch)
+{
+	if (!note.found) return;
+
+	// Only execute if position actually changed
+	if (newStartTick == note.startTick && newPitch == note.pitch)
+		return;
+
+	Track& track = mTrackSet.GetTrack(note.trackIndex);
+
+	auto cmd = std::make_unique<MoveNoteCommand>(
+		track,
+		note.noteOnIndex,
+		note.noteOffIndex,
+		newStartTick,
+		newPitch
+	);
+	ExecuteCommand(std::move(cmd));
+}
+
+void AppModel::ResizeNote(const NoteLocation& note, uint64_t newDuration)
+{
+	if (!note.found) return;
+
+	uint64_t oldDuration = note.endTick - note.startTick;
+
+	// Only execute if duration actually changed
+	if (newDuration == oldDuration)
+		return;
+
+	Track& track = mTrackSet.GetTrack(note.trackIndex);
+
+	auto cmd = std::make_unique<ResizeNoteCommand>(
+		track,
+		note.noteOnIndex,
+		note.noteOffIndex,
+		newDuration
+	);
+	ExecuteCommand(std::move(cmd));
+}
+
+void AppModel::SetNoteMovePreview(const NoteLocation& note, uint64_t newStartTick, ubyte newPitch)
+{
+	mNoteEditPreview.isActive = true;
+	mNoteEditPreview.originalNote = note;
+	mNoteEditPreview.previewStartTick = newStartTick;
+	mNoteEditPreview.previewEndTick = newStartTick + (note.endTick - note.startTick);
+	mNoteEditPreview.previewPitch = newPitch;
+}
+
+void AppModel::SetNoteResizePreview(const NoteLocation& note, uint64_t newEndTick)
+{
+	mNoteEditPreview.isActive = true;
+	mNoteEditPreview.originalNote = note;
+	mNoteEditPreview.previewStartTick = note.startTick;
+	mNoteEditPreview.previewEndTick = newEndTick;
+	mNoteEditPreview.previewPitch = note.pitch;
+}
+
+void AppModel::ClearNoteEditPreview()
+{
+	mNoteEditPreview.isActive = false;
 }
 
 // MIDI Input port management
@@ -695,6 +801,43 @@ void AppModel::CopyToClipboard(const std::vector<ClipboardNote>& notes)
 	mClipboard = notes;
 }
 
+void AppModel::CopyNotesToClipboard(const std::vector<NoteLocation>& notes)
+{
+	if (notes.empty()) return;
+
+	// Find the earliest start tick to use as reference (for relative timing)
+	uint64_t earliestTick = UINT64_MAX;
+	for (const auto& note : notes)
+	{
+		if (note.startTick < earliestTick)
+		{
+			earliestTick = note.startTick;
+		}
+	}
+
+	// Convert selected notes to clipboard format
+	std::vector<AppModel::ClipboardNote> clipboardNotes;
+	clipboardNotes.reserve(notes.size());
+
+	for (const auto& note : notes)
+	{
+		Track& track = mTrackSet.GetTrack(note.trackIndex);
+		const TimedMidiEvent& noteOnEvent = track[note.noteOnIndex];
+
+		AppModel::ClipboardNote clipNote;
+		clipNote.relativeStartTick = note.startTick - earliestTick;
+		clipNote.duration = note.endTick - note.startTick;
+		clipNote.pitch = note.pitch;
+		clipNote.velocity = noteOnEvent.mm.mData[2];  // Velocity is third byte
+		clipNote.trackIndex = note.trackIndex;
+
+		clipboardNotes.push_back(clipNote);
+	}
+
+	// Copy to AppModel clipboard
+	CopyToClipboard(clipboardNotes);
+}
+
 const std::vector<AppModel::ClipboardNote>& AppModel::GetClipboard() const
 {
 	return mClipboard;
@@ -708,6 +851,20 @@ bool AppModel::HasClipboardData() const
 void AppModel::ClearClipboard()
 {
 	mClipboard.clear();
+}
+
+// Paste Clipboard notes at given tick position
+// param optional: default pasteTick is the transport's playhead
+void AppModel::PasteNotes(uint64_t pasteTick)
+{
+	if (!HasClipboardData()) return;
+	
+	if (pasteTick == UINT64_MAX) 
+	{   
+		pasteTick = mTransport.GetCurrentTick();
+	}
+	auto cmd = std::make_unique<PasteCommand>(mTrackSet, GetClipboard(), pasteTick);
+	ExecuteCommand(std::move(cmd));
 }
 
 // Private Methods

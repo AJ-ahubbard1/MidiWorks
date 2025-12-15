@@ -12,6 +12,7 @@ namespace MidiConstants
 	static constexpr int MIDI_NOTE_COUNT = 128;     // MIDI notes 0-127
 	static constexpr int MAX_MIDI_NOTE = 127;       // Highest MIDI note
 	static constexpr int PROGRAM_COUNT = 128;       // MIDI programs 0-127
+	static constexpr int NOTES_PER_OCTAVE = 12;		// 12 chromatic pitches
 
 	// Default Initial Values (can change at runtime)
 	static constexpr double DEFAULT_TEMPO = 120.0;

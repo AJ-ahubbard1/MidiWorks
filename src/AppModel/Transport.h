@@ -184,8 +184,6 @@ public:
 		return GetTicksPerBeat() * mTimeSignatureNumerator;
 	}
 
-
-
 private:
 	State			mState = State::Stopped;
 	uint64_t		mCurrentTimeMs = 0;

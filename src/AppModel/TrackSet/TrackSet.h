@@ -46,10 +46,13 @@ public:
 
 	NoteLocation FindNoteAt(uint64_t tick, ubyte pitch);
 
-	std::vector<NoteLocation> FindNotesInRegion(uint64_t minTick, uint64_t maxTick, 
+	std::vector<NoteLocation> FindNotesInRegion(uint64_t minTick, uint64_t maxTick,
 			ubyte minPitch, ubyte maxPitch);
 
 	std::vector<NoteLocation> GetAllNotes();
+
+	// Static helper to extract note pairs from a single Track
+	static std::vector<NoteLocation> GetNotesFromTrack(const Track& track, int trackIndex = 0);
 
 	void FinalizeRecording(Track& recordingBuffer);
 
