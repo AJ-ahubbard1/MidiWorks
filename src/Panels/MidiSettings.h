@@ -24,7 +24,14 @@ private:
 	{
 		wxFont mainFont(wxFontInfo(wxSize(0, 12)));
 
-		auto inPorts = mAppModel->GetMidiInputPortNames();
+		auto inPortsVec = mAppModel->GetMidiInputManager().GetPortNames();
+
+		// Convert std::vector<std::string> to wxArrayString for cross-platform compatibility
+		wxArrayString inPorts;
+		for (const auto& port : inPortsVec)
+		{
+			inPorts.Add(port);
+		}
 
 		mInPortList = new wxRadioBox(this, wxID_ANY, wxT("Midi In Port"),
 			wxDefaultPosition, wxDefaultSize, inPorts, 1, wxRA_SPECIFY_COLS);
@@ -51,6 +58,6 @@ private:
 	void OnInPortClicked(wxCommandEvent& evt)
 	{
 		unsigned int p = evt.GetSelection();
-		mAppModel->SetMidiInputPort(p);
+		mAppModel->GetMidiInputManager().SetInputPort(p);
 	}
 };

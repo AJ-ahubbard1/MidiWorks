@@ -2,6 +2,7 @@
 #include "Command.h"
 #include "AppModel/TrackSet/TrackSet.h"
 #include <algorithm>
+#include <cstdint>
 using namespace MidiInterface;
 
 /// <summary>

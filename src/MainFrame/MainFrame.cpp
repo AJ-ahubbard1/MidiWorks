@@ -16,101 +16,76 @@ MainFrame::MainFrame()
 	CreateSizer();
 
 	Bind(wxEVT_AUI_PANE_CLOSE, &MainFrame::OnPaneClosed, this);
+	Bind(wxEVT_CLOSE_WINDOW, &MainFrame::OnClose, this);
 	mTimer.Bind(wxEVT_TIMER, &MainFrame::OnTimer, this);
 
 	// Set up keyboard shortcuts for transport control
 	wxAcceleratorEntry entries[3];
-	entries[0].Set(wxACCEL_NORMAL, WXK_SPACE, wxID_HIGHEST + 1000);  // Spacebar = Toggle Play
-	entries[1].Set(wxACCEL_NORMAL, 'R', wxID_HIGHEST + 1001);        // R = Record
-	entries[2].Set(wxACCEL_NORMAL, 'Q', wxID_HIGHEST + 1002);        // Q = Quantize
+	entries[0].Set(wxACCEL_NORMAL, WXK_SPACE, ID_KEYBOARD_TOGGLE_PLAY);  // Spacebar = Toggle Play
+	entries[1].Set(wxACCEL_NORMAL, 'R', ID_KEYBOARD_RECORD);              // R = Record
+	entries[2].Set(wxACCEL_NORMAL, 'Q', ID_KEYBOARD_QUANTIZE);            // Q = Quantize
 	wxAcceleratorTable accelTable(3, entries);
 	SetAcceleratorTable(accelTable);
 
-	Bind(wxEVT_MENU, &MainFrame::OnTogglePlay, this, wxID_HIGHEST + 1000);
-	Bind(wxEVT_MENU, &MainFrame::OnStartRecord, this, wxID_HIGHEST + 1001);
+	Bind(wxEVT_MENU, &MainFrame::OnTogglePlay, this, ID_KEYBOARD_TOGGLE_PLAY);
+	Bind(wxEVT_MENU, &MainFrame::OnStartRecord, this, ID_KEYBOARD_RECORD);
 
 	mAuiManager.Update();
-	mTimer.Start(2);
+	mTimer.Start(1);
 	Bind(wxEVT_AUI_RENDER, &MainFrame::OnAuiRender, this);
 
 	CreateStatusBar();
 	SetStatusText("Thanks for using MidiWorks");
 }
 
-// Instantiate panels, define layout metadata, and add panel into mPanels map
+// Instantiate panels, define layout metadata, and register each panel (IDs auto-assigned)
 void MainFrame::CreateDockablePanes()
 {
-	int idBase = wxID_HIGHEST + 1;
 	auto& soundBank = mAppModel->GetSoundBank();
-	mMidiSettingsPanel = new MidiSettingsPanel(this, mAppModel, *wxLIGHT_GREY, "Midi Settings");
+
 	mSoundBankPanel = new SoundBankPanel(this, soundBank);
+	RegisterPanel({"Sound Bank", mSoundBankPanel, PanePosition::Left, wxSize(247, 636)});
+
+	mMidiSettingsPanel = new MidiSettingsPanel(this, mAppModel, *wxLIGHT_GREY, "Midi Settings");
+	RegisterPanel({"Midi Settings", mMidiSettingsPanel, PanePosition::Left, wxSize(247, 253), wxSize(-1, -1)});
+
 	mTransportPanel = new TransportPanel(this, mAppModel, *wxLIGHT_GREY, "Transport");
+	RegisterPanel({"Transport", mTransportPanel, PanePosition::Top, wxSize(-1, -1), wxSize(-1, -1), false, false});
+
 	mMidiCanvasPanel = new MidiCanvasPanel(this, mAppModel, "Canvas");
+	RegisterPanel({"Midi Canvas", mMidiCanvasPanel, PanePosition::Center});
+
 	mLogPanel = new LogPanel(this);
+	RegisterPanel({"Midi Log", mLogPanel, PanePosition::Right, wxSize(247, -1)});
+
 	mUndoHistoryPanel = new UndoHistoryPanel(this, mAppModel);
+	RegisterPanel({"Undo History", mUndoHistoryPanel, PanePosition::Right, wxSize(247, -1)});
+
 	mShortcutsPanel = new ShortcutsPanel(this, *wxLIGHT_GREY, "Shortcuts");
-
-	// Define layout metadata and register each panel
-	PanelInfo soundBankInfo
-	{
-		"Sound Bank", mSoundBankPanel, idBase++,
-		PanePosition::Left, wxSize(247, 636)
-	};
-	PanelInfo midiSettingsPanelInfo
-	{
-		"Midi Settings", mMidiSettingsPanel, idBase++,
-		PanePosition::Left, wxSize(247, 253), wxSize(-1, -1)
-	};
-	PanelInfo transportPanelInfo
-	{
-		"Transport", mTransportPanel, idBase++,
-		PanePosition::Top, wxSize(-1, -1), wxSize(-1, -1), false, false
-	};
-	PanelInfo midiCanvasInfo
-	{
-		"Midi Canvas", mMidiCanvasPanel, idBase++, PanePosition::Center
-	};
-	PanelInfo logPanelInfo
-	{
-		"Midi Log", mLogPanel, idBase++,
-		PanePosition::Right, wxSize(247, -1)
-	};
-	PanelInfo undoHistoryPanelInfo
-	{
-		"Undo History", mUndoHistoryPanel, idBase++,
-		PanePosition::Right, wxSize(247, -1)
-	};
-	PanelInfo shortcutsPanelInfo
-	{
-		"Shortcuts", mShortcutsPanel, idBase++,
-		PanePosition::Right, wxSize(347, -1)
-	};
-
-	RegisterPanel(soundBankInfo);
-	RegisterPanel(midiSettingsPanelInfo);
-	RegisterPanel(transportPanelInfo);
-	RegisterPanel(midiCanvasInfo);
-	RegisterPanel(logPanelInfo);
-	RegisterPanel(undoHistoryPanelInfo);
-	RegisterPanel(shortcutsPanelInfo);
+	RegisterPanel({"Shortcuts", mShortcutsPanel, PanePosition::Right, wxSize(347, -1)});
 
 	// Register log callback for MIDI event logging
-	mAppModel->SetLogCallback([this](const TimedMidiEvent& event) {
-		if (mLogPanel) {
+	mAppModel->GetMidiInputManager().SetLogCallback([this](const TimedMidiEvent& event)
+	{
+		if (mLogPanel)
+		{
 			mLogPanel->LogMidiEvent(event);
 		}
 	});
 
 	// Register dirty state callback for title bar updates
-	mAppModel->SetDirtyStateCallback([this](bool isDirty) {
+	mAppModel->SetDirtyStateCallback([this](bool isDirty) 
+	{
 		UpdateTitle();
 	});
 }
 
 // Add Panels to map, used to toggle visibility
-void MainFrame::RegisterPanel(const PanelInfo& info)
+void MainFrame::RegisterPanel(PanelInfo info)
 {
-	// The IDs are incremented inside of CreateDockablePanes to insure they are unique
+	// Auto-assign unique menu ID for this panel
+	info.menuId = mNextPanelId++;
+
 	mPanels.insert({info.menuId, info});
 	mAuiManager.AddPane(info.window, CreatePaneInfo(info));
 }
@@ -132,6 +107,7 @@ void MainFrame::CreateMenuBar()
 
 	// File Menu
 	auto* fileMenu = new wxMenu();
+	// Menu Append params: event id, label string, help string
 	fileMenu->Append(wxID_NEW, "&New Project\tCtrl+N", "Create a new project");
 	fileMenu->Append(wxID_OPEN, "&Open...\tCtrl+O", "Open a project");
 	fileMenu->Append(wxID_SAVE, "&Save\tCtrl+S", "Save the current project");
@@ -139,12 +115,12 @@ void MainFrame::CreateMenuBar()
 	fileMenu->AppendSeparator();
 	fileMenu->Append(wxID_EXIT, "E&xit\tAlt+F4", "Exit MidiWorks");
 
+	// Use event ids and bind them to event handlers
 	Bind(wxEVT_MENU, &MainFrame::OnNew, this, wxID_NEW);
 	Bind(wxEVT_MENU, &MainFrame::OnOpen, this, wxID_OPEN);
 	Bind(wxEVT_MENU, &MainFrame::OnSave, this, wxID_SAVE);
 	Bind(wxEVT_MENU, &MainFrame::OnSaveAs, this, wxID_SAVEAS);
 	Bind(wxEVT_MENU, &MainFrame::OnExit, this, wxID_EXIT);
-
 	menuBar->Append(fileMenu, "&File");
 
 	// Edit Menu - Undo/Redo
@@ -152,10 +128,10 @@ void MainFrame::CreateMenuBar()
 	editMenu->Append(wxID_UNDO, "Undo\tCtrl+Z", "Undo last action");
 	editMenu->Append(wxID_REDO, "Redo\tCtrl+Y", "Redo last undone action");
 	editMenu->AppendSeparator();
-	editMenu->Append(wxID_HIGHEST + 1002, "Quantize to Grid\tQ", "Snap all notes to nearest grid division");
+	editMenu->Append(ID_KEYBOARD_QUANTIZE, "Quantize to Grid\tQ", "Snap all notes to nearest grid division");
 	Bind(wxEVT_MENU, &MainFrame::OnUndo, this, wxID_UNDO);
 	Bind(wxEVT_MENU, &MainFrame::OnRedo, this, wxID_REDO);
-	Bind(wxEVT_MENU, &MainFrame::OnQuantize, this, wxID_HIGHEST + 1002);
+	Bind(wxEVT_MENU, &MainFrame::OnQuantize, this, ID_KEYBOARD_QUANTIZE);
 	menuBar->Append(editMenu, "Edit");
 
 	// View Menu - Dockable Panels
@@ -178,63 +154,13 @@ void MainFrame::CreateSizer()
 	SetSizer(sizer);
 }
 
-// Toggle visibility of panes associated with clicked panes in view menu
-void MainFrame::OnTogglePane(wxCommandEvent& event)
-{
-	for (const auto& [id, info] : GetAllPanels())
-	{
-		// find the correct pane and flip visibility
-		// new state needs to be passed to AUI manager, menu, and AppModel
-		if (event.GetId() == id)
-		{
-			auto& pane = mAuiManager.GetPane(info.name);
-			bool newState = !pane.IsShown();
-			pane.Show(newState);
-			mAuiManager.Update();
-
-			GetMenuBar()->Check(id, newState);
-			SetPanelVisibility(id, newState);
-			break;
-		}
-	}
-}
-
-// Update AppModel and view menu when a pane's [x] close button is clicked
-void MainFrame::OnPaneClosed(wxAuiManagerEvent& event)
-{
-	wxString name = event.GetPane()->name;
-
-	for (const auto& [id, info] : GetAllPanels())
-	{
-		if (info.name == name)
-		{
-			GetMenuBar()->Check(id, false);
-			SetPanelVisibility(id, false);
-			break;
-		}
-	}
-}
-
+// Update the App Model then necessary panels
 void MainFrame::OnTimer(wxTimerEvent&)
 {
 	mAppModel->Update();
-	// @TODO: If needed later on, make a MainFrame::Update function for the multiple panes
 	mTransportPanel->UpdateDisplay();
 	mMidiCanvasPanel->Update();
 	// Note: Logging now handled via callback - no polling needed
-}
-
-// Debug Tool for layout, when docked panes are resized, the dimensions are shown in controlbar
-void MainFrame::OnAuiRender(wxAuiManagerEvent& event)
-{
-	wxString msg = "Layout changed";
-	for (const auto& pane : mAuiManager.GetAllPanes())
-	{
-		wxSize sz = pane.window->GetSize();
-		msg += wxString::Format("|%s: %d x %d", pane.name, sz.GetWidth(), sz.GetHeight());
-	}
-	SetStatusText(msg);
-	event.Skip();
 }
 
 // After Panes are created, set the checks in the views menu to match the panes' visibilities
@@ -246,202 +172,34 @@ void MainFrame::SyncMenuChecks()
 	}
 }
 
-// Undo last action (Ctrl+Z)
-void MainFrame::OnUndo(wxCommandEvent& event)
-{
-	// Stop playback/recording to prevent iterator invalidation
-	// (can't modify tracks while they're being iterated during playback)
-	mAppModel->StopPlaybackIfActive();
-
-	mAppModel->Undo();
-	mUndoHistoryPanel->UpdateDisplay();  // Update command history display
-	Refresh();  // Redraw canvas to show changes
-}
-
-// Redo last undone action (Ctrl+Y)
-void MainFrame::OnRedo(wxCommandEvent& event)
-{
-	// Stop playback/recording to prevent iterator invalidation
-	// (can't modify tracks while they're being iterated during playback)
-	mAppModel->StopPlaybackIfActive();
-	
-	mAppModel->Redo();
-	mUndoHistoryPanel->UpdateDisplay();  // Update command history display
-	Refresh();  // Redraw canvas to show changes
-}
-
-// Quantize all tracks to grid (Q)
-void MainFrame::OnQuantize(wxCommandEvent& event)
-{
-	uint64_t gridSize = mMidiCanvasPanel->GetGridSize();
-	mAppModel->QuantizeAllTracks(gridSize);
-	mUndoHistoryPanel->UpdateDisplay();
-	Refresh();
-}
-
-// File Menu Handlers
-void MainFrame::OnNew(wxCommandEvent& event)
-{
-	// Check for unsaved changes
-	if (mAppModel->IsProjectDirty()) {
-		int result = wxMessageBox(
-			"Do you want to save changes to the current project?",
-			"Unsaved Changes",
-			wxYES_NO | wxCANCEL | wxICON_QUESTION);
-
-		if (result == wxYES) {
-			OnSave(event);
-		}
-		else if (result == wxCANCEL) {
-			return;
-		}
-	}
-
-	// Clear all data
-	mAppModel->ClearProject();
-
-	// Update UI controls to reflect cleared state
-	mSoundBankPanel->UpdateFromModel();
-	mTransportPanel->UpdateTempoDisplay();
-
-	UpdateTitle();
-	Refresh();
-}
-
-void MainFrame::OnOpen(wxCommandEvent& event)
-{
-	// Check for unsaved changes
-	if (mAppModel->IsProjectDirty()) {
-		int result = wxMessageBox(
-			"Do you want to save changes to the current project?",
-			"Unsaved Changes",
-			wxYES_NO | wxCANCEL | wxICON_QUESTION);
-
-		if (result == wxYES) {
-			OnSave(event);
-		}
-		else if (result == wxCANCEL) {
-			return;
-		}
-	}
-
-	wxFileDialog openDialog(this,
-		"Open MidiWorks Project",
-		wxEmptyString,
-		wxEmptyString,
-		"MidiWorks Projects (*.mwp)|*.mwp",
-		wxFD_OPEN | wxFD_FILE_MUST_EXIST);
-
-	if (openDialog.ShowModal() == wxID_CANCEL) {
-		return;
-	}
-
-	std::string path = openDialog.GetPath().ToStdString();
-	if (mAppModel->LoadProject(path)) {
-		// Update UI controls to reflect loaded data
-		mSoundBankPanel->UpdateFromModel();
-		mTransportPanel->UpdateTempoDisplay();
-
-		UpdateTitle();
-		Refresh();  // Redraw canvas with loaded data
-	}
-	else {
-		wxMessageBox("Failed to load project", "Error", wxOK | wxICON_ERROR);
-	}
-}
-
-void MainFrame::OnSave(wxCommandEvent& event)
-{
-	if (mAppModel->GetCurrentProjectPath().empty()) {
-		// No path yet, use Save As
-		OnSaveAs(event);
-		return;
-	}
-
-	if (mAppModel->SaveProject(mAppModel->GetCurrentProjectPath())) {
-		UpdateTitle();  // Title updates automatically via callback, but ensure it's current
-	}
-	else {
-		wxMessageBox("Failed to save project", "Error", wxOK | wxICON_ERROR);
-	}
-}
-
-void MainFrame::OnSaveAs(wxCommandEvent& event)
-{
-	wxFileDialog saveDialog(this,
-		"Save MidiWorks Project",
-		wxEmptyString,
-		wxEmptyString,
-		"MidiWorks Projects (*.mwp)|*.mwp",
-		wxFD_SAVE | wxFD_OVERWRITE_PROMPT);
-
-	if (saveDialog.ShowModal() == wxID_CANCEL) {
-		return;
-	}
-
-	std::string path = saveDialog.GetPath().ToStdString();
-	if (mAppModel->SaveProject(path)) {
-		UpdateTitle();  // Title updates automatically via callback, but ensure it's current
-	}
-	else {
-		wxMessageBox("Failed to save project", "Error", wxOK | wxICON_ERROR);
-	}
-}
-
-void MainFrame::OnExit(wxCommandEvent& event)
-{
-	// Check for unsaved changes
-	if (mAppModel->IsProjectDirty()) {
-		int result = wxMessageBox(
-			"Do you want to save changes before exiting?",
-			"Unsaved Changes",
-			wxYES_NO | wxCANCEL | wxICON_QUESTION);
-
-		if (result == wxYES) {
-			OnSave(event);
-		}
-		else if (result == wxCANCEL) {
-			return;
-		}
-	}
-
-	Close(true);
-}
-
 void MainFrame::UpdateTitle()
 {
 	std::string title = "MidiWorks - ";
-	std::string path = mAppModel->GetCurrentProjectPath();
+	std::string path = mAppModel->GetProjectManager().GetCurrentProjectPath();
 
-	if (path.empty()) {
+	if (path.empty())
+	{
 		title += "Untitled";
 	}
-	else {
+	else
+	{
 		// Extract filename from full path
 		size_t lastSlash = path.find_last_of("/\\");
-		if (lastSlash != std::string::npos) {
+		if (lastSlash != std::string::npos)
+		{
 			title += path.substr(lastSlash + 1);
 		}
-		else {
+		else
+		{
 			title += path;
 		}
 	}
 
 	// Add asterisk if dirty
-	if (mAppModel->IsProjectDirty()) {
+	if (mAppModel->GetProjectManager().IsProjectDirty()) 
+	{
 		title += " *";
 	}
 
 	SetTitle(title);
-}
-
-// Transport keyboard shortcuts
-void MainFrame::OnTogglePlay(wxCommandEvent& event)
-{
-	mAppModel->GetTransport().TogglePlay();
-}
-
-void MainFrame::OnStartRecord(wxCommandEvent& event)
-{
-	mAppModel->GetTransport().ToggleRecord();
 }

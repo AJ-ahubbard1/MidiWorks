@@ -4,6 +4,7 @@
 #include "RtMidiWrapper/MidiMessage/MidiMessage.h"
 #include "MidiConstants.h"
 #include <algorithm>
+#include <cstdint>
 using namespace MidiInterface;
 
 struct TimedMidiEvent
@@ -51,8 +52,16 @@ public:
 
 	std::vector<NoteLocation> GetAllNotes();
 
+	// Get all raw MIDI events from all tracks (for debugging)
+	std::vector<TimedMidiEvent> GetAllTimedMidiEvents();
+
 	// Static helper to extract note pairs from a single Track
 	static std::vector<NoteLocation> GetNotesFromTrack(const Track& track, int trackIndex = 0);
+
+	// Merge overlapping notes during loop recording
+	// When consecutive NoteOn messages of same pitch/channel occur,
+	// merge them into a single note (first NoteOn + last NoteOff)
+	static void MergeOverlappingNotes(Track& buffer);
 
 	void FinalizeRecording(Track& recordingBuffer);
 

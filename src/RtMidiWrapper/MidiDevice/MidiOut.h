@@ -47,7 +47,7 @@ namespace MidiInterface
 
         void sendMessage(MidiMessage mm)
         {
-            mPlayer->sendMessage(mm.mData, 3);
+            mPlayer->sendMessage(mm.mData, mm.getMessageSize());
         }
 
         unsigned int getNumPorts() const

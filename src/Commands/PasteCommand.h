@@ -1,7 +1,7 @@
 #pragma once
 #include "Command.h"
 #include "AppModel/TrackSet/TrackSet.h"
-#include "AppModel/AppModel.h"
+#include "AppModel/Clipboard/Clipboard.h"
 #include <algorithm>
 #include <vector>
 using namespace MidiInterface;
@@ -18,9 +18,9 @@ public:
 	/// Construct a paste command.
 	/// </summary>
 	/// <param name="trackSet">Reference to the track set</param>
-	/// <param name="clipboardNotes">Notes to paste (from AppModel clipboard)</param>
+	/// <param name="clipboardNotes">Notes to paste (from clipboard)</param>
 	/// <param name="pasteTick">Tick position where notes should be pasted</param>
-	PasteCommand(TrackSet& trackSet, const std::vector<AppModel::ClipboardNote>& clipboardNotes, uint64_t pasteTick)
+	PasteCommand(TrackSet& trackSet, const std::vector<Clipboard::ClipboardNote>& clipboardNotes, uint64_t pasteTick)
 		: mTrackSet(trackSet)
 		, mClipboardNotes(clipboardNotes)
 		, mPasteTick(pasteTick)
@@ -133,7 +133,7 @@ private:
 	};
 
 	TrackSet& mTrackSet;
-	std::vector<AppModel::ClipboardNote> mClipboardNotes;
+	std::vector<Clipboard::ClipboardNote> mClipboardNotes;
 	uint64_t mPasteTick;
 	std::vector<PastedNoteInfo> mPastedNotes;  // Indices of pasted notes for undo
 };

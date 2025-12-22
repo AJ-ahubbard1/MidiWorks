@@ -136,6 +136,19 @@ namespace MidiInterface
 			return static_cast<MidiEvent>(mData[0] & 0xF0);
 		}
 
+		// Get the correct MIDI message size based on message type
+		size_t getMessageSize() const
+		{
+			MidiEvent evt = getEventType();
+			// Program Change and Channel Pressure are 2-byte messages
+			if (evt == PROGRAM_CHANGE || evt == CHANNEL_PRESSURE)
+			{
+				return 2;
+			}
+			// All other messages are 3-byte messages
+			return 3;
+		}
+
 		ubyte getChannel() const
 		{
 			return static_cast<ubyte>(mData[0] & 0x0F);

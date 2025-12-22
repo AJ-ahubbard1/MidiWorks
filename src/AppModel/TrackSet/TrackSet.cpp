@@ -134,6 +134,78 @@ std::vector<NoteLocation> TrackSet::GetAllNotes()
 	return result;
 }
 
+std::vector<TimedMidiEvent> TrackSet::GetAllTimedMidiEvents()
+{
+	std::vector<TimedMidiEvent> result;
+
+	for (int trackIndex = 0; trackIndex < MidiConstants::CHANNEL_COUNT; trackIndex++)
+	{
+		const Track& track = mTracks[trackIndex];
+		result.insert(result.end(), track.begin(), track.end());
+	}
+
+	return result;
+}
+
+void TrackSet::MergeOverlappingNotes(Track& buffer)
+{
+	if (buffer.size() < 2) return;
+
+	// Sort by tick to ensure chronological order
+	std::sort(buffer.begin(), buffer.end(),
+		[](const TimedMidiEvent& a, const TimedMidiEvent& b) {
+			return a.tick < b.tick;
+		});
+
+	std::vector<size_t> indicesToRemove;
+
+	// Scan for consecutive NoteOns of same pitch/channel
+	for (size_t i = 0; i < buffer.size() - 1; i++)
+	{
+		const auto& event1 = buffer[i];
+
+		// Skip if already marked for removal or not a NoteOn
+		if (std::find(indicesToRemove.begin(), indicesToRemove.end(), i) != indicesToRemove.end())
+			continue;
+		if (!event1.mm.isNoteOn())
+			continue;
+
+		uint8_t pitch1 = event1.mm.getPitch();
+		uint8_t channel1 = event1.mm.getChannel();
+
+		// Check if next event is also NoteOn with same pitch/channel
+		const auto& event2 = buffer[i + 1];
+		if (event2.mm.isNoteOn() &&
+		    event2.mm.mData[1] == pitch1 &&
+		    event2.mm.getChannel() == channel1)
+		{
+			// Consecutive NoteOns found! Mark second NoteOn for removal
+			indicesToRemove.push_back(i + 1);
+
+			// Find and remove the first NoteOff (keep last NoteOff)
+			for (size_t j = i + 2; j < buffer.size(); j++)
+			{
+				const auto& eventJ = buffer[j];
+				if (eventJ.mm.isNoteOff() &&
+				    eventJ.mm.getPitch() == pitch1 &&
+				    eventJ.mm.getChannel() == channel1)
+				{
+					// Found first NoteOff, mark for removal
+					indicesToRemove.push_back(j);
+					break;  // Only remove the first NoteOff
+				}
+			}
+		}
+	}
+
+	// Remove marked events in reverse order to maintain indices
+	std::sort(indicesToRemove.begin(), indicesToRemove.end(), std::greater<size_t>());
+	for (size_t idx : indicesToRemove)
+	{
+		buffer.erase(buffer.begin() + idx);
+	}
+}
+
 void TrackSet::FinalizeRecording(Track& recordingBuffer)
 {
 	for (const auto& event : recordingBuffer)

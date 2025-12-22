@@ -67,9 +67,21 @@ namespace MidiCanvasConstants
 	const double AUTOSCROLL_TRIGGER_THRESHOLD = 0.8;  // Playhead position that triggers auto-scroll (80% of screen)
 	const double AUTOSCROLL_TARGET_POSITION = 0.2;    // Target playhead position after scroll (20% from left)
 
+	// ========== Zoom Constraints ==========
+	const int DEFAULT_NOTE_HEIGHT_PIXELS = 5;        // Initial note height before window resize
+	const int MAX_NOTE_HEIGHT_PIXELS = 50;           // Maximum zoom: 50 pixels per note
+	const int MIN_NOTE_HEIGHT_PIXELS = 1;            // Absolute minimum: 1 pixel per note
+
 	// ========== Note Editing Constraints ==========
 	const int MAX_EDITABLE_PITCH = 120;               // Notes above this pitch trigger selection mode instead
 	const int USER_TRACK_COUNT = 15;                  // Number of user MIDI tracks (0-14, channel 15 reserved for metronome)
+
+	// ========== Debug MIDI Events Display ==========
+	const int MIDI_EVENT_CIRCLE_RADIUS = 4;
+	const wxColour MIDI_EVENT_NOTE_ON(0, 255, 0, 200);    // Green for Note On
+	const wxColour MIDI_EVENT_NOTE_OFF(255, 0, 0, 200);   // Red for Note Off
+	const wxColour MIDI_EVENT_OTHER(100, 150, 255, 200);  // Blue for other MIDI messages
+	const int MIDI_EVENT_HOVER_DISTANCE = 8;              // Pixels to detect hover
 
 	// ========== Note Duration Options ==========
 	const int MAX_CUSTOM_TICKS = 10000;               // Maximum value for custom tick duration

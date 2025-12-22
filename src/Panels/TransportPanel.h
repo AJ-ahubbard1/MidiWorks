@@ -72,7 +72,7 @@ private:
 
 		// Metronome checkbox (renamed to "Click")
 		mMetronomeCheckBox = new wxCheckBox(this, wxID_ANY, "Click");
-		mMetronomeCheckBox->SetValue(mModel->IsMetronomeEnabled());
+		mMetronomeCheckBox->SetValue(mModel->GetMetronomeService().IsEnabled());
 
 		// Loop checkbox
 		mLoopCheckBox = new wxCheckBox(this, wxID_ANY, "Loop");
@@ -189,7 +189,7 @@ private:
 
 	void OnMetronomeToggle(wxCommandEvent& event)
 	{
-		mModel->SetMetronomeEnabled(mMetronomeCheckBox->GetValue());
+		mModel->GetMetronomeService().SetEnabled(mMetronomeCheckBox->GetValue());
 	}
 
 	void OnLoopToggle(wxCommandEvent& event)

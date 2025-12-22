@@ -141,15 +141,31 @@
   <ItemGroup>
     <ClCompile Include="src\App.cpp" />
     <ClCompile Include="src\AppModel\AppModel.cpp" />
+    <ClCompile Include="src\AppModel\Clipboard\Clipboard.cpp" />
+    <ClCompile Include="src\AppModel\MidiInputManager\MidiInputManager.cpp" />
+    <ClCompile Include="src\AppModel\NoteEditor\NoteEditor.cpp" />
+    <ClCompile Include="src\AppModel\ProjectManager\ProjectManager.cpp" />
+    <ClCompile Include="src\AppModel\RecordingSession\RecordingSession.cpp" />
+    <ClCompile Include="src\AppModel\UndoRedoManager\UndoRedoManager.cpp" />
     <ClCompile Include="src\AppModel\SoundBank\SoundBank.cpp" />
     <ClCompile Include="src\AppModel\TrackSet\TrackSet.cpp" />
+    <ClCompile Include="src\AppModel\Transport\Transport.cpp" />
     <ClCompile Include="src\Commands\NoteEditCommands.cpp" />
     <ClCompile Include="src\MainFrame\MainFrame.cpp" />
+    <ClCompile Include="src\MainFrame\MainFrameEventHandlers.cpp" />
     <ClCompile Include="src\Panels\MidiCanvas\MidiCanvas.cpp" />
+    <ClCompile Include="src\Panels\MidiCanvas\MidiCanvasEventHandlers.cpp" />
     <ClCompile Include="src\RtMidiWrapper\RtMidi\RtMidi.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="src\AppModel\AppModel.h" />
+    <ClInclude Include="src\AppModel\Clipboard\Clipboard.h" />
+    <ClInclude Include="src\AppModel\MetronomeService\MetronomeService.h" />
+    <ClInclude Include="src\AppModel\MidiInputManager\MidiInputManager.h" />
+    <ClInclude Include="src\AppModel\NoteEditor\NoteEditor.h" />
+    <ClInclude Include="src\AppModel\ProjectManager\ProjectManager.h" />
+    <ClInclude Include="src\AppModel\RecordingSession\RecordingSession.h" />
+    <ClInclude Include="src\AppModel\UndoRedoManager\UndoRedoManager.h" />
     <ClInclude Include="src\Commands\Command.h" />
     <ClInclude Include="src\Commands\NoteEditCommands.h" />
     <ClInclude Include="src\Commands\PasteCommand.h" />
@@ -159,8 +175,9 @@
     <ClInclude Include="src\MainFrame\PaneInfo.h" />
     <ClInclude Include="src\AppModel\SoundBank\SoundBank.h" />
     <ClInclude Include="src\AppModel\TrackSet\TrackSet.h" />
-    <ClInclude Include="src\AppModel\Transport.h" />
+    <ClInclude Include="src\AppModel\Transport\Transport.h" />
     <ClInclude Include="src\MainFrame\MainFrame.h" />
+    <ClInclude Include="src\MidiConstants.h" />
     <ClInclude Include="src\Panels\ChannelControls.h" />
     <ClInclude Include="src\Panels\ChannelTrackRow.h" />
     <ClInclude Include="src\Panels\Dummy.h" />
@@ -169,6 +186,7 @@
     <ClInclude Include="src\Panels\Log.h" />
     <ClInclude Include="src\Panels\MainSynth.h" />
     <ClInclude Include="src\Panels\MidiCanvas\MidiCanvas.h" />
+    <ClInclude Include="src\Panels\MidiCanvas\MidiCanvasConstants.h" />
     <ClInclude Include="src\Panels\MidiSettings.h" />
     <ClInclude Include="src\Panels\Panels.h" />
     <ClInclude Include="src\Panels\SoundBankPanel.h" />

@@ -2,9 +2,12 @@
 #include <wx/display.h>
 #include "MainFrame/MainFrame.h"
 
+
+// Simple entry point for wx widgets application
 class App : public wxApp
 {
 public:
+	// Starts MainFrame, the primary view of MidiWorks
 	bool OnInit()
 	{
 		mMainFrame = new MainFrame();
@@ -13,6 +16,7 @@ public:
 		return true;
 	}
 
+	// Starts window in center of screen at 2/3 the width and height
 	void SetScreenSizeAndPosition()
 	{
 		wxDisplay display;
@@ -27,4 +31,5 @@ private:
 	MainFrame* mMainFrame;
 };
 
+// Line needed to run wx app 
 wxIMPLEMENT_APP(App);

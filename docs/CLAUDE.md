@@ -20,14 +20,18 @@ MidiWorks is a wxWidgets-based Digital Audio Workstation (DAW) written in C++20.
 
 ## Build System
 
+MidiWorks supports both Windows (Visual Studio) and cross-platform (CMake) build systems.
+
+### Windows Build (Visual Studio)
+
 **Visual Studio Solution:** `MidiWorks.sln` / `MidiWorks.vcxproj`
 
-### Prerequisites
+#### Prerequisites
 - Visual Studio 2022 (Platform Toolset v143)
 - wxWidgets library with `WXWIN` environment variable set
 - Windows 10 SDK
 
-### Build Commands
+#### Build Commands
 ```powershell
 # Build from Visual Studio IDE
 # Open MidiWorks.sln and press F5 (Debug) or Ctrl+F5 (Release)
@@ -37,18 +41,53 @@ msbuild MidiWorks.sln /p:Configuration=Debug /p:Platform=x64
 msbuild MidiWorks.sln /p:Configuration=Release /p:Platform=x64
 ```
 
-### Build Configurations
+#### Build Configurations
 - **Debug|Win32** - 32-bit debug build
 - **Release|Win32** - 32-bit release build
 - **Debug|x64** - 64-bit debug build
 - **Release|x64** - 64-bit release build
 
+### Cross-Platform Build (CMake)
+
+**CMake Build:** `CMakeLists.txt`
+
+#### Ubuntu/Linux Build
+See [BUILD_UBUNTU.md](BUILD_UBUNTU.md) for detailed Ubuntu build instructions.
+
+```bash
+# Install dependencies
+sudo apt install build-essential cmake libwxgtk3.2-dev libasound2-dev
+
+# Build
+mkdir build && cd build
+cmake ..
+make -j$(nproc)
+./bin/MidiWorks
+```
+
+#### macOS Build
+```bash
+# Install dependencies via Homebrew
+brew install wxwidgets cmake
+
+# Build
+mkdir build && cd build
+cmake ..
+make -j$(sysctl -n hw.ncpu)
+./bin/MidiWorks
+```
+
 ### Dependencies
-- **wxWidgets** - GUI framework (must set `WXWIN` environment variable)
-  - Win32: `$(WXWIN)\lib\vc_lib`
-  - x64: `$(WXWIN)\lib\vc_x64_lib`
+- **wxWidgets** - Cross-platform GUI framework
+  - Windows: Set `WXWIN` environment variable
+    - Win32: `$(WXWIN)\lib\vc_lib`
+    - x64: `$(WXWIN)\lib\vc_x64_lib`
+  - Linux: `libwxgtk3.2-dev` or `libwxgtk3.0-gtk3-dev`
+  - macOS: Install via Homebrew
 - **RtMidi** - Included in `src/RtMidiWrapper/RtMidi/`
-- **winmm.lib** - Windows multimedia library (for MIDI)
+  - Windows: Uses Windows MM API (`winmm.lib`)
+  - Linux: Uses ALSA API (`libasound2`)
+  - macOS: Uses CoreMIDI framework
 
 ## Architecture
 

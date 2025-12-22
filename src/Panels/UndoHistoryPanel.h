@@ -45,7 +45,7 @@ public:
 		mRedoList->Clear();
 
 		// Display undo stack (most recent at bottom)
-		const auto& undoStack = mAppModel->GetUndoStack();
+		const auto& undoStack = mAppModel->GetUndoRedoManager().GetUndoStack();
 		if (undoStack.empty())
 		{
 			mUndoList->Append("(Empty - No actions to undo)");
@@ -59,7 +59,7 @@ public:
 		}
 
 		// Display redo stack (most recent at bottom)
-		const auto& redoStack = mAppModel->GetRedoStack();
+		const auto& redoStack = mAppModel->GetUndoRedoManager().GetRedoStack();
 		if (redoStack.empty())
 		{
 			mRedoList->Append("(Empty - No actions to redo)");

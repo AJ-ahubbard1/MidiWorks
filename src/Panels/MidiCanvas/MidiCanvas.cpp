@@ -1,15 +1,12 @@
 #include "MidiCanvas.h"
-#include "MidiCanvasConstants.h"
 #include <map>
-
-using namespace MidiCanvasConstants;
 
 MidiCanvasPanel::MidiCanvasPanel(wxWindow* parent, std::shared_ptr<AppModel> appModel, const wxString& label)
 	: wxPanel(parent, wxID_ANY, wxDefaultPosition, wxDefaultSize, 0, label),
 	mAppModel(appModel),
 	mTransport(appModel->GetTransport()),
 	mTrackSet(appModel->GetTrackSet()),
-	mRecordingBuffer(appModel->GetRecordingBuffer())
+	mRecordingBuffer(appModel->GetRecordingSession().GetBuffer())
 {
 	SetBackgroundStyle(wxBG_STYLE_PAINT);
 
@@ -23,6 +20,12 @@ MidiCanvasPanel::MidiCanvasPanel(wxWindow* parent, std::shared_ptr<AppModel> app
 	mGridSnapCheckbox = new wxCheckBox(this, wxID_ANY, "Grid Snap");
 	mGridSnapCheckbox->SetValue(true);  // Enable by default
 	controlsSizer->Add(mGridSnapCheckbox, 0, wxALL | wxALIGN_CENTER_VERTICAL, 5);
+	controlsSizer->AddSpacer(5);
+
+	// Show MIDI Events checkbox (debug)
+	mShowMidiEventsCheckbox = new wxCheckBox(this, wxID_ANY, "Show MIDI Events");
+	mShowMidiEventsCheckbox->SetValue(false);  // Off by default
+	controlsSizer->Add(mShowMidiEventsCheckbox, 0, wxALL | wxALIGN_CENTER_VERTICAL, 5);
 	controlsSizer->AddSpacer(5);
 
 	// Duration selector
@@ -141,6 +144,7 @@ void MidiCanvasPanel::Draw(wxPaintEvent&)
 	DrawLoopRegion(gc);
 	DrawTrackNotes(gc);
 	DrawRecordingBuffer(gc);
+	DrawMidiEventsDebug(gc);  // Debug: MIDI event circles
 	DrawNoteAddPreview(gc);
 	DrawNoteEditPreview(gc);
 	DrawSelectedNotes(gc);
@@ -322,442 +326,6 @@ void MidiCanvasPanel::ClampOffset()
 	}
 }
 
-void MidiCanvasPanel::OnMouseWheel(wxMouseEvent& event)
-{
-	int rotation = event.GetWheelRotation();     // positive = scroll up, negative = scroll down
-	int delta = event.GetWheelDelta();           // usually 120
-	int lines = rotation / delta;
-
-	if (event.ShiftDown())
-	{
-		// Shift + wheel: Vertical zoom (adjust note height)
-		if (lines > 0)
-			mNoteHeight = std::min(mMaxNoteHeight, mNoteHeight + lines); // zoom in (taller notes)
-		else if (lines < 0)
-			mNoteHeight = std::max(mMinNoteHeight, mNoteHeight + lines); // zoom out (shorter notes)
-
-		wxString msg = wxString::Format("Note Height: %d pixels", mNoteHeight);
-		mDebugMessage->SetLabelText(msg);
-	}
-	else
-	{
-		// Normal wheel: Horizontal zoom (adjust ticks per pixel)
-		if (lines > 0)
-			mTicksPerPixel = std::max(1, mTicksPerPixel - lines); // zoom in
-		else if (lines < 0)
-			mTicksPerPixel += -lines;                             // zoom out
-
-		wxString msg = wxString::Format("Ticks Per Pixel: %d", mTicksPerPixel);
-		mDebugMessage->SetLabelText(msg);
-	}
-
-	ClampOffset(); // Apply boundaries after zoom
-	Refresh(); // trigger redraw
-}
-
-void MidiCanvasPanel::OnLeftDown(wxMouseEvent& event)
-{
-	// Ensure panel has keyboard focus for shortcuts to work
-	SetFocus();
-
-	wxPoint pos = event.GetPosition();
-
-	// Check if we're clicking on loop edges first (priority over notes)
-	if (IsNearLoopStart(pos.x))
-	{
-		mMouseMode = MouseMode::DraggingLoopStart;
-		return;
-	}
-	else if (IsNearLoopEnd(pos.x))
-	{
-		mMouseMode = MouseMode::DraggingLoopEnd;
-		return;
-	}
-
-	// Check if we clicked on an existing note
-	NoteLocation clickedNote = FindNoteAtPosition(pos.x, pos.y);
-
-	if (clickedNote.found)
-	{
-		// Clicked on an existing note
-		mSelectedNote = clickedNote;
-		mDragStartPos = pos;
-
-		// Check if clicking on resize edge
-		if (IsOnResizeEdge(pos.x, clickedNote))
-		{
-			// Start resizing
-			mMouseMode = MouseMode::ResizingNote;
-			mOriginalStartTick = clickedNote.startTick;
-			mOriginalEndTick = clickedNote.endTick;
-		}
-		else
-		{
-			// Start moving
-			mMouseMode = MouseMode::MovingNote;
-			mOriginalStartTick = clickedNote.startTick;
-			mOriginalEndTick = clickedNote.endTick;
-			mOriginalPitch = clickedNote.pitch;
-		}
-	}
-	else
-	{
-		// Clicked on empty space
-		uint64_t tick = ScreenXToTick(pos.x);
-		ubyte pitch = ScreenYToPitch(pos.y);
-
-		// Ignore notes above editable range (extreme high range, rarely used)
-		if (pitch > MAX_EDITABLE_PITCH)
-		{
-			// Start rectangle selection instead
-			mIsSelecting = true;
-			mSelectionStart = pos;
-			mSelectionEnd = pos;
-			ClearSelection();
-			return;
-		}
-
-		// Check if Shift is held - if so, start rectangle selection
-		if (event.ShiftDown())
-		{
-			mIsSelecting = true;
-			mSelectionStart = pos;
-			mSelectionEnd = pos;
-			// Don't clear selection if Shift is held (additive selection)
-		}
-		else
-		{
-			// Start preview playback on record-enabled channels
-			mAppModel->PlayPreviewNote(pitch);
-
-			// Store the starting tick for note creation
-			mPreviewStartTick = tick;
-			mMouseMode = MouseMode::Adding;
-		}
-	}
-}
-
-void MidiCanvasPanel::OnLeftUp(wxMouseEvent& event)
-{
-	// Finalize rectangle selection
-	if (mIsSelecting)
-	{
-		mIsSelecting = false;
-		// Final selection is already in mSelectedNotes (updated during drag)
-		Refresh();
-		return;
-	}
-
-	if (mMouseMode == MouseMode::Adding && mAppModel->IsPreviewingNote())
-	{
-		// Stop the preview playback
-		mAppModel->StopPreviewNote();
-
-		// Apply grid snap to starting tick
-		uint64_t snappedTick = ApplyGridSnap(mPreviewStartTick);
-		uint64_t duration = GetSelectedDuration();
-
-		// Add note to all record-enabled channels
-		mAppModel->AddNoteToRecordChannels(mAppModel->GetPreviewPitch(), snappedTick, duration);
-	}
-	else if (mMouseMode == MouseMode::MovingNote && mSelectedNote.found)
-	{
-		// Finalize move using preview state (track data was never modified)
-		if (mAppModel->HasNoteEditPreview())
-		{
-			const auto& preview = mAppModel->GetNoteEditPreview();
-			mAppModel->MoveNote(mSelectedNote, preview.previewStartTick, preview.previewPitch);
-			mAppModel->ClearNoteEditPreview();
-		}
-		mSelectedNote.found = false;
-	}
-	else if (mMouseMode == MouseMode::ResizingNote && mSelectedNote.found)
-	{
-		// Finalize resize using preview state (track data was never modified)
-		if (mAppModel->HasNoteEditPreview())
-		{
-			const auto& preview = mAppModel->GetNoteEditPreview();
-			uint64_t newDuration = preview.previewEndTick - preview.previewStartTick;
-			mAppModel->ResizeNote(mSelectedNote, newDuration);
-			mAppModel->ClearNoteEditPreview();
-		}
-		mSelectedNote.found = false;
-	}
-
-	// Reset mode and refresh
-	mMouseMode = MouseMode::Idle;
-	Refresh();
-}
-
-void MidiCanvasPanel::OnMiddleDown(wxMouseEvent& event)
-{
-	wxPoint pos = event.GetPosition();
-
-	// Check if we clicked on a note
-	NoteLocation clickedNote = FindNoteAtPosition(pos.x, pos.y);
-
-	if (clickedNote.found)
-	{
-		// Delete the note
-		mAppModel->DeleteNote(clickedNote);
-
-		// Clear hover state if we deleted the hovered note
-		if (mHoveredNote.found &&
-		    mHoveredNote.trackIndex == clickedNote.trackIndex &&
-		    mHoveredNote.noteOnIndex == clickedNote.noteOnIndex)
-		{
-			mHoveredNote.found = false;
-		}
-
-		Refresh();
-	} 
-	// If mouse isn't on a note, move playhead to mouse click
-	else
-	{
-		// Take the mouse position and convert that to ticks 
-		uint64_t newTick = ScreenXToTick(pos.x);
-		// set transport to new tick
-		mTransport.ShiftToTick(newTick);
-	}
-}
-
-void MidiCanvasPanel::OnRightDown(wxMouseEvent& event)
-{
-	// Ensure panel has keyboard focus
-	SetFocus();
-
-	mIsDragging = true;
-	mLastMouse = event.GetPosition();
-}
-
-void MidiCanvasPanel::OnRightUp(wxMouseEvent& event)
-{
-	mIsDragging = false;
-}
-
-void MidiCanvasPanel::OnMouseMove(wxMouseEvent& event)
-{
-	wxPoint pos = event.GetPosition();
-
-	// Handle rectangle selection dragging
-	if (mIsSelecting)
-	{
-		mSelectionEnd = pos;
-		// Find notes in current rectangle
-		mSelectedNotes = FindNotesInRectangle(mSelectionStart, mSelectionEnd);
-		Refresh();
-		return;
-	}
-
-	// Handle right-click panning
-	if (mIsDragging)
-	{
-		wxPoint delta = pos - mLastMouse;
-		mOriginOffset += delta;
-		ClampOffset(); // Apply boundaries after panning
-		mLastMouse = pos;
-		Refresh();
-		return;
-	}
-
-	// Handle loop edge dragging
-	if (mMouseMode == MouseMode::DraggingLoopStart)
-	{
-		uint64_t newTick = ScreenXToTick(pos.x);
-		newTick = ApplyGridSnap(newTick);
-		mTransport.SetLoopStart(newTick);
-		Refresh();
-		return;
-	}
-
-	if (mMouseMode == MouseMode::DraggingLoopEnd)
-	{
-		uint64_t newTick = ScreenXToTick(pos.x);
-		newTick = ApplyGridSnap(newTick);
-		mTransport.SetLoopEnd(newTick);
-		Refresh();
-		return;
-	}
-
-	// Handle note preview while adding (left button held)
-	if (mMouseMode == MouseMode::Adding && mAppModel->IsPreviewingNote())
-	{
-		ubyte newPitch = ScreenYToPitch(pos.y);
-		uint64_t newTick = ScreenXToTick(pos.x);
-
-		bool pitchChanged = (newPitch != mAppModel->GetPreviewPitch());
-		bool timingChanged = (newTick != mPreviewStartTick);
-
-		// If pitch changed, switch the preview note audio
-		if (pitchChanged)
-		{
-			mAppModel->StopPreviewNote();
-			mAppModel->PlayPreviewNote(newPitch);
-		}
-
-		// If pitch or timing changed, update the visual preview
-		if (pitchChanged || timingChanged)
-		{
-			mPreviewStartTick = newTick;  // Update current position
-			Refresh();  // Redraw to show updated preview note
-		}
-		return;
-	}
-
-	// Handle moving note
-	if (mMouseMode == MouseMode::MovingNote && mSelectedNote.found)
-	{
-		// Calculate new position based on mouse delta
-		int deltaX = pos.x - mDragStartPos.x;
-		int deltaY = pos.y - mDragStartPos.y;
-
-		uint64_t newTick = mOriginalStartTick + (deltaX * mTicksPerPixel);
-		int pitchDelta = -deltaY / mNoteHeight;  // Negative because Y is flipped
-		int newPitch = std::clamp(static_cast<int>(mOriginalPitch) + pitchDelta, 0, MidiConstants::MAX_MIDI_NOTE);
-
-		// Store preview state in model (doesn't modify track data)
-		mAppModel->SetNoteMovePreview(mSelectedNote, newTick, static_cast<ubyte>(newPitch));
-
-		Refresh();
-		return;
-	}
-
-	// Handle resizing note
-	if (mMouseMode == MouseMode::ResizingNote && mSelectedNote.found)
-	{
-		// Calculate new end position based on mouse X
-		uint64_t newEndTick = ScreenXToTick(pos.x);
-		// Ensure minimum duration
-		if (newEndTick <= mOriginalStartTick) newEndTick = mOriginalStartTick + MIN_NOTE_DURATION_TICKS;
-
-		// Store preview state in model (doesn't modify track data)
-		mAppModel->SetNoteResizePreview(mSelectedNote, newEndTick);
-
-		Refresh();
-		return;
-	}
-
-	// Update hover state when idle
-	if (mMouseMode == MouseMode::Idle)
-	{
-		NoteLocation newHover = FindNoteAtPosition(pos.x, pos.y);
-		if (newHover.found != mHoveredNote.found ||
-		    (newHover.found && (newHover.trackIndex != mHoveredNote.trackIndex ||
-		                        newHover.noteOnIndex != mHoveredNote.noteOnIndex)))
-		{
-			mHoveredNote = newHover;
-			Refresh();
-		}
-	}
-
-	// Update debug message with mouse position
-	uint64_t tick = ScreenXToTick(pos.x);
-	ubyte pitch = ScreenYToPitch(pos.y);
-	wxString msg = wxString::Format("Mouse: (%d, %d) | Tick: %llu, Pitch: %d",
-	                                 pos.x, pos.y, tick, pitch);
-	mDebugMessage->SetLabelText(msg);
-}
-
-void MidiCanvasPanel::OnSize(wxSizeEvent& event)
-{
-	int canvasHeight = GetSize().GetHeight();
-
-	// Calculate minimum note height (fully zoomed out = all notes visible)
-	mMinNoteHeight = std::max(1, canvasHeight / MidiConstants::MIDI_NOTE_COUNT);
-
-	// Initialize to minimum zoom (fully zoomed out)
-	mNoteHeight = mMinNoteHeight;
-
-	// At minimum zoom, all notes fit exactly, so no vertical offset needed
-	mOriginOffset.y = 0;
-
-	ClampOffset(); // Ensure we're within valid bounds
-	event.Skip(); // Allow default handling
-}
-
-void MidiCanvasPanel::OnMouseLeave(wxMouseEvent& event)
-{
-	// If we're previewing a note and the mouse leaves the window, stop the preview
-	// This prevents stuck notes if the mouse leaves while left button is held
-	if (mAppModel->IsPreviewingNote() && mMouseMode == MouseMode::Adding)
-	{
-		mAppModel->StopPreviewNote();
-		mMouseMode = MouseMode::Idle;
-	}
-}
-
-void MidiCanvasPanel::CopySelectedNotesToClipboard()
-{
-	if (mSelectedNotes.empty()) return;
-	mAppModel->CopyNotesToClipboard(mSelectedNotes);
-}
-
-void MidiCanvasPanel::DeleteSelectedNotes()
-{
-	if (mSelectedNotes.empty()) return;
-
-	mAppModel->DeleteNotes(mSelectedNotes);
-	ClearSelection();
-}
-
-void MidiCanvasPanel::OnKeyDown(wxKeyEvent& event)
-{
-	int keyCode = event.GetKeyCode();
-
-	// Delete - Delete selected notes
-	if (keyCode == WXK_DELETE && !mSelectedNotes.empty())
-	{
-		DeleteSelectedNotes();
-		Refresh();
-		return;
-	}
-
-	// Escape - Clear selection
-	if (keyCode == WXK_ESCAPE)
-	{
-		ClearSelection();
-		Refresh();
-		return;
-	}
-
-	// Ctrl+A - Select all notes
-	if (event.ControlDown() && keyCode == 'A')
-	{
-		ClearSelection();
-		mSelectedNotes = mTrackSet.GetAllNotes();
-		Refresh();
-		return;
-	}
-
-	// Ctrl+C - Copy selected notes to clipboard
-	if (event.ControlDown() && keyCode == 'C' && !mSelectedNotes.empty())
-	{
-		CopySelectedNotesToClipboard();
-		return;
-	}
-
-	// Ctrl+V - Paste clipboard notes at the playhead tick
-	if (event.ControlDown() && keyCode == 'V')
-	{
-		mAppModel->PasteNotes();
-		ClearSelection();
-		Refresh();
-		return;
-	}
-
-	// Ctrl+X - Cut selected notes (copy + delete)
-	if (event.ControlDown() && keyCode == 'X' && !mSelectedNotes.empty())
-	{
-		CopySelectedNotesToClipboard();
-		DeleteSelectedNotes();
-		Refresh();
-		return;
-	}
-
-	// Allow event to propagate for other handlers
-	event.Skip();
-}
-
 
 // ========== Drawing Helper Methods ==========
 void MidiCanvasPanel::DrawNote(wxGraphicsContext* gc, const NoteLocation& note)
@@ -879,7 +447,7 @@ void MidiCanvasPanel::DrawRecordingBuffer(wxGraphicsContext* gc)
 
 void MidiCanvasPanel::DrawNoteAddPreview(wxGraphicsContext* gc)
 {
-	if (!mAppModel->IsPreviewingNote() || mMouseMode != MouseMode::Adding)
+	if (!mAppModel->GetSoundBank().IsPreviewingNote() || mMouseMode != MouseMode::Adding)
 		return;
 
 	gc->SetBrush(wxBrush(NOTE_ADD_PREVIEW));
@@ -889,7 +457,7 @@ void MidiCanvasPanel::DrawNoteAddPreview(wxGraphicsContext* gc)
 	uint64_t duration = GetSelectedDuration();
 
 	int x = TickToScreenX(snappedTick);
-	int y = PitchToScreenY(mAppModel->GetPreviewPitch());
+	int y = PitchToScreenY(mAppModel->GetSoundBank().GetPreviewPitch());
 	int w = TicksToWidth(duration);
 	gc->DrawRectangle(x, y, w, mNoteHeight);
 }
@@ -965,4 +533,110 @@ void MidiCanvasPanel::DrawPlayhead(wxGraphicsContext* gc)
 
 	gc->SetPen(wxPen(PLAYHEAD, PLAYHEAD_WIDTH));
 	gc->StrokeLine(playheadX, 0, playheadX, canvasHeight);
+}
+
+void MidiCanvasPanel::DrawMidiEventsDebug(wxGraphicsContext* gc)
+{
+	if (!mShowMidiEventsCheckbox->GetValue()) return;
+
+	// Clear previous debug events cache
+	mDebugEvents.clear();
+
+	// Get all raw MIDI events from TrackSet
+	std::vector<TimedMidiEvent> allEvents = mTrackSet.GetAllTimedMidiEvents();
+
+	// Draw each MIDI event as a colored circle
+	for (const auto& event : allEvents)
+	{
+		// Calculate screen position based on tick and pitch
+		int screenX = TickToScreenX(event.tick);
+		int screenY = PitchToScreenY(event.mm.getPitch());
+
+		// Determine color based on event type
+		wxColour color;
+		MidiEvent eventType = event.mm.getEventType();
+		bool isNoteOn = (eventType == MidiEvent::NOTE_ON);
+		bool isNoteOff = (eventType == MidiEvent::NOTE_OFF);
+
+		if (isNoteOn)
+		{
+			color = MIDI_EVENT_NOTE_ON;
+		}
+		else if (isNoteOff)
+		{
+			color = MIDI_EVENT_NOTE_OFF;
+		}
+		else
+		{
+			color = MIDI_EVENT_OTHER;
+		}
+
+		// Draw circle
+		gc->SetBrush(wxBrush(color));
+		gc->SetPen(*wxTRANSPARENT_PEN);
+		gc->DrawEllipse(screenX - MIDI_EVENT_CIRCLE_RADIUS,
+		                screenY - MIDI_EVENT_CIRCLE_RADIUS,
+		                MIDI_EVENT_CIRCLE_RADIUS * 2,
+		                MIDI_EVENT_CIRCLE_RADIUS * 2);
+
+		// Cache event info for hover detection
+		MidiEventDebugInfo debugInfo;
+		debugInfo.tick = event.tick;
+		debugInfo.pitch = event.mm.getPitch();
+		debugInfo.velocity = event.mm.mData[2];
+		debugInfo.trackIndex = event.mm.getChannel();
+		debugInfo.isNoteOn = isNoteOn;
+		debugInfo.screenX = screenX;
+		debugInfo.screenY = screenY;
+		mDebugEvents.push_back(debugInfo);
+	}
+
+	// Draw tooltip for hovered event
+	if (mHoveredEventIndex >= 0 && mHoveredEventIndex < mDebugEvents.size())
+	{
+		DrawMidiEventTooltip(gc, mDebugEvents[mHoveredEventIndex]);
+	}
+}
+
+void MidiCanvasPanel::DrawMidiEventTooltip(wxGraphicsContext* gc, const MidiEventDebugInfo& event)
+{
+	// Determine event type string
+	std::string eventType;
+	if (event.isNoteOn)
+	{
+		eventType = "Note On";
+	}
+	else if (event.velocity == 0 && !event.isNoteOn)
+	{
+		eventType = "Note Off";
+	}
+	else
+	{
+		eventType = "Other";
+	}
+
+	// Format tooltip text
+	std::string text = std::format("{}:{}:{}:{}, {}",
+	                               eventType,
+	                               event.trackIndex,
+	                               event.pitch,
+	                               event.velocity,
+	                               event.tick);
+
+	// Measure text size
+	double width, height;
+	gc->SetFont(wxFont(9, wxFONTFAMILY_DEFAULT, wxFONTSTYLE_NORMAL, wxFONTWEIGHT_NORMAL), *wxBLACK);
+	gc->GetTextExtent(text, &width, &height);
+
+	// Draw background rectangle
+	int padding = 4;
+	int rectX = event.screenX + 10;
+	int rectY = event.screenY - 10 - height - padding * 2;
+
+	gc->SetBrush(wxBrush(wxColour(255, 255, 200, 230)));  // Light yellow background
+	gc->SetPen(wxPen(*wxBLACK, 1));
+	gc->DrawRectangle(rectX, rectY, width + padding * 2, height + padding * 2);
+
+	// Draw text
+	gc->DrawText(text, rectX + padding, rectY + padding);
 }

@@ -39,6 +39,33 @@
     <ClCompile Include="src\AppModel\SoundBank\SoundBank.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="src\MainFrame\MainFrameEventHandlers.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="src\Panels\MidiCanvas\MidiCanvasEventHandlers.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="src\AppModel\RecordingSession\RecordingSession.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="src\AppModel\Clipboard\Clipboard.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="src\AppModel\MidiInputManager\MidiInputManager.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="src\AppModel\NoteEditor\NoteEditor.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="src\AppModel\ProjectManager\ProjectManager.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="src\AppModel\UndoRedoManager\UndoRedoManager.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="src\AppModel\Transport\Transport.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="src\MainFrame\MainFrame.h">
@@ -104,7 +131,7 @@
     <ClInclude Include="src\Panels\SoundBankPanel.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="src\AppModel\Transport.h">
+    <ClInclude Include="src\AppModel\Transport\Transport.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="src\Panels\TransportPanel.h">
@@ -141,6 +168,33 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="src\Commands\QuantizeCommand.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="src\Panels\MidiCanvas\MidiCanvasConstants.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="src\MidiConstants.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="src\AppModel\RecordingSession\RecordingSession.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="src\AppModel\Clipboard\Clipboard.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="src\AppModel\MetronomeService\MetronomeService.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="src\AppModel\MidiInputManager\MidiInputManager.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="src\AppModel\NoteEditor\NoteEditor.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="src\AppModel\ProjectManager\ProjectManager.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="src\AppModel\UndoRedoManager\UndoRedoManager.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>

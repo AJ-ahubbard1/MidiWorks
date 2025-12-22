@@ -10,13 +10,13 @@ struct PanelInfo
 {
 	wxString		name;
 	wxWindow*		window = nullptr;
-	int				menuId = -1;
 	PanePosition	defaultPosition;
 	wxSize			minSize{-1, -1};
 	wxSize			bestSize{-1, -1};
 	bool			hasCaption = true;
 	bool			hasCloseButton = true;
 	bool			isVisible = true;
+	int				menuId = -1;  // Moved to end for optional initialization
 };
 
 inline wxAuiPaneInfo CreatePaneInfo(const PanelInfo& info)

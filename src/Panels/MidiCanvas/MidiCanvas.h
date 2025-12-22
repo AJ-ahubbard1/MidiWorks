@@ -4,14 +4,16 @@
 #include <wx/graphics.h>
 #include <wx/spinctrl.h>
 #include "RtMidiWrapper/RtMidiWrapper.h"
-#include "AppModel/Transport.h"
+#include "AppModel/Transport/Transport.h"
 #include "AppModel/TrackSet/TrackSet.h"
 #include "AppModel/AppModel.h"
 #include "Commands/NoteEditCommands.h"
 #include "Commands/PasteCommand.h"
 #include "MidiConstants.h"
+#include "MidiCanvasConstants.h"
 
 using namespace MidiInterface;
+using namespace MidiCanvasConstants;
 
 class MidiCanvasPanel : public wxPanel
 {
@@ -33,11 +35,11 @@ private:
 	wxCheckBox* mGridSnapCheckbox;
 	wxChoice* mDurationChoice;
 	wxSpinCtrl* mCustomTicksCtrl;
+	wxCheckBox* mShowMidiEventsCheckbox;
 
 	// ========== View State (Zoom & Pan) ==========
-	int mNoteHeight = 5;         // Current note height in pixels (pixels per MIDI note)
-	int mMinNoteHeight = 1;      // Minimum zoom: canvasHeight / MIDI_NOTE_COUNT (all notes visible)
-	int mMaxNoteHeight = 50;     // Maximum zoom: 50 pixels per note
+	int mNoteHeight = DEFAULT_NOTE_HEIGHT_PIXELS;  // Current note height in pixels
+	int mMinNoteHeight;          // Minimum zoom: dynamically calculated as canvasHeight / MIDI_NOTE_COUNT
 	int mTicksPerPixel = 30;     // Horizontal zoom level
 	wxPoint mOriginOffset;       // Pan offset for scrolling
 
@@ -70,10 +72,27 @@ private:
 	wxPoint mDragStartPos;       // Mouse position when drag started
 	uint64_t mPreviewStartTick = 0;  // Note creation preview (UI state for visual feedback during drag)
 
-	// Drawing
+	// ========== Debug MIDI Events State ==========
+	struct MidiEventDebugInfo {
+		uint64_t tick;
+		ubyte pitch;
+		ubyte velocity;
+		int trackIndex;
+		bool isNoteOn;
+		int screenX;
+		int screenY;
+	};
+	std::vector<MidiEventDebugInfo> mDebugEvents;  // Cache for hover detection
+	int mHoveredEventIndex = -1;  // Index of currently hovered event
+
+	// ========================================================================
+	// METHODS - Implemented in MidiCanvas.cpp
+	// ========================================================================
+
+	// Core Update & Drawing
 	void Draw(wxPaintEvent&);
 
-	// Coordinate conversion helpers
+	// Coordinate Conversion Helpers
 	int FlipY(int y) const;
 	uint64_t ScreenXToTick(int screenX) const;
 	ubyte ScreenYToPitch(int screenY) const;
@@ -81,31 +100,25 @@ private:
 	int PitchToScreenY(ubyte pitch) const;
 	int TicksToWidth(uint64_t ticks) const;
 
-	// UI helpers
+	// UI Helpers
 	uint64_t GetSelectedDuration() const;
 	uint64_t ApplyGridSnap(uint64_t tick) const;
 
-	// Note finding
+	// Note Finding & Selection
 	NoteLocation FindNoteAtPosition(int screenX, int screenY);
 	bool IsOnResizeEdge(int screenX, const NoteLocation& note);
-
-	// Multi-selection
 	std::vector<NoteLocation> FindNotesInRectangle(wxPoint start, wxPoint end);
 	void ClearSelection();
 	bool IsNoteSelected(const NoteLocation& note) const;
 
-	// Helper methods to eliminate duplication
-	void CopySelectedNotesToClipboard();
-	void DeleteSelectedNotes();
-
-	// Loop edge detection
+	// Loop Edge Detection
 	bool IsNearLoopStart(int screenX);
 	bool IsNearLoopEnd(int screenX);
 
-	// View management
+	// View Management
 	void ClampOffset();
 
-	// Drawing helpers
+	// Drawing Helpers
 	void DrawNote(wxGraphicsContext* gc, const NoteLocation& note);
 	void DrawGrid(wxGraphicsContext* gc);
 	void DrawLoopRegion(wxGraphicsContext* gc);
@@ -117,16 +130,38 @@ private:
 	void DrawHoverBorder(wxGraphicsContext* gc);
 	void DrawSelectionRectangle(wxGraphicsContext* gc);
 	void DrawPlayhead(wxGraphicsContext* gc);
+	void DrawMidiEventsDebug(wxGraphicsContext* gc);
+	void DrawMidiEventTooltip(wxGraphicsContext* gc, const MidiEventDebugInfo& event);
 
-	// Event handlers
+	// ========================================================================
+	// EVENT HANDLERS - Implemented in MidiCanvasEventHandlers.cpp
+	// ========================================================================
+
+	// Mouse Wheel - Zoom
 	void OnMouseWheel(wxMouseEvent& event);
+
+	// Left Mouse Button - Note Add/Move/Resize
 	void OnLeftDown(wxMouseEvent& event);
 	void OnLeftUp(wxMouseEvent& event);
+
+	// Middle Mouse Button - Delete Note / Move Playhead
 	void OnMiddleDown(wxMouseEvent& event);
+
+	// Right Mouse Button - Panning
 	void OnRightDown(wxMouseEvent& event);
 	void OnRightUp(wxMouseEvent& event);
+
+	// Mouse Move - Drag Operations
 	void OnMouseMove(wxMouseEvent& event);
+
+	// Window Events
 	void OnSize(wxSizeEvent& event);
 	void OnMouseLeave(wxMouseEvent& event);
+
+	// Keyboard Events
 	void OnKeyDown(wxKeyEvent& event);
+
+	// Helper Methods (for keyboard shortcuts)
+	void CopySelectedNotesToClipboard();
+	void DeleteSelectedNotes();
 };
