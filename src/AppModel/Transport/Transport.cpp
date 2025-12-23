@@ -7,39 +7,34 @@ Transport::State Transport::GetState() const { return mState; }
 void Transport::SetState(State state) { mState = state; }
 
 // State queries
-bool Transport::IsPlaying() const { return mState == State::Playing; }
-bool Transport::IsRecording() const { return mState == State::Recording; }
-bool Transport::IsStopped() const { return mState == State::Stopped; }
+bool Transport::IsPlaying() const		 { return mState == State::Playing;			}
+bool Transport::IsRecording() const		 { return mState == State::Recording;		}
+bool Transport::IsStopped() const		 { return mState == State::Stopped;			}
+bool Transport::IsFastForwarding() const { return mState == State::FastForwarding;	}
+bool Transport::IsRewinding() const		 { return mState == State::Rewinding;		}
+// Is the Playhead currently moving?
+bool Transport::IsMoving() const 
+{
+	return IsPlaying() || IsRecording() || IsFastForwarding() || IsRewinding();
+}
 
 // State transitions
 void Transport::TogglePlay()
 {
 	switch (mState)
 	{
-	case State::Stopped:
-		mState = State::ClickedPlay;
-		break;
-	case State::Playing:
-		mState = State::StopPlaying;
-		break;
-	case State::Recording:
-		mState = State::StopRecording;
-		break;
-	default:
-		break;
+	case State::Stopped:	mState = State::ClickedPlay;	break;
+	case State::Playing:	mState = State::StopPlaying;	break;
+	case State::Recording:	mState = State::StopRecording;	break;
+	default: break;
 	}
 }
 
 void Transport::ToggleRecord()
 {
-	if (mState == State::Stopped)
-	{
-		mState = State::ClickedRecord;
-	}
-	else if (mState == State::Recording)
-	{
-		mState = State::StopRecording;
-	}
+	if (mState == State::Stopped) mState = State::ClickedRecord;
+
+	else if (mState == State::Recording) mState = State::StopRecording;
 }
 
 // Loop control
@@ -83,7 +78,12 @@ uint64_t Transport::GetStartPlayBackTick() const { return mStartPlayBackTick; }
 void Transport::ShiftCurrentTime()
 {
 	mShiftSpeed *= mShiftAccel;
-	int shift = (mState == State::FastForwarding) ? mShiftSpeed : -mShiftSpeed;
+
+	// Cap shift speed to prevent excessive acceleration
+	if (mShiftSpeed > MAX_SHIFT_SPEED)
+		mShiftSpeed = MAX_SHIFT_SPEED;
+
+	int shift = IsFastForwarding() ? mShiftSpeed : -mShiftSpeed;
 	if (shift < 0 && -shift > mCurrentTimeMs)
 	{
 		mCurrentTimeMs = 0;
@@ -97,6 +97,11 @@ void Transport::ShiftCurrentTime()
 
 }
 
+void Transport::ResetShiftRate()
+{
+	mShiftSpeed = DEFAULT_SHIFT_SPEED;
+}
+
 void Transport::ShiftToTick(uint64_t newTick)
 {
 	mCurrentTick = newTick;
@@ -106,7 +111,6 @@ void Transport::ShiftToTick(uint64_t newTick)
 void Transport::Stop()
 {
 	mStartPlayBackTick = 0;
-	mShiftSpeed = DEFAULT_SHIFT_SPEED;
 }
 
 void Transport::Reset()

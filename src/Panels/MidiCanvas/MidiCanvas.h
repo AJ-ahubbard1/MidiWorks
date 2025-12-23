@@ -39,7 +39,7 @@ private:
 
 	// ========== View State (Zoom & Pan) ==========
 	int mNoteHeight = DEFAULT_NOTE_HEIGHT_PIXELS;  // Current note height in pixels
-	int mMinNoteHeight;          // Minimum zoom: dynamically calculated as canvasHeight / MIDI_NOTE_COUNT
+	int mMinNoteHeight = 0;		 // Minimum zoom: dynamically calculated as canvasHeight / MIDI_NOTE_COUNT
 	int mTicksPerPixel = 30;     // Horizontal zoom level
 	wxPoint mOriginOffset;       // Pan offset for scrolling
 
@@ -53,8 +53,9 @@ private:
 		DraggingLoopEnd
 	};
 	MouseMode mMouseMode = MouseMode::Idle;
-	bool mIsDragging = false;    // Right-click dragging (panning)
-	wxPoint mLastMouse;          // Last mouse position for drag operations
+	bool mIsDragging = false;           // Right-click dragging (panning)
+	bool mOffsetInitialized = false;    // Track if initial offset has been set
+	wxPoint mLastMouse;                 // Last mouse position for drag operations
 
 	// ========== Note Selection State ==========
 	NoteLocation mHoveredNote;              // Note currently under mouse cursor

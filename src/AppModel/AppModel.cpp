@@ -80,7 +80,7 @@ void AppModel::CheckMidiInQueue()
 			routed.setChannel(c.channelNumber);
 			mSoundBank.GetMidiOutDevice()->sendMessage(routed);
 
-			if (c.record && IsMusicalMessage(routed) && mTransport.GetState() == Transport::State::Recording)
+			if (c.record && IsMusicalMessage(routed) && mTransport.IsRecording())
 			{
 				mRecordingSession.AddEvent({routed, currentTick});
 
@@ -114,11 +114,11 @@ MetronomeService& AppModel::GetMetronomeService() { return mMetronomeService; }
 
 void AppModel::StopPlaybackIfActive()
 {
-	if (mTransport.GetState() == Transport::State::Playing)
+	if (mTransport.IsPlaying())
 	{
 		mTransport.SetState(Transport::State::StopPlaying);
 	}
-	else if (mTransport.GetState() == Transport::State::Recording)
+	else if (mTransport.IsRecording())
 	{
 		mTransport.SetState(Transport::State::StopRecording);
 	}
@@ -252,6 +252,8 @@ bool AppModel::IsMusicalMessage(const MidiMessage& msg)
 
 void AppModel::PlayMessages(std::vector<MidiMessage> msgs)
 {
+	if (msgs.empty()) return;
+
 	auto player = mSoundBank.GetMidiOutDevice();
 	auto channels = mSoundBank.GetAllChannels();
 
@@ -295,14 +297,20 @@ void AppModel::HandleStopPlaying()
 
 void AppModel::HandleClickedPlay()
 {
-	GetDeltaTimeMs();
+	// Call GetDeltaTimeMs:
+	// This sets mLastTick to now to prepare for playback 
+	// If call doesn't happen Delta would be HUGE 
+	// (total time when transport state was stopped)
+	// causing an unpredictable jump 
+	GetDeltaTimeMs(); 
+
 	mTrackSet.FindStart(mTransport.StartPlayBack());
 	mTransport.SetState(Transport::State::Playing);
 }
 
 void AppModel::HandlePlaying()
 {
-	static std::vector<MidiMessage> messages;
+	std::vector<MidiMessage> messages;
 
 	uint64_t lastTick = mTransport.GetCurrentTick();
 	mTransport.UpdatePlayBack(GetDeltaTimeMs());
@@ -332,6 +340,7 @@ void AppModel::HandlePlaying()
 
 void AppModel::HandleClickedRecord()
 {
+	// See HandleClickedPlay for reason behind GetDeltaTimeMs call
 	GetDeltaTimeMs();
 	mTrackSet.FindStart(mTransport.StartPlayBack());
 
@@ -346,7 +355,7 @@ void AppModel::HandleClickedRecord()
 
 void AppModel::HandleRecording()
 {
-	static std::vector<MidiMessage> messages;
+	std::vector<MidiMessage> messages;
 
 	uint64_t lastTick = mTransport.GetCurrentTick();
 	mTransport.UpdatePlayBack(GetDeltaTimeMs());

@@ -53,12 +53,9 @@ private:
     void UpdateTitle();
     uint64_t GetDeltaTimeMs();
 
-	// EVENT HANDLERS - Implemented in MainFrameEventHandlers.cpp
     
-	// Helper for unsaved changes prompt 
-    enum class UnsavedChangesAction { Continue, Cancel };
-    UnsavedChangesAction PromptForUnsavedChanges();
 
+	// EVENT HANDLERS - Implemented in MainFrameEventHandlers.cpp
     // View / Panel Management Events
     void OnTogglePane(wxCommandEvent& event);
     void OnPaneClosed(wxAuiManagerEvent& event);
@@ -70,6 +67,9 @@ private:
     void OnQuantize(wxCommandEvent& event);
 
     // File Menu Events
+	// Helper for unsaved changes prompt 
+    enum class UnsavedChangesAction { Continue, Cancel };
+    UnsavedChangesAction PromptForUnsavedChanges();
     void OnNew(wxCommandEvent& event);
     void OnOpen(wxCommandEvent& event);
     void OnSave(wxCommandEvent& event);

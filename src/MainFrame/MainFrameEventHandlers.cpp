@@ -3,37 +3,6 @@
 #include "MainFrame.h"
 #include "Commands/QuantizeCommand.h"
 
-// HELPER METHODS
-
-// Prompts user about unsaved changes and optionally saves
-// Returns: Continue (proceed with action) or Cancel (abort action)
-MainFrame::UnsavedChangesAction MainFrame::PromptForUnsavedChanges()
-{
-	if (!mAppModel->GetProjectManager().IsProjectDirty()) 
-	{
-		return UnsavedChangesAction::Continue;  // No unsaved changes, proceed
-	}
-
-	int result = wxMessageBox(
-		"Do you want to save changes to the current project?",
-		"Unsaved Changes",
-		wxYES_NO | wxCANCEL | wxICON_QUESTION);
-
-	if (result == wxYES) 
-	{
-		wxCommandEvent saveEvent;
-		OnSave(saveEvent);
-		return UnsavedChangesAction::Continue;
-	}
-	else if (result == wxCANCEL) 
-	{
-		return UnsavedChangesAction::Cancel;
-	}
-
-	// User clicked NO - discard changes and continue
-	return UnsavedChangesAction::Continue;
-}
-
 // VIEW / PANEL MANAGEMENT EVENTS
 
 // Toggle visibility of panes associated with clicked panes in view menu
@@ -125,6 +94,36 @@ void MainFrame::OnQuantize(wxCommandEvent& event)
 }
 
 // FILE MENU EVENTS
+
+// HELPER METHOD
+// Prompts user about unsaved changes and optionally saves
+// Returns: Continue (proceed with action) or Cancel (abort action)
+MainFrame::UnsavedChangesAction MainFrame::PromptForUnsavedChanges()
+{
+	if (!mAppModel->GetProjectManager().IsProjectDirty()) 
+	{
+		return UnsavedChangesAction::Continue;  // No unsaved changes, proceed
+	}
+
+	int result = wxMessageBox(
+		"Do you want to save changes to the current project?",
+		"Unsaved Changes",
+		wxYES_NO | wxCANCEL | wxICON_QUESTION);
+
+	if (result == wxYES) 
+	{
+		wxCommandEvent saveEvent;
+		OnSave(saveEvent);
+		return UnsavedChangesAction::Continue;
+	}
+	else if (result == wxCANCEL) 
+	{
+		return UnsavedChangesAction::Cancel;
+	}
+
+	// User clicked NO - discard changes and continue
+	return UnsavedChangesAction::Continue;
+}
 
 // Create new project (Ctrl+N)
 void MainFrame::OnNew(wxCommandEvent& event)

@@ -64,9 +64,10 @@ namespace MidiCanvasConstants
 	const int MIN_NOTE_DURATION_TICKS = 100;        // Minimum note duration when resizing
 
 	// ========== Auto-Scroll Constants ==========
-	const double AUTOSCROLL_TRIGGER_THRESHOLD = 0.8;  // Playhead position that triggers auto-scroll (80% of screen)
-	const double AUTOSCROLL_TARGET_POSITION = 0.2;    // Target playhead position after scroll (20% from left)
-
+	const double AUTOSCROLL_TARGET_POSITION = 0.2;		// Fixed playhead position (20% from left edge)
+														// During playback/recording/FF/REW, playhead stays locked here
+														// and the grid/notes scroll underneath
+	const int MAX_TICK_VALUE = 100'000'000;				// Prevent overflow if position tick < 0
 	// ========== Zoom Constraints ==========
 	const int DEFAULT_NOTE_HEIGHT_PIXELS = 5;        // Initial note height before window resize
 	const int MAX_NOTE_HEIGHT_PIXELS = 50;           // Maximum zoom: 50 pixels per note

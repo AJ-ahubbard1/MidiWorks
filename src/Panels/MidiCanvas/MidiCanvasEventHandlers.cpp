@@ -213,7 +213,14 @@ void MidiCanvasPanel::OnMiddleDown(wxMouseEvent& event)
 		// Take the mouse position and convert that to ticks
 		uint64_t newTick = ScreenXToTick(pos.x);
 		// set transport to new tick
-		mTransport.ShiftToTick(newTick);
+		if (newTick < MAX_TICK_VALUE)
+		{
+			mTransport.ShiftToTick(newTick);
+		}
+		else
+		{
+			mTransport.ShiftToTick(0);
+		}
 	}
 }
 
@@ -389,6 +396,7 @@ void MidiCanvasPanel::OnMouseMove(wxMouseEvent& event)
 
 void MidiCanvasPanel::OnSize(wxSizeEvent& event)
 {
+	int canvasWidth = GetSize().GetWidth();
 	int canvasHeight = GetSize().GetHeight();
 
 	// Calculate minimum note height (fully zoomed out = all notes visible)
@@ -399,6 +407,14 @@ void MidiCanvasPanel::OnSize(wxSizeEvent& event)
 
 	// At minimum zoom, all notes fit exactly, so no vertical offset needed
 	mOriginOffset.y = 0;
+
+	// Initialize horizontal offset on first size event (fixed playhead position)
+	if (!mOffsetInitialized && canvasWidth > 0)
+	{
+		int targetPlayheadX = canvasWidth * AUTOSCROLL_TARGET_POSITION;
+		mOriginOffset.x = targetPlayheadX;
+		mOffsetInitialized = true;
+	}
 
 	ClampOffset(); // Ensure we're within valid bounds
 	event.Skip(); // Allow default handling

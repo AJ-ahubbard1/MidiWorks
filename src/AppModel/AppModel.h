@@ -64,22 +64,20 @@ public:
 	void CopyNotesToClipboard(const std::vector<NoteLocation>& notes);
 	void PasteNotes(uint64_t pasteTick = UINT64_MAX);
 
-	
 
 private:
-	std::chrono::steady_clock::time_point mLastTick;
-	SoundBank	mSoundBank;
-	Transport	mTransport;
-	TrackSet	mTrackSet;
-	RecordingSession mRecordingSession;
-	Clipboard mClipboard;
-	NoteEditor mNoteEditor;
-	ProjectManager mProjectManager;
-	UndoRedoManager mUndoRedoManager;
-	MidiInputManager mMidiInputManager;
-	MetronomeService mMetronomeService;
-
-	DirtyStateCallback mDirtyStateCallback;
+	std::chrono::steady_clock::time_point	mLastTick;
+	SoundBank								mSoundBank;
+	Transport								mTransport;
+	TrackSet								mTrackSet;
+	RecordingSession						mRecordingSession;
+	Clipboard								mClipboard;
+	NoteEditor								mNoteEditor;
+	ProjectManager							mProjectManager;
+	UndoRedoManager							mUndoRedoManager;
+	MidiInputManager						mMidiInputManager;
+	MetronomeService						mMetronomeService;
+	DirtyStateCallback						mDirtyStateCallback;
 
 	uint64_t GetDeltaTimeMs();
 	bool IsMusicalMessage(const MidiMessage& msg);

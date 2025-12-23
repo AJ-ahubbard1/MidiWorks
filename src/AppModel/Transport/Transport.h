@@ -5,8 +5,8 @@
 class Transport
 {
 public:
-	// StopRecording, StopPlaying, ClickedPlay, and ClickedRecord are Transition States:
-	// used to setup their corresponding states.
+	// StopRecording, StopPlaying, ClickedPlay, and ClickedRecord are Transition States,
+	// used to finalize or setup the Recording and Playing states.
 	enum class State { Stopped, StopRecording, StopPlaying, Playing, ClickedPlay,
 						Recording, ClickedRecord, Rewinding, FastForwarding };
 
@@ -16,9 +16,9 @@ public:
 		bool isDownbeat = false;  // First beat of measure
 	};
 
-	double		mTempo = MidiConstants::DEFAULT_TEMPO;
-	int			mTimeSignatureNumerator = MidiConstants::DEFAULT_TIME_SIGNATURE_NUMERATOR;
-	int			mTimeSignatureDenominator = MidiConstants::DEFAULT_TIME_SIGNATURE_DENOMINATOR;
+	double		mTempo						= MidiConstants::DEFAULT_TEMPO;
+	int			mTimeSignatureNumerator		= MidiConstants::DEFAULT_TIME_SIGNATURE_NUMERATOR;
+	int			mTimeSignatureDenominator	= MidiConstants::DEFAULT_TIME_SIGNATURE_DENOMINATOR;
 
 	// Loop settings
 	bool		mLoopEnabled = false;
@@ -35,6 +35,9 @@ public:
 	bool IsPlaying() const;
 	bool IsRecording() const;
 	bool IsStopped() const;
+	bool IsFastForwarding() const;
+	bool IsRewinding() const;
+	bool IsMoving() const;
 
 	// State transitions
 	void TogglePlay();	
@@ -46,12 +49,13 @@ public:
 	uint64_t GetLoopStart() const;
 	uint64_t GetLoopEnd() const;
 
-
+	// Playback Controls
 	uint64_t StartPlayBack();
 	void UpdatePlayBack(uint64_t deltaMs);
 	uint64_t GetCurrentTick() const;
 	uint64_t GetStartPlayBackTick() const;
 	void ShiftCurrentTime();
+	void ResetShiftRate();
 	void ShiftToTick(uint64_t newTick);
 	void Stop();
 	void Reset();
@@ -72,8 +76,9 @@ private:
 	uint64_t		mStartPlayBackTick = 0;
 	uint64_t		mCurrentTick = 0;
 	int				mTicksPerQuarter = MidiConstants::TICKS_PER_QUARTER;
-	const double	DEFAULT_SHIFT_SPEED = 5.0f;
+	const double	DEFAULT_SHIFT_SPEED = 20.0;
+	const double	MAX_SHIFT_SPEED = 500.0;
 	double			mShiftSpeed = DEFAULT_SHIFT_SPEED;
-	double			mShiftAccel = 1.01f;
+	double			mShiftAccel = 1.01;
 };
 

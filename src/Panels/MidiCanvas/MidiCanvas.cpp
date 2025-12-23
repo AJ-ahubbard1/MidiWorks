@@ -65,7 +65,7 @@ MidiCanvasPanel::MidiCanvasPanel(wxWindow* parent, std::shared_ptr<AppModel> app
 	// Debug message at the end (so it doesn't cover other controls)
 	mDebugMessage = new wxStaticText(this, wxID_ANY, "", wxDefaultPosition, wxSize(200, -1));
 	controlsSizer->Add(mDebugMessage, 0, wxALL | wxALIGN_CENTER_VERTICAL, 5);
-	controlsSizer->AddSpacer(5);
+	controlsSizer->AddSpacer(30);
 
 	// Add controls to main sizer at the top
 	mainSizer->Add(controlsSizer, 0, wxEXPAND);
@@ -92,29 +92,22 @@ MidiCanvasPanel::MidiCanvasPanel(wxWindow* parent, std::shared_ptr<AppModel> app
 void MidiCanvasPanel::Update()
 {
 	uint64_t currentTick = mTransport.GetCurrentTick();
+	wxSize clientSize = GetClientSize();
+	int canvasWidth = clientSize.GetWidth();
+	int targetPlayheadX = canvasWidth * AUTOSCROLL_TARGET_POSITION;
 
-	// Auto-pan to start when playhead is reset to tick 0
-	if (currentTick == 0 && mOriginOffset.x != 0)
+	// Track tick changes to detect Reset button clicks while stopped
+	static uint64_t lastTick = 0;
+	bool tickChanged = (currentTick != lastTick);
+	lastTick = currentTick;
+
+	// Fixed playhead auto-scroll: playhead locked at target position, content scrolls
+	// Update when: moving OR tick changed while stopped (e.g., Reset button)
+	if (mTransport.IsMoving() || tickChanged)
 	{
-		mOriginOffset.x = 0;  // Pan back to start position
+		// Lock playhead at target position (e.g., 20% from left edge)
+		mOriginOffset.x = targetPlayheadX - (currentTick / mTicksPerPixel);
 		ClampOffset();
-	}
-	// Auto-scroll during playback/recording to keep playhead visible
-	else if (mTransport.IsPlaying() || mTransport.IsRecording())
-	{
-		wxSize clientSize = GetClientSize();
-		int canvasWidth = clientSize.GetWidth();
-
-		int playheadX = TickToScreenX(currentTick);
-
-		// If playhead exceeds threshold, scroll to keep it at target position
-		int scrollThreshold = canvasWidth * AUTOSCROLL_TRIGGER_THRESHOLD;
-		if (playheadX > scrollThreshold)
-		{
-			int targetPlayheadX = canvasWidth * AUTOSCROLL_TARGET_POSITION;
-			mOriginOffset.x = targetPlayheadX - (currentTick / mTicksPerPixel);
-			ClampOffset();
-		}
 	}
 
 	Refresh();
@@ -283,21 +276,18 @@ void MidiCanvasPanel::ClampOffset()
 	int canvasWidth = GetSize().GetWidth();
 	int canvasHeight = GetSize().GetHeight();
 
-	// Constants
-	const int MAX_MEASURES = 100;  // Allow scrolling to 100 measures
-	const int TICKS_PER_MEASURE = MidiConstants::TICKS_PER_QUARTER * 4;  // Assumes 4/4 time
-	const int MAX_TICK = MAX_MEASURES * TICKS_PER_MEASURE;
-
 	// Horizontal limits (time axis)
 	// When offset.x = 0, tick 0 is at left edge
 	// When offset.x < 0, we've scrolled right (tick 0 is off-screen left)
 
-	// Right boundary: can scroll right to see up to MAX_TICK
-	// When MAX_TICK is at right edge: canvasWidth = MAX_TICK / ticksPerPixel + offset.x
-	int minOffsetX = canvasWidth - (MAX_TICK / mTicksPerPixel);
+	// Right boundary: can scroll right to see up to MAX_TICK_VALUE
+	// When maxTick is at right edge: canvasWidth = MAX_TICK_VALUE / ticksPerPixel + offset.x
+	int minOffsetX = canvasWidth - (MAX_TICK_VALUE / mTicksPerPixel);
 
-	// Left boundary: can't scroll left past tick 0
-	int maxOffsetX = 0;
+	// Left boundary: allow scrolling left to position tick 0 at the target playhead position
+	// This enables fixed playhead scrolling where tick 0 appears at the target position
+	int targetPlayheadX = canvasWidth * AUTOSCROLL_TARGET_POSITION;
+	int maxOffsetX = targetPlayheadX;
 
 	// Clamp horizontal offset
 	mOriginOffset.x = std::max(minOffsetX, std::min(mOriginOffset.x, maxOffsetX));
@@ -392,13 +382,10 @@ void MidiCanvasPanel::DrawGrid(wxGraphicsContext* gc)
 
 void MidiCanvasPanel::DrawLoopRegion(wxGraphicsContext* gc)
 {
-	if (!mTransport.mLoopEnabled && mTransport.GetLoopStart() == 0 && mTransport.GetLoopEnd() == MidiConstants::DEFAULT_LOOP_END)
-		return;
-
 	wxSize clientSize = GetClientSize();
 	int loopStartX = TickToScreenX(mTransport.GetLoopStart());
 	int loopEndX = TickToScreenX(mTransport.GetLoopEnd());
-	int canvasHeight = clientSize.GetHeight() - CONTROL_BAR_HEIGHT;
+	int canvasHeight = clientSize.GetHeight(); 
 
 	// Use semi-transparent blue when enabled, dimmed gray when disabled
 	wxColour loopColor = mTransport.mLoopEnabled ? LOOP_ENABLED : LOOP_DISABLED;

@@ -167,6 +167,7 @@ private:
 	}
 	void StopTransport(wxMouseEvent& event)
 	{
+		mTransport.ResetShiftRate();
 		switch (mPreviousState)
 		{
 		case Transport::State::Stopped:
