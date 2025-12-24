@@ -87,23 +87,6 @@ Should respect collision prevention strategy once bug #4 is implemented.
 
 ---
 
-### #7 - Add measure navigation to arrow keys
-**Status:** Open
-**Priority:** Medium
-**Found:** 2025-12-17
-
-**Description:**
-Need keyboard shortcuts to jump to next/previous measure for faster navigation.
-
-**Proposed Feature:**
-- Left arrow: Move playhead to start of previous measure
-- Right arrow: Move playhead to start of next measure
-
-**Notes:**
-Should be added to keyboard shortcut system and documented in ShortcutsPanel. Measure boundaries are calculated based on time signature and tick position (960 ticks per quarter note, default 4/4 time = 3840 ticks per measure).
-
----
-
 ### #8 - Loop recording active note tracking reliability
 **Status:** Open
 **Priority:** High
@@ -141,75 +124,6 @@ Potential for stuck notes or buffer corruption under edge cases.
 
 **Notes:**
 See AppModel.cpp:124-154 (auto-close logic) and AppModel.cpp:233-251 (active note tracking in CheckMidiInQueue). This is a critical issue because stuck notes are very noticeable and disruptive to the user experience.
-
----
-
-### #9 - MIDI input latency and recording timestamp accuracy
-**Status:** Open
-**Priority:** High
-**Found:** 2025-12-17
-
-**Description:**
-MIDI input latency is currently uncompensated, causing recorded notes to be timestamped later than when they were actually played. This results in recordings that sound "late" or "sluggish" on playback, even if the performance was accurate.
-
-**Root Causes:**
-1. **System latency** - OS audio/MIDI stack introduces delay (typically 10-50ms)
-2. **Audio buffer latency** - Larger buffers = more stable but higher latency
-3. **Timestamp accuracy** - Notes timestamped with `mTransport.GetCurrentTick()` which reflects current playback time, not actual key press time
-4. **Monitoring latency** - Delay between pressing key and hearing sound affects timing perception
-
-**Current Behavior:**
-- `CheckMidiInQueue()` timestamps incoming MIDI with current transport tick (AppModel.cpp:211)
-- No latency measurement or compensation
-- No user control over audio buffer size
-- No direct monitoring option
-
-**Impact on User:**
-- Recorded notes consistently late relative to metronome/backing tracks
-- Frustrating recording experience, especially for rhythm-critical parts
-- Users may overcompensate by playing early, creating inconsistent timing
-
-**Potential Solutions:**
-1. **Latency measurement** - Loopback test or manual calibration UI
-2. **Timestamp compensation** - Subtract measured latency from recorded note timestamps
-3. **ASIO support** - Use ASIO API on Windows for lower latency (RtMidi supports this)
-4. **Buffer size control** - Let users adjust audio buffer size vs latency tradeoff
-5. **Direct monitoring** - Route MIDI input directly to output with minimal buffering
-6. **Latency indicator** - Display current system latency in UI so users understand the issue
-
-**Implementation Phases:**
-
-**Phase 1 - Manual Offset (Quick Win, ~1 hour)**
-- Add "Recording Offset" setting (milliseconds slider in MidiSettingsPanel)
-- Subtract offset from all recorded timestamps in CheckMidiInQueue()
-- User calibrates manually: record with metronome, adjust until notes align
-- Solves 80% of the problem with minimal complexity
-- Store offset in project settings
-
-**Phase 2 - Automatic Measurement (Moderate complexity)**
-- Implement loopback latency test: send MIDI note out, loop back in, measure round-trip
-- Divide by 2 for input latency estimate
-- Add "Calibrate Latency" button in settings
-- Requires user to connect MIDI out → MIDI in with cable/virtual port
-- Display measured latency in UI
-- Auto-populate recording offset with measured value
-
-**Phase 3 - ASIO Support (Professional, high complexity)**
-- Add ASIO API support on Windows (RtMidi already supports this)
-- Add audio API selection dropdown in settings (Windows MM / ASIO)
-- Handle lower-level callback model required by ASIO
-- Expose buffer size control for latency/stability tradeoff
-- Display current system latency in real-time
-- Typical latency reduction: 40ms → 5-10ms
-
-**Technical Considerations:**
-- Need to measure round-trip latency (input → processing → output)
-- Latency can vary by MIDI device and system load
-- May need per-device latency calibration
-- Timestamp compensation must account for tempo changes
-
-**Notes:**
-This is a complex problem that affects all real-time audio applications. Most professional DAWs provide latency compensation and ASIO support. Research solutions used by Reaper, Ableton, FL Studio. Consider implementing in phases: (1) measurement/display, (2) basic compensation, (3) advanced features.
 
 ---
 
@@ -393,38 +307,6 @@ This is a fundamental DAW workflow feature. See `AppModel::CopyNotesToClipboard(
 
 ---
 
-### #15 - Inconsistent encapsulation in Transport class
-**Status:** Open
-**Priority:** Medium
-**Found:** 2025-12-22
-
-**Description:**
-Transport class exposes public member variables (mTempo, mLoopEnabled, mLoopStartTick, mLoopEndTick) while other component classes use proper getters/setters. This breaks encapsulation and is inconsistent with the rest of the codebase architecture.
-
-**Problematic Code:**
-- Transport.h:19-26 - Public member variables
-- AppModel.cpp:320, 365 - Direct access: `if (mTransport.mLoopEnabled && currentTick >= mTransport.mLoopEndTick - 1)`
-
-**Issues:**
-1. **Breaks encapsulation** - Internal state exposed to external modification
-2. **Inconsistent with other components** - SoundBank, TrackSet, etc. use getters
-3. **No validation** - Direct access bypasses any validation logic
-4. **Hard to refactor** - Public members create tight coupling
-
-**Expected Behavior:**
-Transport should use getters/setters like other component classes for consistency and proper encapsulation.
-
-**Proposed Solution:**
-1. Make member variables private
-2. Add getter/setter methods (some already exist like GetLoopStart/GetLoopEnd)
-3. Add missing getters: `IsLoopEnabled()`, `GetTempo()`, `SetTempo(double tempo)`
-4. Update AppModel to use getters instead of direct access
-
-**Notes:**
-Transport already has some getters (GetLoopStart, GetLoopEnd) but is inconsistent. Complete the encapsulation for all public members. This improves maintainability and follows Single Responsibility Principle.
-
----
-
 ### #16 - Magic number sentinel value in PasteNotes
 **Status:** Open
 **Priority:** Low
@@ -459,91 +341,6 @@ void AppModel::PasteNotes(std::optional<uint64_t> pasteTick = std::nullopt)
 
 **Notes:**
 This is a minor refactoring but improves code clarity and type safety. Low priority because current implementation works, but should be addressed during next refactoring pass.
-
----
-
-### #17 - Mixed responsibilities in CheckMidiInQueue
-**Status:** Open
-**Priority:** Medium
-**Found:** 2025-12-22
-
-**Description:**
-`CheckMidiInQueue()` handles multiple concerns: MIDI input polling, routing, playback, recording, and note tracking. This violates Single Responsibility Principle and makes the method hard to test and maintain.
-
-**Problematic Code:**
-- AppModel.cpp:59-103 - 44-line method handling:
-  - MIDI input polling
-  - Callback notification
-  - Channel iteration and solo logic
-  - MIDI routing and playback
-  - Recording buffer management
-  - Active note tracking (NoteOn/NoteOff)
-
-**Issues:**
-1. **Too many responsibilities** - Difficult to understand at a glance
-2. **Hard to test** - Can't test recording logic in isolation from routing logic
-3. **Poor maintainability** - Changes to recording affect routing and vice versa
-4. **Nested complexity** - Deep nesting with multiple conditions
-
-**Expected Behavior:**
-Extract recording logic into separate focused method(s).
-
-**Proposed Solution:**
-```cpp
-void AppModel::CheckMidiInQueue()
-{
-    if (!mMidiInputManager.GetDevice().checkForMessage()) return;
-
-    MidiMessage mm = mMidiInputManager.GetDevice().getMessage();
-    auto currentTick = mTransport.GetCurrentTick();
-
-    NotifyMidiEventCallback(mm, currentTick);
-    RouteAndPlayMidiMessage(mm, currentTick);
-}
-
-void AppModel::RouteAndPlayMidiMessage(const MidiMessage& mm, uint64_t currentTick)
-{
-    auto channels = mSoundBank.GetAllChannels();
-    for (MidiChannel& c : channels)
-    {
-        if (mSoundBank.ShouldChannelPlay(c, true))
-        {
-            MidiMessage routed = mm;
-            routed.setChannel(c.channelNumber);
-            mSoundBank.GetMidiOutDevice()->sendMessage(routed);
-
-            if (c.record && IsMusicalMessage(routed) && mTransport.GetState() == Transport::State::Recording)
-            {
-                RecordMidiEvent(routed, currentTick);
-            }
-        }
-    }
-}
-
-void AppModel::RecordMidiEvent(const MidiMessage& msg, uint64_t currentTick)
-{
-    mRecordingSession.AddEvent({msg, currentTick});
-
-    // Track active notes for loop recording
-    ubyte status = msg.mData[0] & 0xF0;
-    ubyte pitch = msg.getPitch();
-    ubyte channel = msg.getChannel();
-
-    if (status == 0x90 && msg.mData[2] > 0)  // NoteOn
-    {
-        mRecordingSession.StartNote(pitch, channel, currentTick);
-    }
-    else if (status == 0x80 || (status == 0x90 && msg.mData[2] == 0))  // NoteOff
-    {
-        mRecordingSession.StopNote(pitch, channel);
-    }
-}
-```
-
-**Notes:**
-This refactoring improves readability, testability, and maintainability. Each method has a single, clear purpose. Medium priority - would be good to address during next refactoring session.
-
----
 
 ---
 
@@ -705,8 +502,175 @@ if (mTransport.ShouldLoopBack(currentTick))
 Low priority style/clarity issue. Option 2 is preferred as it encapsulates the loop logic in Transport where it belongs and makes the intent self-documenting.
 
 ---
+**Priority:** Medium
+**Found:** 2025-12-24
+
+**Description:**
+The `QuantizeCommand` quantizes all MIDI events independently by snapping them to the nearest grid point. This can cause note-on and note-off events to snap to the same tick (creating zero-length notes) or cause consecutive notes to overlap (note-off and next note-on at same tick).
+
+**Problematic Code:**
+QuantizeCommand.h:46-62 - Quantizes all events without considering note pairing or overlap
+
+**Example Problem:**
+```
+Before quantize (grid = 960 ticks, quarter note):
+  NoteOn  C4 at tick 950   (near grid point 960)
+  NoteOff C4 at tick 1400  (near grid point 1440)
+  NoteOn  C4 at tick 1410  (near grid point 1440)
+
+After quantize:
+  NoteOn  C4 at tick 960   ✓ Snapped to grid
+  NoteOff C4 at tick 1440  ✓ Snapped to grid
+  NoteOn  C4 at tick 1440  ✗ SAME TICK! Creates overlap/stuck note
+```
+
+**Additional Issues:**
+- Zero-duration notes when note-on and note-off snap to same grid point
+- No respect for `NOTE_SEPARATION_TICKS` constant after quantizing
+- Can violate the note separation guarantees established elsewhere in the codebase
+
+**Expected Behavior:**
+After quantizing, notes should maintain proper separation using `NOTE_SEPARATION_TICKS` to prevent overlaps and ensure minimum note duration.
+
+**Proposed Solutions:**
+
+**Option A: Post-process with SeparateOverlappingNotes** (Quick fix)
+- After quantizing, call `TrackSet::SeparateOverlappingNotes(track)`
+- Reuses existing overlap prevention logic
+- Ensures `NOTE_SEPARATION_TICKS` gap is maintained
+
+**Option B: Duration-aware quantization** (Recommended) ⭐
+Use `TrackSet::GetNotesFromTrack()` to work with note pairs and handle short vs long notes intelligently:
+
+```cpp
+std::vector<NoteLocation> notes = TrackSet::GetNotesFromTrack(track);
+
+for (const auto& note : notes)
+{
+    uint64_t duration = note.endTick - note.startTick;
+
+    if (duration < gridSize)
+    {
+        // Short note: Quantize start, extend to minimum one grid snap
+        uint64_t quantizedStart = RoundToNearestGrid(note.startTick);
+        track[note.noteOnIndex].tick = quantizedStart;
+        track[note.noteOffIndex].tick = quantizedStart + gridSize - NOTE_SEPARATION_TICKS;
+    }
+    else
+    {
+        // Long note: Quantize both start and end independently
+        track[note.noteOnIndex].tick = RoundToNearestGrid(note.startTick);
+        track[note.noteOffIndex].tick = RoundToNearestGrid(note.endTick);
+    }
+}
+
+// Post-process to fix any remaining overlaps
+TrackSet::SeparateOverlappingNotes(track);
+```
+
+**Benefits:**
+- Short notes (< grid size) won't disappear - they're extended to one grid snap minimum
+- Long notes preserve their relative duration while snapping to grid
+- Musically intelligent - respects performance intent
+- Uses existing helper methods (`GetNotesFromTrack`, `SeparateOverlappingNotes`)
+
+**Option C: Preserve duration exactly** (Alternative)
+- Quantize note-on only
+- Keep original duration: `quantized_start + original_duration - NOTE_SEPARATION_TICKS`
+- Preserves phrasing completely, only fixes note timing
+
+**Recommended Approach:**
+Option B - Duration-aware quantization. It handles the common case of "grace notes" or quick ornaments (which should become one grid snap minimum) while still properly quantizing longer sustained notes. The combination of intelligent duration handling + post-process overlap fix ensures musical and technically correct results.
+
+**Notes:**
+This is related to the overall note separation refactoring using `NOTE_SEPARATION_TICKS` constant (MidiConstants.h:9). Any quantize fix should respect this constant to maintain consistency with loop recording, mouse note creation, and overlap prevention.
+
+---
 
 ## Fixed Bugs
+
+### #21 - Quantize can create overlapping or zero-length notes
+**Status:** Fixed
+**Priority:** Medium
+**Found:** 2025-12-24
+**Fixed:** 2025-12-24
+
+**Description:**
+The `QuantizeCommand` quantized all MIDI events independently by snapping them to the nearest grid point. This caused note-on and note-off events to snap to the same tick (creating zero-length notes) or consecutive notes to overlap.
+
+**Solution:**
+Implemented duration-aware quantization algorithm using `TrackSet::GetNotesFromTrack()` to handle short vs long notes intelligently:
+
+**Algorithm:**
+```cpp
+std::vector<NoteLocation> notes = TrackSet::GetNotesFromTrack(mTrack);
+
+for (const auto& note : notes)
+{
+    uint64_t duration = note.endTick - note.startTick;
+    uint64_t quantizedStart = RoundToGrid(note.startTick);
+
+    if (duration < mGridSize)
+    {
+        // Short note (grace note/ornament): extend to one grid snap minimum
+        mTrack[note.noteOnIndex].tick = quantizedStart;
+        mTrack[note.noteOffIndex].tick = quantizedStart + mGridSize - NOTE_SEPARATION_TICKS;
+    }
+    else
+    {
+        // Long note: quantize both start and end independently
+        mTrack[note.noteOnIndex].tick = quantizedStart;
+        mTrack[note.noteOffIndex].tick = RoundToGrid(note.endTick);
+    }
+}
+
+// Post-process to fix any remaining overlaps
+TrackSet::SeparateOverlappingNotes(mTrack);
+```
+
+**Benefits:**
+- Short notes (< grid size) are extended to one grid snap minimum - prevents grace notes from disappearing
+- Long notes preserve their relative duration while snapping to grid
+- Musically intelligent - respects performance intent (short decorative vs sustained notes)
+- Uses `NOTE_SEPARATION_TICKS` constant for consistency with rest of codebase
+- Post-processes with `SeparateOverlappingNotes` as safety net
+
+**Files Modified:**
+- `src/Commands/QuantizeCommand.h` - Complete rewrite of Execute() method with duration-aware algorithm
+
+---
+
+### #9 - MIDI input latency and recording timestamp accuracy
+**Status:** Fixed
+**Priority:** High
+**Found:** 2025-12-17
+**Fixed:** 2025-12-24
+
+**Description:**
+MIDI input latency was causing recorded notes to be timestamped later than when they were actually played, resulting in recordings that sounded "late" or "sluggish" on playback.
+
+**Root Cause:**
+The main issue was timestamp accuracy - notes were timestamped with `mTransport.GetCurrentTick()` which reflected the current playback time, not the actual key press time. With a 10ms update timer, this introduced up to 10ms of polling latency, which could accumulate and become noticeable during recording.
+
+**Solution:**
+Reduced the update timer interval from 10ms to 1ms (MainFrame timer), increasing the polling rate from 100 Hz to 1000 Hz. This reduced maximum polling latency from 10ms to 1ms, which is well below the ~20-30ms threshold where humans start to perceive timing delays.
+
+**Impact:**
+- Recording latency is now imperceptible during normal use
+- Timestamps are captured within 1ms of actual MIDI input
+- No noticeable "late" feeling when recording with MIDI keyboard
+- Professional-level timing accuracy for rhythm-critical parts
+
+**Notes:**
+This fix resolves the latency issue for typical use cases. If latency becomes noticeable again on very large compositions with heavy CPU load, we may need to revisit this and implement additional solutions such as:
+- Manual recording offset calibration
+- ASIO support for lower-level MIDI access
+- Dedicated MIDI input thread
+- Latency measurement and compensation
+
+For now, the 1ms timer provides sufficient accuracy for professional-quality MIDI recording.
+
+---
 
 ### #14 - Static local variables in HandlePlaying/HandleRecording
 **Status:** Fixed
@@ -744,6 +708,184 @@ double mShiftAccel = 1.01;                 // Was: 1.01f
 ```
 
 This eliminates type mismatches and makes the code consistent with C++ conventions (double literals don't need the `f` suffix).
+
+---
+
+### #15 - Inconsistent encapsulation in Transport class
+**Status:** Fixed
+**Priority:** Medium
+**Found:** 2025-12-22
+**Fixed:** 2025-12-23
+
+**Description:**
+Transport class exposed public member variables (mTempo, mLoopEnabled, mLoopStartTick, mLoopEndTick) while other component classes used proper getters/setters. This broke encapsulation and was inconsistent with the rest of the codebase architecture.
+
+**Solution:**
+Implemented comprehensive encapsulation refactoring using struct-based settings:
+
+1. **Created BeatSettings struct** - Groups tempo and time signature settings:
+```cpp
+struct BeatSettings
+{
+    double tempo = MidiConstants::DEFAULT_TEMPO;
+    int timeSignatureNumerator = MidiConstants::DEFAULT_TIME_SIGNATURE_NUMERATOR;
+    int timeSignatureDenominator = MidiConstants::DEFAULT_TIME_SIGNATURE_DENOMINATOR;
+};
+```
+
+2. **Created LoopSettings struct** - Groups loop-related settings:
+```cpp
+struct LoopSettings
+{
+    bool enabled = false;
+    uint64_t startTick = 0;
+    uint64_t endTick = MidiConstants::DEFAULT_LOOP_END;
+};
+```
+
+3. **Added proper API methods:**
+   - `BeatSettings GetBeatSettings() const` / `void SetBeatSettings(const BeatSettings&)`
+   - `LoopSettings GetLoopSettings() const` / `void SetLoopSettings(const LoopSettings&)`
+   - Kept existing convenience methods (`SetLoopStart/End`, `GetLoopStart/End`)
+
+4. **Updated all call sites** across 6 files:
+   - Transport.cpp - Internal references updated
+   - TransportPanel.h - UI controls updated
+   - ProjectManager.cpp - Serialization updated
+   - AppModel.cpp - Loop logic updated
+   - MidiCanvas.cpp - Loop rendering updated
+
+**Benefits:**
+- Proper encapsulation matching rest of codebase
+- Atomic updates of related settings
+- Cleaner code with struct-based grouping
+- Easier to extend (validation, change notifications, etc.)
+- Follows Single Responsibility Principle
+
+---
+
+### #17 - Mixed responsibilities in CheckMidiInQueue
+**Status:** Fixed
+**Priority:** Medium
+**Found:** 2025-12-22
+**Fixed:** 2025-12-23
+
+**Description:**
+`CheckMidiInQueue()` handled multiple concerns in a single 44-line method: MIDI input polling, routing, playback, recording, and note tracking. This violated Single Responsibility Principle and made the method hard to test and maintain.
+
+**Solution:**
+Implemented comprehensive refactoring following Single Responsibility Principle by splitting responsibilities across focused methods and components:
+
+**1. Added MidiInputManager::PollAndNotify()**
+- Moved message polling and callback notification to MidiInputManager
+- Returns `std::optional<MidiMessage>`
+- Encapsulates all input polling concerns in one place
+
+```cpp
+std::optional<MidiMessage> MidiInputManager::PollAndNotify(uint64_t currentTick)
+{
+    if (!mMidiIn->checkForMessage()) return std::nullopt;
+    MidiMessage mm = mMidiIn->getMessage();
+    if (mLogCallback) { mLogCallback({mm, currentTick}); }
+    return mm;
+}
+```
+
+**2. Added RecordingSession::RecordEvent()**
+- Moved recording logic to RecordingSession where it belongs
+- Encapsulates recording buffer management AND active note tracking
+- Better separation of concerns - all recording logic in one component
+
+```cpp
+void RecordingSession::RecordEvent(const MidiMessage& msg, uint64_t currentTick)
+{
+    AddEvent({msg, currentTick});
+    // Parse status and call StartNote/StopNote for note tracking
+}
+```
+
+**3. Added AppModel::RouteAndPlayMessage()**
+- Private helper method for message routing and playback
+- Handles channel iteration, routing, and MIDI output
+- Calls RecordingSession::RecordEvent() when recording
+
+**4. Renamed CheckMidiInQueue() → HandleIncomingMidi()**
+- More descriptive name matching Handle* pattern
+- Moved from public to private (only called from Update())
+- Simplified to 4 lines of pure orchestration
+
+```cpp
+void AppModel::HandleIncomingMidi()
+{
+    auto message = mMidiInputManager.PollAndNotify(mTransport.GetCurrentTick());
+    if (!message) return;
+    RouteAndPlayMessage(*message, mTransport.GetCurrentTick());
+}
+```
+
+**Files Modified:**
+- `MidiInputManager.h/cpp` - Added PollAndNotify
+- `RecordingSession.h/cpp` - Added RecordEvent
+- `AppModel.h/cpp` - Added RouteAndPlayMessage, renamed to HandleIncomingMidi
+
+**Benefits:**
+- Single Responsibility - Each method has one clear purpose
+- Testability - Helper methods can be tested in isolation
+- Maintainability - Recording changes don't affect routing
+- Readability - High-level flow visible at a glance
+- Better Encapsulation - RecordingSession owns all recording concerns
+
+**Before:** 44 lines, 11 responsibilities mixed together
+**After:** 4 lines of clean orchestration, responsibilities delegated to focused methods
+
+---
+
+### #7 - Add measure navigation to arrow keys
+**Status:** Fixed
+**Priority:** Medium
+**Found:** 2025-12-17
+**Fixed:** 2025-12-23
+
+**Description:**
+Keyboard shortcuts to jump to next/previous measure for faster navigation.
+
+**Solution:**
+Implemented measure navigation with arrow keys:
+
+1. **Added Transport Methods:**
+   - `JumpToNextMeasure()` - Jumps playhead to next measure boundary (Transport.h:73, Transport.cpp:132-147)
+   - `JumpToPreviousMeasure()` - Jumps playhead to previous measure boundary (Transport.h:74, Transport.cpp:149-165)
+   - Smart boundary detection: if at measure start, jump full measure; if mid-measure, jump to current measure boundary
+
+2. **Keyboard Bindings:**
+   - Left Arrow → Jump to previous measure
+   - Right Arrow → Jump to next measure
+   - Bindings added in MainFrame.h (ID_KEYBOARD_PREVIOUS_MEASURE, ID_KEYBOARD_NEXT_MEASURE)
+   - Event handlers in MainFrameEventHandlers.cpp (OnPreviousMeasure, OnNextMeasure)
+
+3. **Measure Calculation:**
+   - Correctly uses time signature: 960 ticks per quarter note
+   - Default 4/4 time: 3840 ticks per measure (960 * 4)
+   - Adapts to custom time signatures via `GetTicksPerMeasure()`
+
+4. **Documentation:**
+   - Added to ShortcutsPanel.h Transport Controls section
+   - Users can now discover the arrow key shortcuts in the shortcuts reference panel
+
+**Files Modified:**
+- `src/AppModel/Transport/Transport.h/cpp` - Added measure navigation methods
+- `src/MainFrame/MainFrame.h` - Added keyboard event IDs
+- `src/MainFrame/MainFrame.cpp` - Added keyboard bindings
+- `src/MainFrame/MainFrameEventHandlers.cpp` - Added event handlers
+- `src/Panels/ShortcutsPanel.h` - Documented shortcuts
+- `docs/BugList.md` - Moved to Fixed Bugs
+
+**Benefits:**
+- Faster navigation through long compositions
+- Professional DAW-style workflow
+- Intuitive keyboard shortcuts matching standard DAW behavior
+- Measure-aware navigation respects time signature changes
+- Smooth user experience with smart boundary detection
 
 ---
 

@@ -1,14 +1,23 @@
 #pragma once
 #include "Command.h"
 #include "AppModel/TrackSet/TrackSet.h"
+#include "MidiConstants.h"
 #include <algorithm>
 #include <vector>
 #include <string>
 using namespace MidiInterface;
 
 /// <summary>
-/// Command to quantize MIDI events in a track to a grid.
-/// Snaps all event timestamps to the nearest grid division, fixing timing imperfections.
+/// Command to quantize MIDI events in a track to a grid using duration-aware algorithm.
+/// Intelligently handles short notes (grace notes/ornaments) vs long notes (sustained).
+///
+/// Duration-aware quantization:
+/// - Short notes (< grid size): Quantize start, extend to one grid snap minimum
+///   - Prevents grace notes/ornaments from disappearing into zero-length notes
+///   - Example: 50-tick grace note → one full grid snap (e.g., 960 ticks)
+/// - Long notes (>= grid size): Quantize both start and end independently
+///   - Preserves musical phrasing while fixing timing
+///   - Example: 2000-tick sustained note → snaps to nearest grid points
 ///
 /// Grid sizes (in ticks, assuming 960 ticks per quarter note):
 /// - Whole note: 3840 ticks
@@ -18,10 +27,7 @@ using namespace MidiInterface;
 /// - Sixteenth note: 240 ticks
 /// - Thirty-second note: 120 ticks
 ///
-/// Example:
-/// - Original note at tick 975
-/// - Grid size: 960 (quarter note)
-/// - Quantized: 960 (rounds to nearest quarter note)
+/// Post-processes with SeparateOverlappingNotes to ensure NOTE_SEPARATION_TICKS gap.
 /// </summary>
 class QuantizeCommand : public Command
 {
@@ -45,14 +51,32 @@ public:
 
 	void Execute() override
 	{
-		// Quantize each event to nearest grid division
-		for (auto& event : mTrack)
+		// Get note pairs (note-on + note-off) for intelligent quantization
+		std::vector<NoteLocation> notes = TrackSet::GetNotesFromTrack(mTrack);
+
+		// Duration-aware quantization: handle short vs long notes differently
+		for (const auto& note : notes)
 		{
-			uint64_t tick = event.tick;
-			// Round to nearest multiple of gridSize
-			uint64_t quantized = ((tick + mGridSize / 2) / mGridSize) * mGridSize;
-			event.tick = quantized;
+			uint64_t duration = note.endTick - note.startTick;
+			uint64_t quantizedStart = RoundToGrid(note.startTick);
+
+			if (duration < mGridSize)
+			{
+				// Short note (grace note/ornament): quantize start, extend to one grid snap
+				// This prevents quick decorative notes from disappearing
+				mTrack[note.noteOnIndex].tick = quantizedStart;
+				mTrack[note.noteOffIndex].tick = quantizedStart + mGridSize - MidiConstants::NOTE_SEPARATION_TICKS;
+			}
+			else
+			{
+				// Long note: quantize both start and end independently
+				mTrack[note.noteOnIndex].tick = quantizedStart;
+				mTrack[note.noteOffIndex].tick = RoundToGrid(note.endTick) - MidiConstants::NOTE_SEPARATION_TICKS;
+			}
 		}
+
+		// Post-process to fix any remaining overlaps
+		TrackSet::SeparateOverlappingNotes(mTrack);
 
 		// Re-sort track by tick to maintain chronological order
 		std::sort(mTrack.begin(), mTrack.end(),
@@ -116,6 +140,14 @@ public:
 	}
 
 private:
+	/// <summary>
+	/// Helper to round a tick value to the nearest grid point
+	/// </summary>
+	uint64_t RoundToGrid(uint64_t tick) const
+	{
+		return ((tick + mGridSize / 2) / mGridSize) * mGridSize;
+	}
+
 	Track& mTrack;
 	uint64_t mGridSize;
 	std::vector<uint64_t> mOriginalTicks;  // Original timestamps for undo

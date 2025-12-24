@@ -85,6 +85,8 @@ private:
 		AddSection("Transport Controls");
 		AddShortcut("Spacebar", "Toggle Play/Stop");
 		AddShortcut("R", "Toggle Record");
+		AddShortcut("Left Arrow", "Jump to previous measure");
+		AddShortcut("Right Arrow", "Jump to next measure");
 		AddInfo("Transport buttons:");
 		AddShortcut("Play Button", "Start playback");
 		AddShortcut("Stop Button", "Stop playback/recording");

@@ -4,6 +4,7 @@
 #include <string>
 #include <memory>
 #include <functional>
+#include <optional>
 #include "RtMidiWrapper/MidiDevice/MidiIn.h"
 #include "AppModel/TrackSet/TrackSet.h"
 
@@ -13,11 +14,11 @@
  * Responsibilities:
  * - Manage MIDI input device
  * - Provide port selection
- * - Provide access to device for polling
+ * - Poll for incoming messages and notify callbacks
  * - Manage MIDI event logging callback
  *
- * Note: CheckMidiInQueue() remains in AppModel as it's orchestration logic
- * that coordinates SoundBank, Transport, and RecordingSession.
+ * Note: HandleIncomingMidi() in AppModel orchestrates the MIDI input flow
+ * by coordinating MidiInputManager, SoundBank, Transport, and RecordingSession.
  *
  * Usage:
  *   MidiInputManager inputManager;
@@ -46,7 +47,7 @@ public:
 
 	/**
 	 * Get reference to MIDI input device
-	 * Used by AppModel::CheckMidiInQueue() to poll for messages
+	 * Direct device access (prefer using PollAndNotify)
 	 * @return Reference to MidiIn device
 	 */
 	MidiIn& GetDevice();
@@ -66,10 +67,17 @@ public:
 
 	/**
 	 * Get current log callback
-	 * Used by CheckMidiInQueue to log events
+	 * Used internally by PollAndNotify to log events
 	 * @return Current log callback (may be null)
 	 */
 	const MidiLogCallback& GetLogCallback() const;
+
+	/**
+	 * Poll for incoming MIDI message and notify callback if received
+	 * @param currentTick Current transport tick for timestamp
+	 * @return MIDI message if available, std::nullopt otherwise
+	 */
+	std::optional<MidiMessage> PollAndNotify(uint64_t currentTick);
 
 private:
 	std::shared_ptr<MidiIn> mMidiIn;

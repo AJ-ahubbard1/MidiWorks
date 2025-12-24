@@ -58,10 +58,13 @@ public:
 	// Static helper to extract note pairs from a single Track
 	static std::vector<NoteLocation> GetNotesFromTrack(const Track& track, int trackIndex = 0);
 
-	// Merge overlapping notes during loop recording
+	// Static helper to sort a single track by tick
+	static void SortTrack(Track& track);
+
+	// Separateoverlapping notes during loop recording
 	// When consecutive NoteOn messages of same pitch/channel occur,
-	// merge them into a single note (first NoteOn + last NoteOff)
-	static void MergeOverlappingNotes(Track& buffer);
+	// shift Note Off Message of first note to keep them as separate notes
+	static void SeparateOverlappingNotes(Track& buffer);
 
 	void FinalizeRecording(Track& recordingBuffer);
 

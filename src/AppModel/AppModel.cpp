@@ -48,58 +48,18 @@ void AppModel::Update()
 		case Transport::State::Rewinding:		HandleFastForwardRewind();	break;
 	}
 
-	CheckMidiInQueue();
+	HandleIncomingMidi();
 }
-/* Checks for Midi In Messages
-   If a SoundBank Channel is active, the message will playback.
-   If a SoundBank Channel is set to record: the message will be added to the RecordingSession.
-   This session stores midi messages temporarily during recording,
-   when finished recording, the buffer is added to the track and sorted by timestamp.
+/* Handles incoming MIDI messages from input device
+   Polls for incoming messages, routes them to appropriate channels,
+   plays them back, and records them if recording is active.
  */
-void AppModel::CheckMidiInQueue()
+void AppModel::HandleIncomingMidi()
 {
-	if (!mMidiInputManager.GetDevice().checkForMessage()) return;
+	auto message = mMidiInputManager.PollAndNotify(mTransport.GetCurrentTick());
+	if (!message) return;
 
-	MidiMessage mm = mMidiInputManager.GetDevice().getMessage();
-	auto currentTick = mTransport.GetCurrentTick();
-	auto channels = mSoundBank.GetAllChannels();
-	bool solosFound = mSoundBank.SolosFound();
-
-	// Notify callback of MIDI event (if registered)
-	const auto& logCallback = mMidiInputManager.GetLogCallback();
-	if (logCallback)
-	{
-		logCallback({mm, currentTick});
-	}
-
-	for (MidiChannel& c : channels)
-	{
-		if (mSoundBank.ShouldChannelPlay(c, true))
-		{
-			MidiMessage routed = mm;
-			routed.setChannel(c.channelNumber);
-			mSoundBank.GetMidiOutDevice()->sendMessage(routed);
-
-			if (c.record && IsMusicalMessage(routed) && mTransport.IsRecording())
-			{
-				mRecordingSession.AddEvent({routed, currentTick});
-
-				// Track active notes for loop recording
-				ubyte status = routed.mData[0] & 0xF0;
-				ubyte pitch = routed.getPitch();
-				ubyte channel = routed.getChannel();
-
-				if (status == 0x90 && routed.mData[2] > 0)  // NoteOn with velocity > 0
-				{
-					mRecordingSession.StartNote(pitch, channel, currentTick);
-				}
-				else if (status == 0x80 || (status == 0x90 && routed.mData[2] == 0))  // NoteOff
-				{
-					mRecordingSession.StopNote(pitch, channel);
-				}
-			}
-		}
-	}
+	RouteAndPlayMessage(*message, mTransport.GetCurrentTick());
 }
 
 SoundBank& AppModel::GetSoundBank() { return mSoundBank; }
@@ -270,6 +230,26 @@ void AppModel::PlayMessages(std::vector<MidiMessage> msgs)
 	}
 }
 
+void AppModel::RouteAndPlayMessage(const MidiMessage& mm, uint64_t currentTick)
+{
+	auto channels = mSoundBank.GetAllChannels();
+	bool isRecording = mTransport.IsRecording();
+	for (MidiChannel& c : channels)
+	{
+		if (mSoundBank.ShouldChannelPlay(c, true))
+		{
+			MidiMessage routed = mm;
+			routed.setChannel(c.channelNumber);
+			mSoundBank.GetMidiOutDevice()->sendMessage(routed);
+
+			if (isRecording && c.record && IsMusicalMessage(routed))
+			{
+				mRecordingSession.RecordEvent(routed, currentTick);
+			}
+		}
+	}
+}
+
 // TRANSPORT STATE HANDLERS
 
 void AppModel::HandleStopRecording()
@@ -282,8 +262,10 @@ void AppModel::HandleStopRecording()
 	{
 		auto cmd = std::make_unique<RecordCommand>(mTrackSet, mRecordingSession.GetBuffer());
 		mUndoRedoManager.ExecuteCommand(std::move(cmd));
-		mRecordingSession.Clear();
 	}
+
+	// Always clear to ensure clean state for next recording
+	mRecordingSession.Clear();
 
 	mSoundBank.SilenceAllChannels();
 }
@@ -308,52 +290,32 @@ void AppModel::HandleClickedPlay()
 	mTransport.SetState(Transport::State::Playing);
 }
 
+
 void AppModel::HandlePlaying()
 {
-	std::vector<MidiMessage> messages;
-
-	uint64_t lastTick = mTransport.GetCurrentTick();
-	mTransport.UpdatePlayBack(GetDeltaTimeMs());
-	uint64_t currentTick = mTransport.GetCurrentTick();
-
-	// Loop-back logic (check BEFORE metronome to avoid double-click at loop boundary)
-	if (mTransport.mLoopEnabled && currentTick >= mTransport.mLoopEndTick - 1)
-	{
-		mTransport.ShiftToTick(mTransport.mLoopStartTick);
-		mTrackSet.FindStart(mTransport.mLoopStartTick);
-		currentTick = mTransport.GetCurrentTick();  // Update currentTick after loop-back
-	}
-
-	// Metronome
-	if (mMetronomeService.IsEnabled())
-	{
-		auto beat = mTransport.CheckForBeat(lastTick, currentTick);
-		if (beat.beatOccurred)
-		{
-			mSoundBank.PlayMetronomeClick(beat.isDownbeat);
-		}
-	}
-
-	messages = mTrackSet.PlayBack(currentTick);
-	PlayMessages(messages);
+	HandlePlaybackCore(false);
 }
 
 void AppModel::HandleClickedRecord()
 {
 	// See HandleClickedPlay for reason behind GetDeltaTimeMs call
 	GetDeltaTimeMs();
-	mTrackSet.FindStart(mTransport.StartPlayBack());
-
-	// Initialize recording buffer iterator for loop playback
-	if (mTransport.mLoopEnabled)
-	{
-		mRecordingSession.InitializeLoopPlayback(mTransport.GetCurrentTick());
-	}
-
+	// Move trackset iterators to start of playback based on the playhead tick
+	mTrackSet.FindStart(mTransport.StartPlayBack()); 
 	mTransport.SetState(Transport::State::Recording);
 }
 
 void AppModel::HandleRecording()
+{
+	HandlePlaybackCore(true);
+}
+
+void AppModel::HandleFastForwardRewind()
+{
+	mTransport.ShiftCurrentTime();
+}
+
+void AppModel::HandlePlaybackCore(bool isRecording)
 {
 	std::vector<MidiMessage> messages;
 
@@ -361,22 +323,37 @@ void AppModel::HandleRecording()
 	mTransport.UpdatePlayBack(GetDeltaTimeMs());
 	uint64_t currentTick = mTransport.GetCurrentTick();
 
+	// Get loop settings once
+	const auto& loopSettings = mTransport.GetLoopSettings();
+
 	// Loop-back logic (check BEFORE metronome to avoid double-click at loop boundary)
-	if (mTransport.mLoopEnabled && currentTick >= mTransport.mLoopEndTick - 1)
+	if (loopSettings.enabled && currentTick >= loopSettings.endTick)
 	{
-		// Auto-close any notes still held at loop end to prevent stuck notes
-		uint64_t loopEndTick = mTransport.mLoopEndTick - 1;
-		mRecordingSession.CloseAllActiveNotes(loopEndTick);
+		// === RECORDING-SPECIFIC: Pre-wrap cleanup ===
+		// Must happen BEFORE the wrap to finalize events at the old loop end position
+		if (isRecording)
+		{
+			// Auto-close any notes still held at loop end to prevent stuck notes
+			mRecordingSession.CloseAllActiveNotes(loopSettings.endTick - MidiConstants::NOTE_SEPARATION_TICKS);
 
-		// Merge overlapping notes before jumping back
-		TrackSet::MergeOverlappingNotes(mRecordingSession.GetBuffer());
+			// Fix overlapping same-pitch notes to prevent merging artifacts
+			TrackSet::SeparateOverlappingNotes(mRecordingSession.GetBuffer());
+		}
 
-		mTransport.ShiftToTick(mTransport.mLoopStartTick);
-		mTrackSet.FindStart(mTransport.mLoopStartTick);
+		// === COMMON: Perform the loop wrap (both playback and recording) ===
+		mTransport.ShiftToTick(loopSettings.startTick);
+		mTrackSet.FindStart(loopSettings.startTick);
+		uint64_t diff = currentTick - mTransport.GetCurrentTick();
 		currentTick = mTransport.GetCurrentTick();  // Update currentTick after loop-back
+		lastTick -= diff;
 
-		// Reset recording buffer iterator to loop start position
-		mRecordingSession.ResetLoopPlayback(mTransport.mLoopStartTick);
+		// === RECORDING-SPECIFIC: Post-wrap setup ===
+		// Must happen AFTER the wrap to initialize playback at the new loop start position
+		if (isRecording)
+		{
+			// Reset recording buffer iterator to loop start position for playback
+			mRecordingSession.ResetLoopPlayback(loopSettings.startTick);
+		}
 	}
 
 	// Metronome
@@ -393,7 +370,7 @@ void AppModel::HandleRecording()
 
 	// During loop recording, also play back the recording buffer
 	// so you can hear what you recorded in previous loop iterations
-	if (mTransport.mLoopEnabled)
+	if (isRecording && loopSettings.enabled)
 	{
 		auto loopMessages = mRecordingSession.GetLoopPlaybackMessages(currentTick);
 		messages.insert(messages.end(), loopMessages.begin(), loopMessages.end());
@@ -401,9 +378,3 @@ void AppModel::HandleRecording()
 
 	PlayMessages(messages);
 }
-
-void AppModel::HandleFastForwardRewind()
-{
-	mTransport.ShiftCurrentTime();
-}
-

@@ -213,7 +213,7 @@ void MidiCanvasPanel::OnMiddleDown(wxMouseEvent& event)
 		// Take the mouse position and convert that to ticks
 		uint64_t newTick = ScreenXToTick(pos.x);
 		// set transport to new tick
-		if (newTick < MAX_TICK_VALUE)
+		if (newTick < MidiConstants::MAX_TICK_VALUE)
 		{
 			mTransport.ShiftToTick(newTick);
 		}

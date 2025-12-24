@@ -16,6 +16,9 @@ public:
 	bool IsEmpty() const;
 	void AddEvent(const TimedMidiEvent& event);
 
+	// Recording with automatic note tracking
+	void RecordEvent(const MidiMessage& msg, uint64_t currentTick);
+
 	// Active note tracking (for loop recording - prevents stuck notes at loop boundaries)
 	void StartNote(ubyte pitch, ubyte channel, uint64_t startTick);
 	void StopNote(ubyte pitch, ubyte channel);
@@ -23,7 +26,6 @@ public:
 	bool HasActiveNotes() const;
 
 	// Loop recording playback (plays back previously recorded material during loop recording)
-	void InitializeLoopPlayback(uint64_t startTick);
 	void ResetLoopPlayback(uint64_t loopStartTick);
 	std::vector<MidiMessage> GetLoopPlaybackMessages(uint64_t currentTick);
 

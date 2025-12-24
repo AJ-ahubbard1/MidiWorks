@@ -31,7 +31,7 @@ public:
 	/// </summary>
 	void UpdateTempoDisplay()
 	{
-		mTempoControl->SetValue(mTransport.mTempo);
+		mTempoControl->SetValue(mTransport.GetBeatSettings().tempo);
 	}
 
 private:
@@ -66,7 +66,7 @@ private:
 		mTempoLabel = new wxStaticText(this, wxID_ANY, "Tempo:");
 		mTempoControl = new wxSpinCtrlDouble(this, wxID_ANY, "", wxDefaultPosition, wxSize(80, -1));
 		mTempoControl->SetRange(40.0, 300.0);  // 40-300 BPM range
-		mTempoControl->SetValue(mTransport.mTempo);
+		mTempoControl->SetValue(mTransport.GetBeatSettings().tempo);
 		mTempoControl->SetIncrement(1.0);
 		mTempoControl->SetDigits(1);  // Show 1 decimal place
 
@@ -76,7 +76,7 @@ private:
 
 		// Loop checkbox
 		mLoopCheckBox = new wxCheckBox(this, wxID_ANY, "Loop");
-		mLoopCheckBox->SetValue(mTransport.mLoopEnabled);
+		mLoopCheckBox->SetValue(mTransport.GetLoopSettings().enabled);
 	} 
 	
 	void SetupSizers()
@@ -185,7 +185,9 @@ private:
 
 	void OnTempoChange(wxSpinDoubleEvent& event)
 	{
-		mModel->GetTransport().mTempo = mTempoControl->GetValue();
+		auto settings = mModel->GetTransport().GetBeatSettings();
+		settings.tempo = mTempoControl->GetValue();
+		mModel->GetTransport().SetBeatSettings(settings);
 	}
 
 	void OnMetronomeToggle(wxCommandEvent& event)
@@ -195,7 +197,9 @@ private:
 
 	void OnLoopToggle(wxCommandEvent& event)
 	{
-		mTransport.mLoopEnabled = mLoopCheckBox->GetValue();
+		auto settings = mTransport.GetLoopSettings();
+		settings.enabled = mLoopCheckBox->GetValue();
+		mTransport.SetLoopSettings(settings);
 	}
 };
 

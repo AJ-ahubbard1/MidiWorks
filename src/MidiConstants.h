@@ -5,6 +5,8 @@ namespace MidiConstants
 {
 	// Timing - True constants
 	static constexpr int TICKS_PER_QUARTER = 960;  // PPQN (Pulses Per Quarter Note)
+	static constexpr int MAX_TICK_VALUE = 100'000'000;				// Prevent overflow if position tick < 0
+	static constexpr int NOTE_SEPARATION_TICKS = 10;  // Minimum tick gap to prevent note overlap
 
 	// MIDI Specification - True constants
 	static constexpr int CHANNEL_COUNT = 15;        // 16th reserved for metronome

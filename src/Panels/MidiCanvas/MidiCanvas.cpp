@@ -282,7 +282,7 @@ void MidiCanvasPanel::ClampOffset()
 
 	// Right boundary: can scroll right to see up to MAX_TICK_VALUE
 	// When maxTick is at right edge: canvasWidth = MAX_TICK_VALUE / ticksPerPixel + offset.x
-	int minOffsetX = canvasWidth - (MAX_TICK_VALUE / mTicksPerPixel);
+	int minOffsetX = canvasWidth - (MidiConstants::MAX_TICK_VALUE / mTicksPerPixel);
 
 	// Left boundary: allow scrolling left to position tick 0 at the target playhead position
 	// This enables fixed playhead scrolling where tick 0 appears at the target position
@@ -385,10 +385,10 @@ void MidiCanvasPanel::DrawLoopRegion(wxGraphicsContext* gc)
 	wxSize clientSize = GetClientSize();
 	int loopStartX = TickToScreenX(mTransport.GetLoopStart());
 	int loopEndX = TickToScreenX(mTransport.GetLoopEnd());
-	int canvasHeight = clientSize.GetHeight(); 
+	int canvasHeight = clientSize.GetHeight();
 
 	// Use semi-transparent blue when enabled, dimmed gray when disabled
-	wxColour loopColor = mTransport.mLoopEnabled ? LOOP_ENABLED : LOOP_DISABLED;
+	wxColour loopColor = mTransport.GetLoopSettings().enabled ? LOOP_ENABLED : LOOP_DISABLED;
 
 	gc->SetBrush(wxBrush(loopColor));
 	gc->SetPen(*wxTRANSPARENT_PEN);

@@ -22,8 +22,7 @@ class AppModel
 public:
 	AppModel();
 	void Update();
-	void CheckMidiInQueue();
-	
+
 	SoundBank& GetSoundBank();
 	Transport& GetTransport();
 	TrackSet& GetTrackSet();
@@ -82,6 +81,8 @@ private:
 	uint64_t GetDeltaTimeMs();
 	bool IsMusicalMessage(const MidiMessage& msg);
 	void PlayMessages(std::vector<MidiMessage> msgs);
+	void RouteAndPlayMessage(const MidiMessage& mm, uint64_t currentTick);
+	void HandleIncomingMidi();
 
 	// Transport state handlers
 	void HandleStopRecording();
@@ -91,5 +92,6 @@ private:
 	void HandleClickedRecord();
 	void HandleRecording();
 	void HandleFastForwardRewind();
+	void HandlePlaybackCore(bool isRecording);
 };
 

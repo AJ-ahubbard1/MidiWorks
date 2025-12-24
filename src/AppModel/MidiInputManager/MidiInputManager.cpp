@@ -30,3 +30,17 @@ const MidiInputManager::MidiLogCallback& MidiInputManager::GetLogCallback() cons
 {
 	return mLogCallback;
 }
+
+std::optional<MidiMessage> MidiInputManager::PollAndNotify(uint64_t currentTick)
+{
+	if (!mMidiIn->checkForMessage()) return std::nullopt;
+
+	MidiMessage mm = mMidiIn->getMessage();
+
+	if (mLogCallback)
+	{
+		mLogCallback({mm, currentTick});
+	}
+
+	return mm;
+}

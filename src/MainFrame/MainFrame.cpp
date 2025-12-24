@@ -20,15 +20,19 @@ MainFrame::MainFrame()
 	mTimer.Bind(wxEVT_TIMER, &MainFrame::OnTimer, this);
 
 	// Set up keyboard shortcuts for transport control
-	wxAcceleratorEntry entries[3];
-	entries[0].Set(wxACCEL_NORMAL, WXK_SPACE, ID_KEYBOARD_TOGGLE_PLAY);  // Spacebar = Toggle Play
-	entries[1].Set(wxACCEL_NORMAL, 'R', ID_KEYBOARD_RECORD);              // R = Record
-	entries[2].Set(wxACCEL_NORMAL, 'Q', ID_KEYBOARD_QUANTIZE);            // Q = Quantize
-	wxAcceleratorTable accelTable(3, entries);
+	wxAcceleratorEntry entries[5];
+	entries[0].Set(wxACCEL_NORMAL, WXK_SPACE, ID_KEYBOARD_TOGGLE_PLAY);		// Spacebar = Toggle Play
+	entries[1].Set(wxACCEL_NORMAL, 'R', ID_KEYBOARD_RECORD);				// R = Record
+	entries[2].Set(wxACCEL_NORMAL, 'Q', ID_KEYBOARD_QUANTIZE);				// Q = Quantize
+	entries[3].Set(wxACCEL_NORMAL, WXK_LEFT, ID_KEYBOARD_PREVIOUS_MEASURE); // LEFT Arrow = Previous Measure
+	entries[4].Set(wxACCEL_NORMAL, WXK_RIGHT, ID_KEYBOARD_NEXT_MEASURE);	// RIGHT Arrow = Next Measure
+	wxAcceleratorTable accelTable(5, entries);
 	SetAcceleratorTable(accelTable);
 
 	Bind(wxEVT_MENU, &MainFrame::OnTogglePlay, this, ID_KEYBOARD_TOGGLE_PLAY);
 	Bind(wxEVT_MENU, &MainFrame::OnStartRecord, this, ID_KEYBOARD_RECORD);
+	Bind(wxEVT_MENU, &MainFrame::OnPreviousMeasure, this, ID_KEYBOARD_PREVIOUS_MEASURE);
+	Bind(wxEVT_MENU, &MainFrame::OnNextMeasure, this, ID_KEYBOARD_NEXT_MEASURE);
 
 	mAuiManager.Update();
 	mTimer.Start(1);
@@ -47,22 +51,22 @@ void MainFrame::CreateDockablePanes()
 	RegisterPanel({"Sound Bank", mSoundBankPanel, PanePosition::Left, wxSize(247, 636)});
 
 	mMidiSettingsPanel = new MidiSettingsPanel(this, mAppModel, *wxLIGHT_GREY, "Midi Settings");
-	RegisterPanel({"Midi Settings", mMidiSettingsPanel, PanePosition::Left, wxSize(247, 253), wxSize(-1, -1)});
+	RegisterPanel({"Midi Settings", mMidiSettingsPanel, PanePosition::Left, wxSize(247, 253)});
 
 	mTransportPanel = new TransportPanel(this, mAppModel, *wxLIGHT_GREY, "Transport");
-	RegisterPanel({"Transport", mTransportPanel, PanePosition::Top, wxSize(-1, -1), wxSize(-1, -1), false, false});
+	RegisterPanel({"Transport", mTransportPanel, PanePosition::Top, wxSize(-1, -1), true, false, false});
 
 	mMidiCanvasPanel = new MidiCanvasPanel(this, mAppModel, "Canvas");
 	RegisterPanel({"Midi Canvas", mMidiCanvasPanel, PanePosition::Center});
 
 	mLogPanel = new LogPanel(this);
-	RegisterPanel({"Midi Log", mLogPanel, PanePosition::Right, wxSize(247, -1)});
+	RegisterPanel({"Midi Log", mLogPanel, PanePosition::Float, wxSize(247, 300), false});
 
 	mUndoHistoryPanel = new UndoHistoryPanel(this, mAppModel);
-	RegisterPanel({"Undo History", mUndoHistoryPanel, PanePosition::Right, wxSize(247, -1)});
+	RegisterPanel({"Undo History", mUndoHistoryPanel, PanePosition::Float, wxSize(247, 300), false});
 
 	mShortcutsPanel = new ShortcutsPanel(this, *wxLIGHT_GREY, "Shortcuts");
-	RegisterPanel({"Shortcuts", mShortcutsPanel, PanePosition::Right, wxSize(347, -1)});
+	RegisterPanel({"Shortcuts", mShortcutsPanel, PanePosition::Float, wxSize(347, 500), false});
 
 	// Register log callback for MIDI event logging
 	mAppModel->GetMidiInputManager().SetLogCallback([this](const TimedMidiEvent& event)

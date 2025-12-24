@@ -31,7 +31,7 @@ std::unique_ptr<Command> NoteEditor::CreateAddNoteToRecordChannels(
 	MidiMessage noteOff = MidiMessage::NoteOff(pitch, channel->channelNumber);
 
 	TimedMidiEvent timedNoteOn{noteOn, startTick};
-	TimedMidiEvent timedNoteOff{noteOff, startTick + duration - 1};  // -1 to prevent overlap
+	TimedMidiEvent timedNoteOff{noteOff, startTick + duration - MidiConstants::NOTE_SEPARATION_TICKS};
 
 	// Get the track and create the command
 	Track& track = mTrackSet.GetTrack(channel->channelNumber);

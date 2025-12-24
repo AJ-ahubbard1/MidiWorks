@@ -260,3 +260,15 @@ void MainFrame::OnStartRecord(wxCommandEvent& event)
 {
 	mAppModel->GetTransport().ToggleRecord();
 }
+
+// Previous Measure (Left Arrow key)
+void MainFrame::OnPreviousMeasure(wxCommandEvent& event)
+{
+	mAppModel->GetTransport().JumpToPreviousMeasure();
+}
+
+// Next Measure (Right Arrow key)
+void MainFrame::OnNextMeasure(wxCommandEvent& event)
+{
+	mAppModel->GetTransport().JumpToNextMeasure();
+}

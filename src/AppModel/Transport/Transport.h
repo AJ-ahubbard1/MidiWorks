@@ -16,14 +16,19 @@ public:
 		bool isDownbeat = false;  // First beat of measure
 	};
 
-	double		mTempo						= MidiConstants::DEFAULT_TEMPO;
-	int			mTimeSignatureNumerator		= MidiConstants::DEFAULT_TIME_SIGNATURE_NUMERATOR;
-	int			mTimeSignatureDenominator	= MidiConstants::DEFAULT_TIME_SIGNATURE_DENOMINATOR;
+	struct BeatSettings
+	{
+		double tempo = MidiConstants::DEFAULT_TEMPO;
+		int timeSignatureNumerator = MidiConstants::DEFAULT_TIME_SIGNATURE_NUMERATOR;
+		int timeSignatureDenominator = MidiConstants::DEFAULT_TIME_SIGNATURE_DENOMINATOR;
+	};
 
-	// Loop settings
-	bool		mLoopEnabled = false;
-	uint64_t	mLoopStartTick = 0;
-	uint64_t	mLoopEndTick = MidiConstants::DEFAULT_LOOP_END;  // 4 bars in 4/4 time
+	struct LoopSettings
+	{
+		bool enabled = false;
+		uint64_t startTick = 0;
+		uint64_t endTick = MidiConstants::DEFAULT_LOOP_END;  // 4 bars in 4/4 time
+	};
 
 	Transport();
 
@@ -43,7 +48,13 @@ public:
 	void TogglePlay();	
 	void ToggleRecord();
 	
+	// Beat settings
+	BeatSettings GetBeatSettings() const;
+	void SetBeatSettings(const BeatSettings& settings);
+
 	// Loop control
+	LoopSettings GetLoopSettings() const;
+	void SetLoopSettings(const LoopSettings& settings);
 	void SetLoopStart(uint64_t tick);
 	void SetLoopEnd(uint64_t tick);
 	uint64_t GetLoopStart() const;
@@ -59,7 +70,8 @@ public:
 	void ShiftToTick(uint64_t newTick);
 	void Stop();
 	void Reset();
-	
+	void JumpToNextMeasure();
+	void JumpToPreviousMeasure();
 	
 	wxString GetFormattedTime() const;
 	wxString GetFormattedTime(uint64_t timeMs) const;
@@ -68,10 +80,13 @@ public:
 	BeatInfo CheckForBeat(uint64_t lastTick, uint64_t currentTick) const;
 	uint64_t GetTicksPerBeat() const;
 	uint64_t GetTicksPerMeasure() const;
+
 	
 
 private:
 	State			mState = State::Stopped;
+	BeatSettings	mBeatSettings;
+	LoopSettings	mLoopSettings;
 	uint64_t		mCurrentTimeMs = 0;
 	uint64_t		mStartPlayBackTick = 0;
 	uint64_t		mCurrentTick = 0;

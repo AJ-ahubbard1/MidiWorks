@@ -34,11 +34,12 @@ bool ProjectManager::SaveProject(const std::string& filepath)
 		project["appVersion"] = "0.3";
 
 		// 1. Transport
+		auto beatSettings = mTransport.GetBeatSettings();
 		project["transport"] = {
-			{"tempo", mTransport.mTempo},
+			{"tempo", beatSettings.tempo},
 			{"timeSignature", {
-				mTransport.mTimeSignatureNumerator,
-				mTransport.mTimeSignatureDenominator
+				beatSettings.timeSignatureNumerator,
+				beatSettings.timeSignatureDenominator
 			}},
 			{"currentTick", mTransport.GetCurrentTick()}
 		};
@@ -117,9 +118,11 @@ bool ProjectManager::LoadProject(const std::string& filepath)
 		// TODO: Handle different versions if needed
 
 		// 1. Transport
-		mTransport.mTempo = project["transport"]["tempo"];
-		mTransport.mTimeSignatureNumerator = project["transport"]["timeSignature"][0];
-		mTransport.mTimeSignatureDenominator = project["transport"]["timeSignature"][1];
+		Transport::BeatSettings beatSettings;
+		beatSettings.tempo = project["transport"]["tempo"];
+		beatSettings.timeSignatureNumerator = project["transport"]["timeSignature"][0];
+		beatSettings.timeSignatureDenominator = project["transport"]["timeSignature"][1];
+		mTransport.SetBeatSettings(beatSettings);
 
 		// Optional: Restore playback position
 		if (project["transport"].contains("currentTick")) {
@@ -194,7 +197,7 @@ void ProjectManager::ClearProject()
 	mTransport.SetState(Transport::State::Stopped);
 
 	// Reset transport to defaults
-	mTransport.mTempo = MidiConstants::DEFAULT_TEMPO;
+	mTransport.SetBeatSettings(Transport::BeatSettings());  // Reset to defaults
 	mTransport.Reset();
 
 	// Clear all tracks

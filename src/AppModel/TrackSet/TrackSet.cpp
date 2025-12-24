@@ -1,4 +1,5 @@
 #include "TrackSet.h"
+#include <set>
 
 Track& TrackSet::GetTrack(ubyte channelNumber)
 {
@@ -147,63 +148,62 @@ std::vector<TimedMidiEvent> TrackSet::GetAllTimedMidiEvents()
 	return result;
 }
 
-void TrackSet::MergeOverlappingNotes(Track& buffer)
+void TrackSet::SortTrack(Track& track)
+{
+	if (track.empty()) return;
+
+	std::sort(track.begin(), track.end(), [](const TimedMidiEvent& a, const TimedMidiEvent& b)
+	{
+		return a.tick < b.tick;
+	});
+}
+
+void TrackSet::SeparateOverlappingNotes(Track& buffer)
 {
 	if (buffer.size() < 2) return;
 
 	// Sort by tick to ensure chronological order
-	std::sort(buffer.begin(), buffer.end(),
-		[](const TimedMidiEvent& a, const TimedMidiEvent& b) {
-			return a.tick < b.tick;
-		});
+	SortTrack(buffer);
 
-	std::vector<size_t> indicesToRemove;
+	std::set<size_t> movedIndices; // Track which NoteOffs we've already moved
 
-	// Scan for consecutive NoteOns of same pitch/channel
-	for (size_t i = 0; i < buffer.size() - 1; i++)
+	// Process each NoteOn to find bad pairs
+	for (size_t i = 0; i < buffer.size(); i++)
 	{
-		const auto& event1 = buffer[i];
+		if (!buffer[i].mm.isNoteOn()) continue;
 
-		// Skip if already marked for removal or not a NoteOn
-		if (std::find(indicesToRemove.begin(), indicesToRemove.end(), i) != indicesToRemove.end())
-			continue;
-		if (!event1.mm.isNoteOn())
-			continue;
+		uint8_t pitch = buffer[i].mm.getPitch();
 
-		uint8_t pitch1 = event1.mm.getPitch();
-		uint8_t channel1 = event1.mm.getChannel();
-
-		// Check if next event is also NoteOn with same pitch/channel
-		const auto& event2 = buffer[i + 1];
-		if (event2.mm.isNoteOn() &&
-		    event2.mm.mData[1] == pitch1 &&
-		    event2.mm.getChannel() == channel1)
+		// Look for the next event with the same pitch
+		for (size_t j = i + 1; j < buffer.size(); j++)
 		{
-			// Consecutive NoteOns found! Mark second NoteOn for removal
-			indicesToRemove.push_back(i + 1);
+			if (buffer[j].mm.getPitch() != pitch) continue;
 
-			// Find and remove the first NoteOff (keep last NoteOff)
-			for (size_t j = i + 2; j < buffer.size(); j++)
+			// Found next event with same pitch
+			if (buffer[j].mm.isNoteOn())
 			{
-				const auto& eventJ = buffer[j];
-				if (eventJ.mm.isNoteOff() &&
-				    eventJ.mm.getPitch() == pitch1 &&
-				    eventJ.mm.getChannel() == channel1)
+				// Bad pair detected! Two NoteOns in a row
+				// Find the first NoteOff with this pitch after j that hasn't been moved yet
+				for (size_t k = j + 1; k < buffer.size(); k++)
 				{
-					// Found first NoteOff, mark for removal
-					indicesToRemove.push_back(j);
-					break;  // Only remove the first NoteOff
+					if (buffer[k].mm.isNoteOff() &&
+						buffer[k].mm.getPitch() == pitch &&
+						movedIndices.find(k) == movedIndices.end())
+					{
+						// Move this NoteOff to prevent overlap with the second NoteOn
+						buffer[k].tick = buffer[j].tick - MidiConstants::NOTE_SEPARATION_TICKS;
+						movedIndices.insert(k);
+						break;
+					}
 				}
 			}
+			// Whether it's a NoteOn or NoteOff, we've found the next event for this pitch
+			break;
 		}
 	}
 
-	// Remove marked events in reverse order to maintain indices
-	std::sort(indicesToRemove.begin(), indicesToRemove.end(), std::greater<size_t>());
-	for (size_t idx : indicesToRemove)
-	{
-		buffer.erase(buffer.begin() + idx);
-	}
+	// Re-sort after moving NoteOffs
+	SortTrack(buffer);
 }
 
 void TrackSet::FinalizeRecording(Track& recordingBuffer)
@@ -222,11 +222,6 @@ void TrackSet::Sort()
 {
 	for (auto& track : mTracks)
 	{
-		if (track.empty()) continue;
-
-		std::sort(track.begin(), track.end(), [](const TimedMidiEvent& a, const TimedMidiEvent& b)
-		{
-			return a.tick < b.tick;
-		});
+		SortTrack(track);
 	}
 }

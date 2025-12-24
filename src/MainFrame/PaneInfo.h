@@ -12,10 +12,9 @@ struct PanelInfo
 	wxWindow*		window = nullptr;
 	PanePosition	defaultPosition;
 	wxSize			minSize{-1, -1};
-	wxSize			bestSize{-1, -1};
+	bool			isVisible = true;
 	bool			hasCaption = true;
 	bool			hasCloseButton = true;
-	bool			isVisible = true;
 	int				menuId = -1;  // Moved to end for optional initialization
 };
 
@@ -25,7 +24,6 @@ inline wxAuiPaneInfo CreatePaneInfo(const PanelInfo& info)
 	pane.Name(info.name)
 		.CloseButton(info.hasCloseButton)
 		.MinSize(info.minSize)
-		.BestSize(info.bestSize)
 		.Show(info.isVisible)
 		.Caption(info.name)
 		.CaptionVisible(info.hasCaption);
