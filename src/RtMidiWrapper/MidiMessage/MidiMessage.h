@@ -65,6 +65,14 @@ namespace MidiInterface
 			return *this;
 		}
 
+		// Equality operator, disregards timestamp in comparison
+		bool operator==(const MidiMessage& other) const 
+		{
+			return mData[0] == other.mData[0] &&
+				mData[1] == other.mData[1] &&
+				mData[2] == other.mData[2];
+		}
+
 		void setChannel(ubyte channel)
 		{
 			ubyte event = mData[0] >> 4;        // strip off channel bits
@@ -157,6 +165,11 @@ namespace MidiInterface
 		ubyte getPitch() const
 		{
 			return mData[1];
+		}
+
+		ubyte getVelocity() const
+		{
+			return mData[2];
 		}
 	};
 }

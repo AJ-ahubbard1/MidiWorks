@@ -75,11 +75,7 @@ private:
 
 	// ========== Debug MIDI Events State ==========
 	struct MidiEventDebugInfo {
-		uint64_t tick;
-		ubyte pitch;
-		ubyte velocity;
-		int trackIndex;
-		bool isNoteOn;
+		TimedMidiEvent timedEvent;
 		int screenX;
 		int screenY;
 	};

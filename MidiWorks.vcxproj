@@ -142,6 +142,7 @@
     <ClCompile Include="src\App.cpp" />
     <ClCompile Include="src\AppModel\AppModel.cpp" />
     <ClCompile Include="src\AppModel\Clipboard\Clipboard.cpp" />
+    <ClCompile Include="src\AppModel\DrumMachine\DrumMachine.cpp" />
     <ClCompile Include="src\AppModel\MidiInputManager\MidiInputManager.cpp" />
     <ClCompile Include="src\AppModel\NoteEditor\NoteEditor.cpp" />
     <ClCompile Include="src\AppModel\ProjectManager\ProjectManager.cpp" />
@@ -151,8 +152,10 @@
     <ClCompile Include="src\AppModel\TrackSet\TrackSet.cpp" />
     <ClCompile Include="src\AppModel\Transport\Transport.cpp" />
     <ClCompile Include="src\Commands\NoteEditCommands.cpp" />
+    <ClCompile Include="src\MainFrame\KeyboardHandler.cpp" />
     <ClCompile Include="src\MainFrame\MainFrame.cpp" />
     <ClCompile Include="src\MainFrame\MainFrameEventHandlers.cpp" />
+    <ClCompile Include="src\Panels\DrumMachine\DrumMachinePanel.cpp" />
     <ClCompile Include="src\Panels\MidiCanvas\MidiCanvas.cpp" />
     <ClCompile Include="src\Panels\MidiCanvas\MidiCanvasEventHandlers.cpp" />
     <ClCompile Include="src\RtMidiWrapper\RtMidi\RtMidi.cpp" />
@@ -160,6 +163,7 @@
   <ItemGroup>
     <ClInclude Include="src\AppModel\AppModel.h" />
     <ClInclude Include="src\AppModel\Clipboard\Clipboard.h" />
+    <ClInclude Include="src\AppModel\DrumMachine\DrumMachine.h" />
     <ClInclude Include="src\AppModel\MetronomeService\MetronomeService.h" />
     <ClInclude Include="src\AppModel\MidiInputManager\MidiInputManager.h" />
     <ClInclude Include="src\AppModel\NoteEditor\NoteEditor.h" />
@@ -172,6 +176,8 @@
     <ClInclude Include="src\Commands\QuantizeCommand.h" />
     <ClInclude Include="src\Commands\RecordCommand.h" />
     <ClInclude Include="src\External\json.hpp" />
+    <ClInclude Include="src\MainFrame\KeyboardHandler.h" />
+    <ClInclude Include="src\MainFrame\MainFrameIDs.h" />
     <ClInclude Include="src\MainFrame\PaneInfo.h" />
     <ClInclude Include="src\AppModel\SoundBank\SoundBank.h" />
     <ClInclude Include="src\AppModel\TrackSet\TrackSet.h" />
@@ -180,6 +186,7 @@
     <ClInclude Include="src\MidiConstants.h" />
     <ClInclude Include="src\Panels\ChannelControls.h" />
     <ClInclude Include="src\Panels\ChannelTrackRow.h" />
+    <ClInclude Include="src\Panels\DrumMachine\DrumMachinePanel.h" />
     <ClInclude Include="src\Panels\Dummy.h" />
     <ClInclude Include="src\Panels\Inspector.h" />
     <ClInclude Include="src\Panels\Instrument.h" />

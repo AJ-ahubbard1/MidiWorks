@@ -6,19 +6,36 @@
 
 `MainFrame` is the main application window and serves as the orchestrator for the dockable panel system. It uses wxWidgets' Advanced User Interface (AUI) framework (`wxAuiManager`) to provide a flexible, user-customizable layout where panels can be dragged, docked, resized, and hidden/shown.
 
+## File Structure
+
+The MainFrame component is split across multiple files for separation of concerns:
+
+- **MainFrame.h** - Class declaration, member variables, method signatures
+- **MainFrame.cpp** - Constructor, panel creation, menu building, utility methods
+- **MainFrameEventHandlers.cpp** - All event handler implementations (17 handlers)
+- **KeyboardHandler.h** - Keyboard shortcut handler class declaration
+- **KeyboardHandler.cpp** - Keyboard accelerator table setup and event binding
+- **MainFrameIDs.h** - Event ID enumeration for keyboard shortcuts and panels
+- **PaneInfo.h** - PanelInfo struct and helper functions
+- **README.md** - This documentation
+
 ## Key Responsibilities
 
 1. **Window Management** - Creates and manages the main application window
 2. **Panel Orchestration** - Creates all dockable panels and tracks their state
 3. **Layout Management** - Uses wxAuiManager for docking/floating panels
-4. **Update Loop** - Runs 10ms timer that updates AppModel and refreshes panels
+4. **Update Loop** - Runs 1ms timer that updates AppModel and refreshes panels
 5. **Menu Management** - Dynamically builds View menu from registered panels
 6. **Event Handling** - Responds to panel visibility toggles and close events
+7. **Keyboard Handling** - Delegates to KeyboardHandler class for accelerator table setup
 
 ## Architecture
 
 ```
 MainFrame (wxFrame)
+  │
+  ├─→ mKeyboardHandler (std::unique_ptr<KeyboardHandler>)
+  │   └─→ Sets up accelerators and binds keyboard shortcuts
   │
   ├─→ wxAuiManager (docking system)
   │   ├─→ TransportPanel (docked bottom)
@@ -30,9 +47,9 @@ MainFrame (wxFrame)
   ├─→ mPanels map<int, PanelInfo> (panel registry)
   │   └─→ Tracks: name, window pointer, menuId, position, size, visibility
   │
-  ├─→ mModel (shared_ptr<AppModel>) (application state)
+  ├─→ mAppModel (shared_ptr<AppModel>) (application state)
   │
-  └─→ mTimer (wxTimer) (10ms update loop)
+  └─→ mTimer (wxTimer) (1ms update loop)
 ```
 
 ## Core Components
@@ -44,15 +61,58 @@ Metadata describing each panel:
 ```cpp
 struct PanelInfo
 {
-    wxString name;              // Display name in View menu
-    wxWindow* window;           // Pointer to panel (wxPanel subclass)
-    int menuId;                 // Auto-generated ID (idBase++)
-    wxAuiPaneInfo::Position pos; // Dock position (Top/Bottom/Left/Right/Center)
-    wxSize minSize;             // Minimum panel size
-    wxSize bestSize;            // Preferred panel size
-    bool visible;               // Initially visible?
+    wxString name;               // Display name in View menu
+    wxWindow* window;            // Pointer to panel (wxPanel subclass)
+    PanePosition defaultPosition; // Dock position enum (Left/Right/Top/Bottom/Center/Float)
+    wxSize minSize;              // Minimum panel size
+    bool isVisible = true;       // Initially visible? (optional, defaults to true)
+    bool hasCaption = true;      // Show title bar? (optional, defaults to true)
+    bool hasCloseButton = true;  // Show [X] button? (optional, defaults to true)
+    int menuId = -1;             // Auto-assigned by RegisterPanel()
 };
 ```
+
+**Key Features:**
+- Simple initializer syntax with sensible defaults
+- Auto-assigned menuId (no manual ID management)
+- PanePosition enum for type-safe dock positions
+
+### KeyboardHandler Class (`KeyboardHandler.h/cpp`)
+
+Manages all keyboard shortcuts for MainFrame.
+
+**Purpose:** Separation of keyboard shortcut management from MainFrame initialization code.
+
+**Implementation:**
+```cpp
+class KeyboardHandler
+{
+public:
+    KeyboardHandler(MainFrame* mainFrame, std::shared_ptr<AppModel> appModel);
+    void Initialize();
+
+private:
+    MainFrame* mMainFrame;
+    std::shared_ptr<AppModel> mAppModel;
+    void SetupShortCuts();
+};
+```
+
+**How it works:**
+1. Constructor takes MainFrame* and AppModel references
+2. `Initialize()` creates wxAcceleratorTable with keyboard shortcuts
+3. `SetupShortCuts()` binds events to MainFrame's private event handlers
+4. Friend class relationship allows access to MainFrame's private Bind methods
+
+**Current shortcuts:**
+- **Space** - Toggle Play/Pause
+- **R** - Toggle Record
+- **Q** - Quantize to Grid
+- **Left Arrow** - Previous Measure
+- **Right Arrow** - Next Measure
+
+**Friend Relationship:**
+KeyboardHandler is declared as a friend class in MainFrame.h to access private event handlers for binding.
 
 ### mPanels Map
 
@@ -75,6 +135,93 @@ The wxWidgets docking framework that handles:
 - Floating panels (undock from main window)
 - Automatic layout persistence
 - Show/hide animations
+
+---
+
+## Adding New Keyboard Shortcuts
+
+To add a new keyboard shortcut to MainFrame:
+
+### Step 1: Add Event ID
+
+Add a new ID to the enum in `MainFrameIDs.h`:
+
+```cpp
+enum MainFrameIDs
+{
+    ID_KEYBOARD_TOGGLE_PLAY = wxID_HIGHEST + 1000,
+    ID_KEYBOARD_RECORD,
+    ID_KEYBOARD_QUANTIZE,
+    ID_KEYBOARD_PREVIOUS_MEASURE,
+    ID_KEYBOARD_NEXT_MEASURE,
+    ID_KEYBOARD_MY_NEW_SHORTCUT,  // ← Add this
+
+    ID_PANELS_BEGIN
+};
+```
+
+### Step 2: Add Event Handler
+
+Declare the event handler in `MainFrame.h` (private section):
+
+```cpp
+private:
+    // Transport Control Events
+    void OnTogglePlay(wxCommandEvent& event);
+    void OnStartRecord(wxCommandEvent& event);
+    void OnMyNewShortcut(wxCommandEvent& event);  // ← Add declaration
+```
+
+Implement the handler in `MainFrameEventHandlers.cpp`:
+
+```cpp
+// My New Shortcut (Ctrl+M)
+void MainFrame::OnMyNewShortcut(wxCommandEvent& event)
+{
+    // Your implementation here
+    mAppModel->DoSomething();
+}
+```
+
+### Step 3: Update KeyboardHandler
+
+Add the accelerator entry in `KeyboardHandler.cpp::Initialize()`:
+
+```cpp
+void KeyboardHandler::Initialize()
+{
+    wxAcceleratorEntry entries[6];  // ← Increase array size
+    entries[0].Set(wxACCEL_NORMAL, WXK_SPACE, ID_KEYBOARD_TOGGLE_PLAY);
+    // ... existing entries ...
+    entries[5].Set(wxACCEL_CTRL, 'M', ID_KEYBOARD_MY_NEW_SHORTCUT);  // ← Add this
+
+    wxAcceleratorTable accelTable(6, entries);  // ← Update count
+    mMainFrame->SetAcceleratorTable(accelTable);
+
+    SetupShortCuts();
+}
+```
+
+### Step 4: Bind the Event
+
+Add the binding in `KeyboardHandler.cpp::SetupShortCuts()`:
+
+```cpp
+void KeyboardHandler::SetupShortCuts()
+{
+    // Transport
+    mMainFrame->Bind(wxEVT_MENU, &MainFrame::OnTogglePlay, mMainFrame, ID_KEYBOARD_TOGGLE_PLAY);
+    // ... existing bindings ...
+    mMainFrame->Bind(wxEVT_MENU, &MainFrame::OnMyNewShortcut, mMainFrame, ID_KEYBOARD_MY_NEW_SHORTCUT);  // ← Add this
+}
+```
+
+**Modifier keys:**
+- `wxACCEL_NORMAL` - No modifier
+- `wxACCEL_CTRL` - Ctrl key
+- `wxACCEL_SHIFT` - Shift key
+- `wxACCEL_ALT` - Alt key
+- Can combine: `wxACCEL_CTRL | wxACCEL_SHIFT`
 
 ---
 
@@ -143,71 +290,86 @@ private:
 
 This aggregation header makes all panels available via a single include.
 
-### Step 3: Register in MainFrame::CreateDockablePanes()
+### Step 3: Add Panel Pointer to MainFrame.h
+
+Add a member variable for your panel in `MainFrame.h` (private section):
+
+```cpp
+class MainFrame : public wxFrame
+{
+    // ...
+private:
+    // Panel Pointers
+    MidiSettingsPanel* mMidiSettingsPanel;
+    SoundBankPanel* mSoundBankPanel;
+    TransportPanel* mTransportPanel;
+    MidiCanvasPanel* mMidiCanvasPanel;
+    LogPanel* mLogPanel;
+    UndoHistoryPanel* mUndoHistoryPanel;
+    ShortcutsPanel* mShortcutsPanel;
+    DrumMachinePanel* mDrumMachinePanel;
+    MyNewPanel* mMyNewPanel;  // ← Add this
+};
+```
+
+### Step 4: Initialize and Register in MainFrame::CreateDockablePanes()
+
+In `MainFrame::CreateDockablePanes()`, create your panel instance and register it with custom metadata:
 
 ```cpp
 void MainFrame::CreateDockablePanes()
 {
-    int idBase = wxID_HIGHEST + 1;
-
     // ... existing panels ...
 
-    // Create your panel
-    auto* myPanel = new MyNewPanel(this, mModel);
+    // Create and register your panel
+    mMyNewPanel = new MyNewPanel(this, mAppModel);
+    RegisterPanel({"My Panel", mMyNewPanel, PanePosition::Right, wxSize(300, 200)});
 
-    // Create PanelInfo
-    PanelInfo myInfo{
-        "My Panel",                  // Name shown in View menu
-        myPanel,                     // Panel instance
-        idBase++,                    // Auto-increment menu ID
-        wxAuiPaneInfo::Right(),      // Dock position (see options below)
-        wxSize(300, 200),            // Minimum size
-        wxSize(400, 300),            // Best/preferred size
-        true                         // Initially visible?
-    };
-
-    // Add to panel registry
-    mPanels[myInfo.menuId] = myInfo;
-
-    // Add to AUI manager
-    m_mgr.AddPane(myPanel, CreatePaneInfo(myInfo));
-
-    // ... more panels ...
-
-    // Apply layout
-    m_mgr.Update();
+    // Optional parameters (defaults shown):
+    // RegisterPanel({
+    //     "My Panel",              // Name in View menu
+    //     mMyNewPanel,             // Panel pointer
+    //     PanePosition::Right,     // Dock position
+    //     wxSize(300, 200),        // Minimum size
+    //     true,                    // Initially visible (default)
+    //     true,                    // Has caption/title bar (default)
+    //     true                     // Has close button (default)
+    // });
 }
 ```
 
+**What RegisterPanel() does:**
+- Auto-assigns unique menuId from `mNextPanelId++`
+- Adds panel to `mPanels` map for View menu
+- Adds pane to `mAuiManager` for docking
+
 **Dock Position Options:**
 ```cpp
-wxAuiPaneInfo::Top()      // Dock to top edge
-wxAuiPaneInfo::Bottom()   // Dock to bottom edge
-wxAuiPaneInfo::Left()     // Dock to left edge
-wxAuiPaneInfo::Right()    // Dock to right edge
-wxAuiPaneInfo::Center()   // Center area (can have tabs)
+PanePosition::Left     // Dock to left edge
+PanePosition::Right    // Dock to right edge
+PanePosition::Top      // Dock to top edge
+PanePosition::Bottom   // Dock to bottom edge
+PanePosition::Center   // Center area (can have tabs)
+PanePosition::Float    // Floating window
 ```
 
 **Size Guidelines:**
 - **minSize**: Smallest usable size (prevents user from making too small)
-- **bestSize**: Default size when first docked
 - Use logical sizes based on content (e.g., transport bar is wide/short, settings panel is narrow/tall)
 
-### Step 4: (Optional) Add Update Call
+### Step 5: (Optional) Add Update Call
 
-If your panel needs regular updates from the timer loop:
+If your panel needs regular updates from the timer loop, add a call in `MainFrameEventHandlers.cpp`:
 
 ```cpp
-void MainFrame::OnTimer(wxTimerEvent& event)
+// In MainFrameEventHandlers.cpp
+void MainFrame::OnTimer(wxTimerEvent&)
 {
-    mModel->Update();
-
-    // Update panels that need refresh
-    auto* transport = dynamic_cast<TransportPanel*>(mPanels[transportId].window);
-    if (transport) transport->UpdateDisplay();
-
-    auto* myPanel = dynamic_cast<MyNewPanel*>(mPanels[myPanelId].window);
-    if (myPanel) myPanel->Update();  // ← Add this
+    mAppModel->Update();
+    mTransportPanel->UpdateDisplay();
+    mMidiCanvasPanel->Update();
+    mMyNewPanel->Update();  // ← Add direct call to your panel
+    // Note: Logging now handled via callback - no polling needed
 }
 ```
 
@@ -235,33 +397,41 @@ MainFrame constructor
   │
   ├─→ CreateDockablePanes()
   │   ├─→ Create panel instances
-  │   ├─→ Build PanelInfo structs with idBase++
-  │   ├─→ Add to mPanels map
-  │   └─→ Add to wxAuiManager
+  │   ├─→ RegisterPanel() for each panel
+  │   │   ├─→ Auto-assign menuId from mNextPanelId++
+  │   │   ├─→ Add to mPanels map
+  │   │   └─→ Add to wxAuiManager
+  │   └─→ Register callbacks (log, dirty state)
   │
   ├─→ CreateMenuBar()
   │   └─→ Build View menu from mPanels map
   │
   ├─→ Bind events
-  │   ├─→ wxEVT_MENU → OnTogglePane
-  │   └─→ wxEVT_AUI_PANE_CLOSE → OnPaneClosed
+  │   ├─→ wxEVT_AUI_PANE_CLOSE → OnPaneClosed
+  │   ├─→ wxEVT_CLOSE_WINDOW → OnClose
+  │   └─→ wxEVT_TIMER → OnTimer
   │
-  └─→ mTimer.Start(10)  // 10ms update loop
+  ├─→ Create KeyboardHandler (NEW)
+  │   └─→ KeyboardHandler::Initialize()
+  │       ├─→ Build wxAcceleratorTable
+  │       └─→ Bind shortcuts to MainFrame handlers
+  │
+  └─→ mTimer.Start(1)  // 1ms update loop
 ```
 
-### Update Loop (Every 10ms)
+### Update Loop (Every 1ms)
 
 ```
 mTimer fires wxEVT_TIMER
   │
-  └─→ MainFrame::OnTimer()
-      ├─→ mModel->Update()
+  └─→ MainFrame::OnTimer() (in MainFrameEventHandlers.cpp)
+      ├─→ mAppModel->Update()
       │   └─→ AppModel processes state, MIDI, playback
       │
       └─→ Update panels
-          ├─→ TransportPanel::UpdateDisplay()
-          ├─→ MidiCanvasPanel::Update()
-          └─→ LogPanel::LogMidiEvent() (if flagged)
+          ├─→ mTransportPanel->UpdateDisplay()
+          └─→ mMidiCanvasPanel->Update()
+          (Note: Logging handled via callback, not polling)
 ```
 
 ### View Menu Click Flow
@@ -293,6 +463,16 @@ User clicks [X] on panel
 ---
 
 ## Event Handlers
+
+**Location:** All event handler implementations are in `MainFrameEventHandlers.cpp`
+
+Event handlers are organized by category:
+- **Timer Events** - OnTimer
+- **View/Panel Management** - OnTogglePane, OnPaneClosed, OnAuiRender
+- **Edit Menu** - OnUndo, OnRedo, OnQuantize
+- **File Menu** - OnNew, OnOpen, OnSave, OnSaveAs
+- **Application Lifecycle** - OnExit, OnClose
+- **Transport Control** - OnTogglePlay, OnStartRecord, OnPreviousMeasure, OnNextMeasure
 
 ### OnTogglePane(wxCommandEvent& event)
 
@@ -341,20 +521,26 @@ void MainFrame::OnPaneClosed(wxAuiManagerEvent& event)
 
 ### OnTimer(wxTimerEvent& event)
 
-**Triggered by:** wxTimer every 10ms
+**Location:** `MainFrameEventHandlers.cpp:9-15`
+
+**Triggered by:** wxTimer every 1ms
 
 **Purpose:** Update AppModel and refresh panels
 
 ```cpp
-void MainFrame::OnTimer(wxTimerEvent& event)
+void MainFrame::OnTimer(wxTimerEvent&)
 {
-    // Update model (handles MIDI, playback, recording)
-    mModel->Update();
-
-    // Update panels that need refresh
-    // (Only panels with dynamic/real-time data)
+    mAppModel->Update();
+    mTransportPanel->UpdateDisplay();
+    mMidiCanvasPanel->Update();
+    // Note: Logging now handled via callback - no polling needed
 }
 ```
+
+**Notes:**
+- Timer runs at 1ms interval for responsive updates
+- Only panels with dynamic/real-time data need Update() calls
+- Direct panel pointer access (no dynamic_cast needed)
 
 ---
 
@@ -394,9 +580,9 @@ wxAuiPaneInfo CreatePaneInfo(const PanelInfo& info)
 
 ## Design Notes
 
-### Why Auto-Increment IDs (idBase++)?
+### Why Auto-Increment IDs with RegisterPanel()?
 
-**Old approach (manual enums):**
+**Old approach (manual ID management):**
 ```cpp
 enum {
     ID_VIEW_TRANSPORT = wxID_HIGHEST + 1,
@@ -404,19 +590,24 @@ enum {
     ID_VIEW_MIDI_SETTINGS,
     // ... manually define every ID
 };
+
+PanelInfo info{"Transport", panel, ID_VIEW_TRANSPORT, ...};
+mPanels[info.menuId] = info;
+m_mgr.AddPane(panel, CreatePaneInfo(info));
 ```
 
-**New approach (auto-increment):**
+**New approach (RegisterPanel with auto-increment):**
 ```cpp
-int idBase = wxID_HIGHEST + 1;
-PanelInfo info1{"Transport", panel1, idBase++, ...};
-PanelInfo info2{"SoundBank", panel2, idBase++, ...};
+mTransportPanel = new TransportPanel(this, mAppModel);
+RegisterPanel({"Transport", mTransportPanel, PanePosition::Top, wxSize(-1, -1)});
+// menuId auto-assigned from mNextPanelId++ inside RegisterPanel()
 ```
 
 **Benefits:**
 - ✅ No enum maintenance - just add panels
-- ✅ IDs auto-generated in order
+- ✅ IDs auto-generated by RegisterPanel()
 - ✅ No risk of duplicate IDs
+- ✅ Single line per panel (was 3 lines)
 - ✅ Less boilerplate code
 
 ### Why PanelInfo Struct?
@@ -435,7 +626,36 @@ Alternative would be event-driven (callbacks, signals/slots). Timer approach is 
 - ✅ No threading complexity
 - ✅ Centralized update logic
 
-Trade-off: Slightly higher CPU usage, but negligible at 10ms (100Hz).
+Trade-off: Slightly higher CPU usage, but negligible at 1ms (1000Hz).
+
+### Why Separate KeyboardHandler?
+
+Extracting keyboard shortcut management into a dedicated class provides several benefits:
+
+**Separation of Concerns:**
+- MainFrame focuses on window/panel orchestration
+- KeyboardHandler focuses solely on keyboard shortcuts
+- Cleaner, more maintainable MainFrame constructor
+
+**Easier to Add Shortcuts:**
+- All keyboard-related code in one place
+- Four-step process (ID, handler, accelerator, binding)
+- No hunting through MainFrame code
+
+**Future Extensibility:**
+- Could load shortcuts from config file
+- Could allow user-customizable keybindings
+- Could implement context-sensitive shortcuts
+
+**Reduced Constructor Complexity:**
+- Keyboard setup delegated to single `Initialize()` call
+- 30+ lines of keyboard code moved out of MainFrame
+- Better code organization and readability
+
+**Friend Class Pattern:**
+- KeyboardHandler needs access to MainFrame's private `Bind()` methods
+- Friend declaration makes this relationship explicit
+- More controlled than making event handlers public
 
 ---
 
@@ -459,7 +679,7 @@ class MyPanel {
 
     void Update() {
         auto& transport = mModel->GetTransport();
-        bool isPlaying = (transport.mState == Transport::State::Playing);
+        bool isPlaying = transport.IsPlaying(); 
     }
 };
 ```
@@ -507,18 +727,20 @@ private:
 
 ## Summary: Adding a Panel Checklist
 
-- [ ] Create panel class in `src/Panels/MyPanel.h`
+- [ ] **Step 1:** Create panel class in `src/Panels/MyPanel.h`
   - Inherit from `wxPanel`
   - Accept `wxWindow* parent, std::shared_ptr<AppModel> model`
   - Create UI controls in constructor
   - Add `Update()` method if needed
-- [ ] Add include to `src/Panels/Panels.h`
-- [ ] Register in `MainFrame::CreateDockablePanes()`
-  - Create panel instance
-  - Create `PanelInfo` with `idBase++`
-  - Add to `mPanels` map
-  - Add to `m_mgr` via `CreatePaneInfo()`
-- [ ] (Optional) Add update call in `MainFrame::OnTimer()`
+- [ ] **Step 2:** Add include to `src/Panels/Panels.h`
+  - `#include "MyPanel.h"`
+- [ ] **Step 3:** Add panel pointer to `MainFrame.h`
+  - `MyPanel* mMyPanel;` in private section
+- [ ] **Step 4:** Initialize and register in `MainFrame::CreateDockablePanes()`
+  - Create panel instance: `mMyPanel = new MyPanel(this, mAppModel);`
+  - Register: `RegisterPanel({"My Panel", mMyPanel, PanePosition::Right, wxSize(300, 200)});`
+- [ ] **Step 5:** (Optional) Add update call in `MainFrame::OnTimer()` (MainFrameEventHandlers.cpp)
+  - `mMyPanel->Update();`
 - [ ] Build and test
   - Panel appears in View menu
   - Panel can be shown/hidden
@@ -529,8 +751,12 @@ private:
 
 ## Related Files
 
-- `MainFrame.h/cpp` - Main window and panel orchestration
-- `PaneInfo.h` - PanelInfo struct definition
+- `MainFrame.h` - Class declaration, member variables, method signatures
+- `MainFrame.cpp` - Constructor, panel creation, menu building, utility methods
+- `MainFrameEventHandlers.cpp` - All event handler implementations
+- `KeyboardHandler.h/cpp` - Keyboard shortcut management
+- `MainFrameIDs.h` - Event ID definitions
+- `PaneInfo.h` - PanelInfo struct and helper functions
 - `src/Panels/` - All panel implementations
 - `AppModel/AppModel.h` - Shared application state
 

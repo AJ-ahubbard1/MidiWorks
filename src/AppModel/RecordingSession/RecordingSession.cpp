@@ -36,45 +36,63 @@ void RecordingSession::AddEvent(const TimedMidiEvent& event)
 void RecordingSession::RecordEvent(const MidiMessage& msg, uint64_t currentTick)
 {
 	// Add to recording buffer
-	AddEvent({msg, currentTick});
+	TimedMidiEvent recordedEvent{msg, currentTick};
+	AddEvent(recordedEvent);
+	ubyte velocity = msg.getVelocity();
 
 	// Track active notes for loop recording
-	ubyte status = msg.mData[0] & 0xF0;
-	ubyte pitch = msg.getPitch();
-	ubyte channel = msg.getChannel();
-
-	if (status == 0x90 && msg.mData[2] > 0)  // NoteOn with velocity > 0
+	if (msg.isNoteOn() && velocity > 0)  // NoteOn with velocity > 0
 	{
-		StartNote(pitch, channel, currentTick);
+		StartNote(recordedEvent);
 	}
-	else if (status == 0x80 || (status == 0x90 && msg.mData[2] == 0))  // NoteOff
+	else if (msg.isNoteOff() || (msg.isNoteOn() && velocity == 0))  // NoteOff
 	{
-		StopNote(pitch, channel);
+		StopNote(msg.getChannel(), msg.getPitch());
 	}
 }
 
-void RecordingSession::StartNote(ubyte pitch, ubyte channel, uint64_t startTick)
+void RecordingSession::StartNote(const TimedMidiEvent & note)
 {
-	mActiveNotes.push_back({pitch, channel, startTick});
+	mActiveNotes.push_back(note);
 }
 
-void RecordingSession::StopNote(ubyte pitch, ubyte channel)
+void RecordingSession::StopNote(ubyte channel, ubyte pitch)
 {
 	auto it = std::remove_if(mActiveNotes.begin(), mActiveNotes.end(),
-		[pitch, channel](const ActiveNote& note) {
-			return note.pitch == pitch && note.channel == channel;
+		[channel, pitch](const TimedMidiEvent& note) 
+		{
+			return note.mm.getPitch() == pitch && note.mm.getChannel() == channel;
 		});
 	mActiveNotes.erase(it, mActiveNotes.end());
 }
 
+void RecordingSession::WrapActiveNotesAtLoop(uint64_t endTick, uint64_t loopStartTick)
+{
+	for (auto& note : mActiveNotes)  // Note: not const, we modify tick 
+	{
+		// Close the note at loop end
+		MidiMessage noteOff = MidiMessage::NoteOff(note.mm.getPitch(), note.mm.getChannel());
+		mBuffer.push_back({noteOff, endTick});
+
+		// Reopen the note at loop start (user still holding key)
+		// note.mm already IS the Note On message - just reuse it!
+		mBuffer.push_back({note.mm, loopStartTick});
+
+		// Update active note's start tick for eventual release
+		note.tick = loopStartTick;
+	}
+	// Don't clear mActiveNotes - notes are still physically held!
+}
+
 void RecordingSession::CloseAllActiveNotes(uint64_t endTick)
 {
-	// Create NoteOff messages for all active notes
+	// Close all active notes at the specified tick (for stopping recording)
 	for (const auto& note : mActiveNotes)
 	{
-		MidiMessage noteOff = MidiMessage::NoteOff(note.pitch, note.channel);
+		MidiMessage noteOff = MidiMessage::NoteOff(note.mm.getPitch(), note.mm.getChannel());
 		mBuffer.push_back({noteOff, endTick});
 	}
+	// Clear active notes - they're now closed
 	mActiveNotes.clear();
 }
 

@@ -62,16 +62,6 @@ void AppModel::HandleIncomingMidi()
 	RouteAndPlayMessage(*message, mTransport.GetCurrentTick());
 }
 
-SoundBank& AppModel::GetSoundBank() { return mSoundBank; }
-Transport& AppModel::GetTransport() { return mTransport; }
-TrackSet& AppModel::GetTrackSet() { return mTrackSet; }
-RecordingSession& AppModel::GetRecordingSession() { return mRecordingSession; }
-ProjectManager& AppModel::GetProjectManager() { return mProjectManager; }
-Clipboard& AppModel::GetClipboard() { return mClipboard; }
-UndoRedoManager& AppModel::GetUndoRedoManager() { return mUndoRedoManager; }
-MidiInputManager& AppModel::GetMidiInputManager() { return mMidiInputManager; }
-MetronomeService& AppModel::GetMetronomeService() { return mMetronomeService; }
-
 void AppModel::StopPlaybackIfActive()
 {
 	if (mTransport.IsPlaying())
@@ -192,6 +182,29 @@ void AppModel::PasteNotes(uint64_t pasteTick)
 	mUndoRedoManager.ExecuteCommand(std::move(cmd));
 }
 
+// Record drum machine pattern to TrackSet within loop region
+void AppModel::RecordDrumPatternToTrack()
+{
+	// Get the current drum pattern
+	const Track& pattern = mDrumMachine.GetPattern();
+	if (pattern.empty()) return;
+
+	// Create a copy offset by loop start
+	std::vector<TimedMidiEvent> buffer;
+	uint64_t loopStart = mTransport.GetLoopSettings().startTick;
+
+	for (const auto& event : pattern)
+	{
+		TimedMidiEvent offsetEvent = event;
+		offsetEvent.tick += loopStart;
+		buffer.push_back(offsetEvent);
+	}
+
+	// Use existing RecordCommand for undo/redo support
+	auto cmd = std::make_unique<RecordCommand>(mTrackSet, buffer);
+	mUndoRedoManager.ExecuteCommand(std::move(cmd));
+}
+
 // Private Methods
 uint64_t AppModel::GetDeltaTimeMs()
 {
@@ -250,12 +263,46 @@ void AppModel::RouteAndPlayMessage(const MidiMessage& mm, uint64_t currentTick)
 	}
 }
 
+std::vector<MidiMessage> AppModel::PlayDrumMachinePattern(uint64_t lastTick, uint64_t currentTick)
+{
+	std::vector<MidiMessage> messages;
+
+	// Update loop duration (cheap - just sets flag if duration changed)
+	uint64_t loopDuration = mTransport.GetLoopSettings().endTick -
+		mTransport.GetLoopSettings().startTick;
+	mDrumMachine.UpdatePattern(loopDuration);
+
+	// GetPattern() will regenerate if dirty
+	const Track& pattern = mDrumMachine.GetPattern();
+
+	// Find events between lastTick and currentTick (prevents missing events if tick jumps)
+	for (const auto& event : pattern)
+	{
+		if (event.tick >= lastTick && event.tick <= currentTick)
+		{
+			messages.push_back(event.mm);
+		}
+		else if (event.tick > currentTick)
+		{
+			break;  // Pattern is sorted, no more events in range
+		}
+	}
+
+	return messages;
+}
+
 // TRANSPORT STATE HANDLERS
 
 void AppModel::HandleStopRecording()
 {
 	mTransport.Stop();
 	mTransport.SetState(Transport::State::Stopped);
+
+	// Close any notes still being held when stopping (prevents orphaned Note Ons)
+	if (mRecordingSession.HasActiveNotes())
+	{
+		mRecordingSession.CloseAllActiveNotes(mTransport.GetCurrentTick());
+	}
 
 	// Create RecordCommand to make recording undoable
 	if (!mRecordingSession.IsEmpty())
@@ -333,11 +380,13 @@ void AppModel::HandlePlaybackCore(bool isRecording)
 		// Must happen BEFORE the wrap to finalize events at the old loop end position
 		if (isRecording)
 		{
-			// Auto-close any notes still held at loop end to prevent stuck notes
-			mRecordingSession.CloseAllActiveNotes(loopSettings.endTick - MidiConstants::NOTE_SEPARATION_TICKS);
-
 			// Fix overlapping same-pitch notes to prevent merging artifacts
 			TrackSet::SeparateOverlappingNotes(mRecordingSession.GetBuffer());
+			
+			// Wrap any notes still held at loop end to prevent stuck notes
+			// note offs will be added at the loop end, note ons will be added at loop start
+			uint64_t noteOffTick = loopSettings.endTick - MidiConstants::NOTE_SEPARATION_TICKS;
+			mRecordingSession.WrapActiveNotesAtLoop(noteOffTick, loopSettings.startTick);
 		}
 
 		// === COMMON: Perform the loop wrap (both playback and recording) ===
@@ -374,6 +423,13 @@ void AppModel::HandlePlaybackCore(bool isRecording)
 	{
 		auto loopMessages = mRecordingSession.GetLoopPlaybackMessages(currentTick);
 		messages.insert(messages.end(), loopMessages.begin(), loopMessages.end());
+	}
+
+	// Play drum machine pattern during loop playback
+	if (loopSettings.enabled)
+	{
+		auto drumMessages = PlayDrumMachinePattern(lastTick, currentTick);
+		messages.insert(messages.end(), drumMessages.begin(), drumMessages.end());
 	}
 
 	PlayMessages(messages);

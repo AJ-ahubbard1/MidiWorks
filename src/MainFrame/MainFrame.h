@@ -6,23 +6,13 @@
 #include "AppModel/AppModel.h"
 #include "Panels/Panels.h"
 #include "PaneInfo.h"
+#include "MainFrameIDs.h"
+#include "KeyboardHandler.h"
 
-// Custom wxWidgets IDs for MainFrame
-enum MainFrameIDs
+class MainFrame : public wxFrame 
 {
-	// Keyboard shortcuts
-	ID_KEYBOARD_TOGGLE_PLAY = wxID_HIGHEST + 1000,
-	ID_KEYBOARD_RECORD,
-	ID_KEYBOARD_QUANTIZE,
-    ID_KEYBOARD_PREVIOUS_MEASURE,
-    ID_KEYBOARD_NEXT_MEASURE,
+    friend class KeyboardHandler;
 
-	// Panel menu IDs (dynamically assigned starting here)
-	ID_PANELS_BEGIN
-};
-
-
-class MainFrame : public wxFrame {
 public:
     MainFrame();
 
@@ -31,6 +21,7 @@ private:
     std::shared_ptr<AppModel> mAppModel;  // Contains all app data & business logic 
     wxAuiManager mAuiManager;			  // Advanced UI, enables dockable panes
     wxTimer mTimer;						  // Triggers Update method every 1ms 
+    std::unique_ptr<KeyboardHandler> mKeyboardHandler;
     int mNextPanelId = ID_PANELS_BEGIN;   // Auto-incrementing panel ID counter
 
     // Panel Pointers
@@ -42,6 +33,7 @@ private:
     LogPanel* mLogPanel;
     UndoHistoryPanel* mUndoHistoryPanel;
     ShortcutsPanel* mShortcutsPanel;
+    DrumMachinePanel* mDrumMachinePanel;
 
     // METHODS - Implemented in MainFrame.cpp
     void CreateDockablePanes();
@@ -54,9 +46,7 @@ private:
     void SyncMenuChecks();
     void UpdateTitle();
     uint64_t GetDeltaTimeMs();
-
     
-
 	// EVENT HANDLERS - Implemented in MainFrameEventHandlers.cpp
     // View / Panel Management Events
     void OnTogglePane(wxCommandEvent& event);

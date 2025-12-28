@@ -8,3 +8,4 @@
 #include "Log.h"
 #include "UndoHistoryPanel.h"
 #include "ShortcutsPanel.h"
+#include "DrumMachine/DrumMachinePanel.h"

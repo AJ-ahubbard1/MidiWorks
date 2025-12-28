@@ -20,9 +20,10 @@ public:
 	void RecordEvent(const MidiMessage& msg, uint64_t currentTick);
 
 	// Active note tracking (for loop recording - prevents stuck notes at loop boundaries)
-	void StartNote(ubyte pitch, ubyte channel, uint64_t startTick);
-	void StopNote(ubyte pitch, ubyte channel);
-	void CloseAllActiveNotes(uint64_t endTick);
+	void StartNote(const TimedMidiEvent& note);
+	void StopNote(ubyte channel, ubyte pitch);
+	void WrapActiveNotesAtLoop(uint64_t endTick, uint64_t loopStartTick);
+	void CloseAllActiveNotes(uint64_t endTick);  // Close held notes without reopening (for stop recording)
 	bool HasActiveNotes() const;
 
 	// Loop recording playback (plays back previously recorded material during loop recording)
@@ -32,11 +33,5 @@ public:
 private:
 	Track mBuffer;
 	int mBufferIterator = -1;
-
-	struct ActiveNote {
-		ubyte pitch;
-		ubyte channel;
-		uint64_t startTick;
-	};
-	std::vector<ActiveNote> mActiveNotes;
+	std::vector<TimedMidiEvent> mActiveNotes;
 };

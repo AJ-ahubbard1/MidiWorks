@@ -3,6 +3,17 @@
 #include "MainFrame.h"
 #include "Commands/QuantizeCommand.h"
 
+// TIMER EVENTS
+
+// Update the App Model then necessary panels
+void MainFrame::OnTimer(wxTimerEvent&)
+{
+	mAppModel->Update();
+	mTransportPanel->UpdateDisplay();
+	mMidiCanvasPanel->Update();
+	// Note: Logging now handled via callback - no polling needed
+}
+
 // VIEW / PANEL MANAGEMENT EVENTS
 
 // Toggle visibility of panes associated with clicked panes in view menu

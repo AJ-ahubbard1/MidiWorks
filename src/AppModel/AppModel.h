@@ -15,6 +15,7 @@
 #include "UndoRedoManager/UndoRedoManager.h"
 #include "MidiInputManager/MidiInputManager.h"
 #include "MetronomeService/MetronomeService.h"
+#include "DrumMachine/DrumMachine.h"
 #include "MidiConstants.h"
 
 class AppModel
@@ -22,16 +23,18 @@ class AppModel
 public:
 	AppModel();
 	void Update();
-
-	SoundBank& GetSoundBank();
-	Transport& GetTransport();
-	TrackSet& GetTrackSet();
-	RecordingSession& GetRecordingSession();
-	ProjectManager& GetProjectManager();
-	Clipboard& GetClipboard();
-	UndoRedoManager& GetUndoRedoManager();
-	MidiInputManager& GetMidiInputManager();
-	MetronomeService& GetMetronomeService();
+	
+	// Component Classes
+	SoundBank& GetSoundBank() { return mSoundBank; }
+	Transport& GetTransport() { return mTransport; }
+	TrackSet& GetTrackSet() { return mTrackSet; }
+	RecordingSession& GetRecordingSession() { return mRecordingSession; }
+	ProjectManager& GetProjectManager() { return mProjectManager; }
+	Clipboard& GetClipboard() { return mClipboard; }
+	UndoRedoManager& GetUndoRedoManager() { return mUndoRedoManager; }
+	MidiInputManager& GetMidiInputManager() { return mMidiInputManager; }
+	MetronomeService& GetMetronomeService() { return mMetronomeService; }
+	DrumMachine& GetDrumMachine() { return mDrumMachine; }
 
 	// Change transport state to stop
 	void StopPlaybackIfActive();
@@ -63,6 +66,9 @@ public:
 	void CopyNotesToClipboard(const std::vector<NoteLocation>& notes);
 	void PasteNotes(uint64_t pasteTick = UINT64_MAX);
 
+	// Drum Machine
+	void RecordDrumPatternToTrack();
+
 
 private:
 	std::chrono::steady_clock::time_point	mLastTick;
@@ -76,6 +82,7 @@ private:
 	UndoRedoManager							mUndoRedoManager;
 	MidiInputManager						mMidiInputManager;
 	MetronomeService						mMetronomeService;
+	DrumMachine								mDrumMachine;
 	DirtyStateCallback						mDirtyStateCallback;
 
 	uint64_t GetDeltaTimeMs();
@@ -83,6 +90,7 @@ private:
 	void PlayMessages(std::vector<MidiMessage> msgs);
 	void RouteAndPlayMessage(const MidiMessage& mm, uint64_t currentTick);
 	void HandleIncomingMidi();
+	std::vector<MidiMessage> PlayDrumMachinePattern(uint64_t lastTick, uint64_t currentTick);
 
 	// Transport state handlers
 	void HandleStopRecording();

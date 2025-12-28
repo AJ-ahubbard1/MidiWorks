@@ -24,7 +24,8 @@ struct NoteLocation
 	ubyte		pitch		 = 0;
 
 	// Equality operator for finding notes in selection
-	bool operator==(const NoteLocation& other) const {
+	bool operator==(const NoteLocation& other) const 
+	{
 		return trackIndex == other.trackIndex &&
 		       noteOnIndex == other.noteOnIndex &&
 		       noteOffIndex == other.noteOffIndex;

@@ -541,15 +541,12 @@ void MidiCanvasPanel::DrawMidiEventsDebug(wxGraphicsContext* gc)
 
 		// Determine color based on event type
 		wxColour color;
-		MidiEvent eventType = event.mm.getEventType();
-		bool isNoteOn = (eventType == MidiEvent::NOTE_ON);
-		bool isNoteOff = (eventType == MidiEvent::NOTE_OFF);
 
-		if (isNoteOn)
+		if (event.mm.isNoteOn())
 		{
 			color = MIDI_EVENT_NOTE_ON;
 		}
-		else if (isNoteOff)
+		else if (event.mm.isNoteOff())
 		{
 			color = MIDI_EVENT_NOTE_OFF;
 		}
@@ -567,15 +564,7 @@ void MidiCanvasPanel::DrawMidiEventsDebug(wxGraphicsContext* gc)
 		                MIDI_EVENT_CIRCLE_RADIUS * 2);
 
 		// Cache event info for hover detection
-		MidiEventDebugInfo debugInfo;
-		debugInfo.tick = event.tick;
-		debugInfo.pitch = event.mm.getPitch();
-		debugInfo.velocity = event.mm.mData[2];
-		debugInfo.trackIndex = event.mm.getChannel();
-		debugInfo.isNoteOn = isNoteOn;
-		debugInfo.screenX = screenX;
-		debugInfo.screenY = screenY;
-		mDebugEvents.push_back(debugInfo);
+		mDebugEvents.push_back({event, screenX, screenY});
 	}
 
 	// Draw tooltip for hovered event
@@ -588,12 +577,14 @@ void MidiCanvasPanel::DrawMidiEventsDebug(wxGraphicsContext* gc)
 void MidiCanvasPanel::DrawMidiEventTooltip(wxGraphicsContext* gc, const MidiEventDebugInfo& event)
 {
 	// Determine event type string
+	auto& midiMsg = event.timedEvent.mm;
+	ubyte velocity = midiMsg.getVelocity();
 	std::string eventType;
-	if (event.isNoteOn)
+	if (midiMsg.isNoteOn() && velocity > 0)
 	{
 		eventType = "Note On";
 	}
-	else if (event.velocity == 0 && !event.isNoteOn)
+	else if (midiMsg.isNoteOff() || (midiMsg.isNoteOn() && velocity == 0))
 	{
 		eventType = "Note Off";
 	}
@@ -604,11 +595,7 @@ void MidiCanvasPanel::DrawMidiEventTooltip(wxGraphicsContext* gc, const MidiEven
 
 	// Format tooltip text
 	std::string text = std::format("{}:{}:{}:{}, {}",
-	                               eventType,
-	                               event.trackIndex,
-	                               event.pitch,
-	                               event.velocity,
-	                               event.tick);
+		eventType, midiMsg.getChannel(), midiMsg.getPitch(), velocity, event.timedEvent.tick);
 
 	// Measure text size
 	double width, height;

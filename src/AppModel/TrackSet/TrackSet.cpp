@@ -170,24 +170,25 @@ void TrackSet::SeparateOverlappingNotes(Track& buffer)
 	// Process each NoteOn to find bad pairs
 	for (size_t i = 0; i < buffer.size(); i++)
 	{
-		if (!buffer[i].mm.isNoteOn()) continue;
+		auto& eventI = buffer[i].mm;
+		if (!eventI.isNoteOn()) continue;
 
-		uint8_t pitch = buffer[i].mm.getPitch();
-
-		// Look for the next event with the same pitch
+		// Look for the next event with the same channel and pitch
 		for (size_t j = i + 1; j < buffer.size(); j++)
 		{
-			if (buffer[j].mm.getPitch() != pitch) continue;
+			auto& eventJ = buffer[j].mm;
+			if (eventI.getPitch() != eventJ.getPitch() ||
+				eventI.getChannel() != eventJ.getChannel()) continue;
 
 			// Found next event with same pitch
-			if (buffer[j].mm.isNoteOn())
+			if (eventJ.isNoteOn())
 			{
 				// Bad pair detected! Two NoteOns in a row
 				// Find the first NoteOff with this pitch after j that hasn't been moved yet
 				for (size_t k = j + 1; k < buffer.size(); k++)
 				{
-					if (buffer[k].mm.isNoteOff() &&
-						buffer[k].mm.getPitch() == pitch &&
+					auto& eventK = buffer[k].mm;
+					if (eventK.isNoteOff() && eventK.getPitch() == eventI.getPitch() && 
 						movedIndices.find(k) == movedIndices.end())
 					{
 						// Move this NoteOff to prevent overlap with the second NoteOn

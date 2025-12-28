@@ -93,7 +93,8 @@ Should respect collision prevention strategy once bug #4 is implemented.
 **Found:** 2025-12-17
 
 **Description:**
-The loop recording system has complex logic for tracking active notes and auto-closing them at loop boundaries. This complexity introduces several potential failure modes that could result in stuck notes or recording buffer corruption.
+The loop recording system has complex logic for tracking active notes and auto-closing them at loop boundaries. 
+This complexity introduces several potential failure modes that could result in stuck notes or recording buffer corruption.
 
 **Potential Issues:**
 1. **Active note auto-close at loop end** (AppModel.cpp:124-131) - Could create duplicate note-offs if one is already in buffer
@@ -637,6 +638,263 @@ TrackSet::SeparateOverlappingNotes(mTrack);
 
 **Files Modified:**
 - `src/Commands/QuantizeCommand.h` - Complete rewrite of Execute() method with duration-aware algorithm
+
+---
+
+### #22 - Show MIDI Events tool incorrectly identifies Note Off events
+**Status:** Fixed
+**Priority:** Low
+**Found:** 2025-12-24
+**Fixed:** 2025-12-24
+
+**Description:**
+The "Show MIDI Events" debug tool in MidiCanvas displayed incorrect event types for Note Off events. Mouse-added notes correctly showed "Note Off", but keyboard-recorded notes showed "Other" instead of "Note Off".
+
+**Root Cause:**
+MIDI has two representations for Note Off:
+1. **Explicit Note Off** - Status byte 0x80
+2. **Implicit Note Off** - Note On (0x90) with velocity 0
+
+The tooltip detection logic in `DrawMidiEventTooltip()` (MidiCanvas.cpp:592) only checked `event.isNoteOn` without considering velocity:
+```cpp
+// WRONG - doesn't check velocity!
+if (event.isNoteOn) {
+    eventType = "Note On";
+}
+```
+
+This caused keyboard-recorded notes (which use implicit Note Off) to show as "Note On" because the status byte was 0x90, even though velocity was 0.
+
+**Solution:**
+Implemented a comprehensive refactoring:
+
+**1. Refactored MidiEventDebugInfo struct** (MidiCanvas.h:77-81)
+- Replaced individual fields (`pitch`, `velocity`, `trackIndex`, `isNoteOn`) with single `TimedMidiEvent` field
+- Eliminated data duplication - `TimedMidiEvent` already contains all this information
+- Reduced struct from 7 fields to 3 fields
+
+**Before:**
+```cpp
+struct MidiEventDebugInfo {
+    uint64_t tick;
+    ubyte pitch;
+    ubyte velocity;
+    int trackIndex;
+    bool isNoteOn;
+    int screenX;
+    int screenY;
+};
+```
+
+**After:**
+```cpp
+struct MidiEventDebugInfo {
+    TimedMidiEvent timedEvent;  // Contains mm and tick
+    int screenX;
+    int screenY;
+};
+```
+
+**2. Simplified population code** (MidiCanvas.cpp:567)
+```cpp
+// Before (7 lines):
+MidiEventDebugInfo debugInfo;
+debugInfo.tick = event.tick;
+debugInfo.pitch = event.mm.getPitch();
+debugInfo.velocity = event.mm.mData[2];
+debugInfo.trackIndex = event.mm.getChannel();
+debugInfo.isNoteOn = isNoteOn;
+debugInfo.screenX = screenX;
+debugInfo.screenY = screenY;
+
+// After (1 line using aggregate initialization):
+mDebugEvents.push_back({event, screenX, screenY});
+```
+
+**3. Fixed event type detection** (MidiCanvas.cpp:583-594)
+```cpp
+auto& midiMsg = event.timedEvent.mm;
+ubyte velocity = midiMsg.getVelocity();
+
+if (midiMsg.isNoteOn() && velocity > 0)  // ✓ Real Note On
+{
+    eventType = "Note On";
+}
+else if (!midiMsg.isNoteOn() || (midiMsg.isNoteOn() && velocity == 0))  // ✓ Both forms
+{
+    eventType = "Note Off";
+}
+else
+{
+    eventType = "Other";
+}
+```
+
+**Files Modified:**
+- `src/Panels/MidiCanvas/MidiCanvas.h` - Refactored `MidiEventDebugInfo` struct
+- `src/Panels/MidiCanvas/MidiCanvas.cpp` - Simplified population, fixed event type detection
+
+**Benefits:**
+- ✓ Correctly identifies both explicit and implicit Note Off events
+- ✓ Cleaner code with reduced redundancy (7 fields → 3 fields, 7 lines → 1 line)
+- ✓ Better maintainability using helper methods from `MidiMessage` class
+- ✓ Single source of truth - data stored once in `TimedMidiEvent`
+
+---
+
+### #23 - Loop recording creates orphaned Note Off events for held notes
+**Status:** Fixed
+**Priority:** High
+**Found:** 2025-12-24
+**Fixed:** 2025-12-24
+
+**Description:**
+When loop recording, if a user held down a note across the loop boundary, the system created orphaned Note Off events with no matching Note On, resulting in invalid MIDI data.
+
+**Problem Scenario:**
+```
+User holds C4 starting at tick 100
+Loop end is at tick 960
+
+Tick 100: Note On (C4) recorded
+Tick 960: Loop wraps
+         → CloseAllActiveNotes() creates Note Off (C4) at tick 960
+         → Loop jumps to tick 0
+         → USER STILL HOLDING KEY PHYSICALLY!
+Tick 50:  User releases key
+         → MIDI device sends Note Off (C4)
+         → Orphaned Note Off recorded with no matching Note On! ✗
+```
+
+**Result:** Bad MIDI data with unpaired Note Off events that could cause playback issues.
+
+**Root Cause:**
+The `CloseAllActiveNotes()` method created Note Off events at loop boundaries to prevent stuck notes, but didn't account for notes that were still physically held on the MIDI keyboard after the loop wrapped. The `ActiveNote` struct also lacked velocity information needed to recreate Note On events.
+
+**Solution:**
+Implemented comprehensive refactoring to handle notes held across loop boundaries:
+
+**1. Added `getVelocity()` helper to MidiMessage** (MidiMessage.h:162-165)
+```cpp
+ubyte getVelocity() const
+{
+    return mData[2];
+}
+```
+
+**2. Extended ActiveNote struct with velocity** (RecordingSession.h:36-41)
+```cpp
+// Before:
+struct ActiveNote {
+    ubyte pitch;
+    ubyte channel;
+    uint64_t startTick;
+};
+
+// After:
+struct ActiveNote {
+    ubyte channel;
+    ubyte pitch;
+    ubyte velocity;  // NEW - needed to recreate Note On
+    uint64_t startTick;
+};
+```
+
+**3. Updated note tracking to capture velocity** (RecordingSession.cpp:48)
+```cpp
+// StartNote() now takes velocity parameter
+ubyte velocity = msg.getVelocity();
+StartNote(channel, pitch, velocity, currentTick);
+```
+
+**4. Renamed and enhanced CloseAllActiveNotes → WrapActiveNotesAtLoop** (RecordingSession.cpp:70-86)
+
+The new name better describes what the method does: wrapping notes at loop boundaries.
+
+**Before:**
+```cpp
+void CloseAllActiveNotes(uint64_t endTick)
+{
+    for (const auto& note : mActiveNotes)
+    {
+        MidiMessage noteOff = MidiMessage::NoteOff(note.pitch, note.channel);
+        mBuffer.push_back({noteOff, endTick});
+    }
+    mActiveNotes.clear();  // ✗ Loses track of held notes!
+}
+```
+
+**After:**
+```cpp
+void WrapActiveNotesAtLoop(uint64_t endTick, uint64_t loopStartTick)
+{
+    for (auto& note : mActiveNotes)  // Not const - we modify startTick
+    {
+        // Close the note at loop end
+        MidiMessage noteOff = MidiMessage::NoteOff(note.pitch, note.channel);
+        mBuffer.push_back({noteOff, endTick});
+
+        // Reopen the note at loop start (user still holding key!)
+        MidiMessage noteOn = MidiMessage::NoteOn(note.pitch, note.velocity, note.channel);
+        mBuffer.push_back({noteOn, loopStartTick});
+
+        // Update active note's start tick for eventual release
+        note.startTick = loopStartTick;
+    }
+    // Don't clear mActiveNotes - notes are still physically held!
+}
+```
+
+**5. Updated call site** (AppModel.cpp:342)
+```cpp
+// Before:
+mRecordingSession.CloseAllActiveNotes(loopSettings.endTick - NOTE_SEPARATION_TICKS);
+
+// After:
+mRecordingSession.WrapActiveNotesAtLoop(
+    loopSettings.endTick - NOTE_SEPARATION_TICKS,
+    loopSettings.startTick
+);
+```
+
+**6. Fixed operation ordering** (AppModel.cpp:336-342)
+
+Moved `SeparateOverlappingNotes()` to run BEFORE `WrapActiveNotesAtLoop()` to prevent the overlap detection from incorrectly processing the synthetic wrap events:
+```cpp
+// Fix overlapping same-pitch notes first
+TrackSet::SeparateOverlappingNotes(mRecordingSession.GetBuffer());
+
+// Then wrap any notes still held at loop end
+mRecordingSession.WrapActiveNotesAtLoop(noteOffTick, loopSettings.startTick);
+```
+
+**Expected Behavior After Fix:**
+```
+User holds C4 from tick 100 through loop boundary
+
+Iteration 1: Note On (tick 100) → Note Off (tick 960) ✓
+Iteration 2: Note On (tick 0) → Note Off (tick 50) ✓  [when user releases]
+```
+
+**Files Modified:**
+- `src/RtMidiWrapper/MidiMessage/MidiMessage.h` - Added `getVelocity()` helper
+- `src/AppModel/RecordingSession/RecordingSession.h` - Extended `ActiveNote` struct, renamed method
+- `src/AppModel/RecordingSession/RecordingSession.cpp` - Updated `StartNote()`, `RecordEvent()`, implemented `WrapActiveNotesAtLoop()`
+- `src/AppModel/AppModel.cpp` - Updated call site and operation ordering
+
+**Additional Improvements:**
+- Improved code readability by using `isNoteOn()`, `isNoteOff()`, `getPitch()`, `getChannel()`, and `getVelocity()` helper methods instead of raw byte manipulation
+- Refactored `SeparateOverlappingNotes()` to use references and helper methods for better performance and clarity
+
+**Benefits:**
+- ✓ Proper MIDI data with all Note On/Off pairs matched
+- ✓ No orphaned events during loop recording
+- ✓ Correctly handles multiple notes held simultaneously across loop boundaries
+- ✓ Preserves original note velocity when reopening at loop start
+- ✓ Cleaner, more maintainable code using helper methods
+
+**Related:**
+This fix also addressed the broader refactoring mentioned in bug #8 (Loop recording active note tracking reliability) by simplifying and clarifying the active note tracking logic.
 
 ---
 
