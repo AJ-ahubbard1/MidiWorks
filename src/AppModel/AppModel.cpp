@@ -341,8 +341,8 @@ std::vector<MidiMessage> AppModel::PlayDrumMachinePattern(uint64_t lastTick, uin
 	std::vector<MidiMessage> messages;
 
 	// Update loop duration (cheap - just sets flag if duration changed)
-	uint64_t loopDuration = mTransport.GetLoopSettings().endTick -
-		mTransport.GetLoopSettings().startTick;
+	auto loopSettings = mTransport.GetLoopSettings();
+	uint64_t loopDuration = loopSettings.endTick - loopSettings.startTick;
 	mDrumMachine.UpdatePattern(loopDuration);
 
 	// GetPattern() will regenerate if dirty
@@ -351,11 +351,14 @@ std::vector<MidiMessage> AppModel::PlayDrumMachinePattern(uint64_t lastTick, uin
 	// Find events between lastTick and currentTick (prevents missing events if tick jumps)
 	for (const auto& event : pattern)
 	{
-		if (event.tick >= lastTick && event.tick < currentTick)
+		// Drum pattern starts at 0, need to offset by loop's start tick for
+		// pattern to match loop region
+		uint64_t tick = event.tick + loopSettings.startTick;
+		if (tick >= lastTick && tick < currentTick)
 		{
 			messages.push_back(event.mm);
 		}
-		else if (event.tick > currentTick)
+		else if (tick > currentTick)
 		{
 			break;  // Pattern is sorted, no more events in range
 		}
@@ -369,7 +372,7 @@ std::vector<MidiMessage> AppModel::PlayDrumMachinePattern(uint64_t lastTick, uin
 void AppModel::HandleStopRecording()
 {
 	mTransport.Stop();
-	mTransport.SetState(Transport::State::Stopped);
+	 mTransport.SetState(Transport::State::Stopped);
 
 	// Close any notes still being held when stopping (prevents orphaned Note Ons)
 	if (mRecordingSession.HasActiveNotes())

@@ -477,81 +477,34 @@ The DrumMachine panel was recently added (commit 69b698d). These enhancements wo
 ---
 
 ### #25 - DrumMachine plays even when panel is hidden
-**Status:** Open
-**Priority:** Medium
+**Status:** Won't Fix
+**Priority:** N/A
 **Found:** 2025-12-28
+**Resolved:** 2025-12-29
 
 **Description:**
-The DrumMachine pattern plays back during loop playback even when the DrumMachine panel is not visible. This wastes CPU cycles and can cause confusion when users hear drum sounds but don't see the drum machine panel open.
+The DrumMachine pattern plays back during loop playback even when the DrumMachine panel is not visible.
 
-**Current Behavior:**
-- DrumMachine generates pattern and adds to playback regardless of panel visibility
-- Pattern plays during loop playback even if panel is closed/hidden
-- No visual feedback to indicate drum machine is active when panel is hidden
+**Resolution:**
+This is **intentional behavior** that matches professional DAW standards. Instruments and patterns should play regardless of UI panel visibility - this is the expected workflow in all major DAWs (Ableton, FL Studio, Logic, etc.).
 
-**Expected Behavior:**
-- DrumMachine should only play when panel is visible
-- When panel is hidden/closed, drum pattern should not be added to playback
-- Alternatively: Add visual indicator (in transport or status bar) when drum machine is active
+**Proper Solution:**
+Use the **mute button** (implemented in bug #24 Option 5) to control drum machine playback. This provides:
+- Standard DAW workflow (mute/solo controls audio routing, not UI visibility)
+- Ability to edit patterns while muted
+- Clear separation between UI state and audio routing
+- Familiar behavior for users coming from other DAWs
 
-**Proposed Solutions:**
+**Why Panel Visibility Should NOT Control Playback:**
+- Users may want to hear drums while working in other panels (piano roll, mixer, etc.)
+- Closing a panel to silence it is non-standard and confusing
+- CPU usage from drum machine playback is negligible
+- Mute button provides explicit, discoverable control
 
-**Option 1: Check Panel Visibility Before Playback** ⭐
-- Check if DrumMachinePanel is visible before adding pattern to playback
-- Use wxWindow::IsShown() to determine visibility
-- Simple conditional in playback logic
+**Related:**
+- Bug #24 Option 5 - Mute/Solo buttons (provides the proper playback control mechanism)
 
-**Implementation:**
-```cpp
-// In AppModel or wherever drum pattern is added to playback
-if (mDrumMachinePanel && mDrumMachinePanel->IsShown())
-{
-    // Add drum machine pattern to playback
-    const Track& pattern = mDrumMachine.GetPattern();
-    // ... playback logic
-}
-```
-
-**Option 2: Link to AUI Pane Visibility**
-- Check AuiManager pane visibility state
-- Works with dockable panel system
-- More robust for complex layouts
-
-**Implementation:**
-```cpp
-// In MainFrame or AppModel
-wxAuiPaneInfo& paneInfo = mAuiManager.GetPane("DrumMachine");
-if (paneInfo.IsOk() && paneInfo.IsShown())
-{
-    // Play drum machine pattern
-}
-```
-
-**Option 3: Add Enable/Disable Toggle**
-- Add checkbox/button to enable/disable drum machine playback
-- Independent of panel visibility
-- Allows users to keep panel open but disable playback
-- Similar to mute/solo in mixer
-
-**Recommended Approach:**
-Combine Option 1 and Option 3:
-- Check panel visibility by default (automatic)
-- Add optional "Enable" toggle for explicit control
-- Best of both worlds: automatic behavior + manual override
-
-**Benefits:**
-- Reduces CPU usage when drum machine is not in use
-- Prevents confusion from "phantom" drum sounds
-- Cleaner separation of concerns (panel visibility → playback state)
-- More intuitive user experience
-
-**Files to Modify:**
-- `src/AppModel/AppModel.cpp` - Add visibility check in playback logic
-- `src/Panels/DrumMachine/DrumMachinePanel.h` - Potentially add enable toggle
-- `src/MainFrame/MainFrame.h` - Access to AUI pane info if using Option 2
-
-**Notes:**
-This is similar to how DAWs handle track arming - only record-enabled tracks participate in recording. The drum machine should only participate in playback when it's actively being used (panel visible) or explicitly enabled.
+---
 
 ---
 
@@ -1592,6 +1545,38 @@ The reliability issues were resolved through comprehensive RecordingSession refa
 
 **Related:**
 This fix was implemented as part of bug #23 (Loop recording creates orphaned Note Off events for held notes).
+
+---
+
+### #26 - Drum machine playback only works with loop start at tick 0
+**Status:** Fixed
+**Priority:** High
+**Found:** 2025-12-30
+**Fixed:** 2025-12-30
+
+**Description:**
+The DrumMachine playback only functioned correctly when the loop region started at tick 0. Moving the loop start to any other position caused drum machine playback to fail completely.
+
+**Root Cause:**
+The drum pattern is generated starting at tick 0 (relative to the pattern itself). When checking which events should play, the code was comparing pattern ticks (starting at 0) directly against playback ticks (which could be anywhere in the composition). This caused all events to be filtered out when the loop didn't start at tick 0.
+
+**Solution:**
+Added tick offset in `PlayDrumMachinePattern()` method (AppModel.cpp:354-356):
+```cpp
+// Drum pattern starts at 0, need to offset by loop's start tick for
+// pattern to match loop region
+uint64_t tick = event.tick + loopSettings.startTick;
+```
+
+This ensures drum pattern events are offset by the loop's starting tick, so they align with the loop region regardless of where it's positioned.
+
+**Files Modified:**
+- `src/AppModel/AppModel.cpp` - Added tick offset in PlayDrumMachinePattern()
+
+**Benefits:**
+- Drum machine now works correctly at any loop position
+- Pattern playback properly adapts to loop start tick
+- No change to pattern generation - just corrects playback timing
 
 ---
 

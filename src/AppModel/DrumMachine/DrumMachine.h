@@ -26,6 +26,7 @@ public:
 	void SetColumnCount(int columns);
 	int GetColumnCount() const { return mColumnCount; }
 	void UpdatePattern(uint64_t loopDuration);	// Regenerate Track from Pads
+	const Track& GetPattern();  // Returns pattern, regenerates if dirty
 
 	// Row Management
 	void AddRow(const std::string& name, ubyte pitch);
@@ -41,13 +42,15 @@ public:
 	void EnablePad(size_t rowIndex, size_t columnIndex);  // Enable specific pad (for live recording)
 	void SetPadVelocity(size_t rowIndex, size_t columnIndex, ubyte velocity);
 	bool IsPadEnabled(size_t rowIndex, size_t columnIndex) const;
+	void Clear();
 
 	// Channel Selection
 	void SetChannel(ubyte channel) { mChannel = channel; mPatternDirty = true; }
 	ubyte GetChannel() { return mChannel; }
 
 	// Playback Integration
-	const Track& GetPattern();  // Returns pattern, regenerates if dirty
+	bool IsMuted() const { return mIsMuted; }
+	void SetMuted(bool isMuted) { mIsMuted = isMuted; }
 
 	// Grid Visualization Helper
 	bool IsColumnOnMeasure(int column, uint64_t ticksPerMeasure) const;
@@ -55,12 +58,6 @@ public:
 	// Get column index for a given tick position (for live recording)
 	int GetColumnAtTick(uint64_t tick, uint64_t loopStartTick) const;
 
-	// Persistence
-	void Clear();
-
-	// 
-	bool IsMuted() const { return mIsMuted; }
-	void SetMuted(bool isMuted) { mIsMuted = isMuted; }
 
 private:
 	std::vector<DrumRow> mRows;

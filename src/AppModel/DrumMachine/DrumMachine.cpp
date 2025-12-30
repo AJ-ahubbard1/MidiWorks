@@ -35,33 +35,6 @@ const Track& DrumMachine::GetPattern()
     return mPattern;
 }
 
-void DrumMachine::RegeneratePattern()
-{
-    mPattern.clear();
-    uint64_t padDuration = CalculatePadDuration(mLastLoopDuration);
-
-    for (size_t rowIdx = 0; rowIdx < mRows.size(); rowIdx++)
-    {
-        const DrumRow& row = GetRow(rowIdx);
-        for (size_t colIdx = 0; colIdx < mColumnCount; colIdx++)  // Fixed: was mRows.size()
-        {
-            const DrumPad& pad = GetPad(rowIdx, colIdx);
-            if (pad.enabled)
-            {
-                uint64_t tick = colIdx * padDuration;
-                // Create Note On
-                MidiMessage noteOn = MidiMessage::NoteOn(row.pitch, pad.velocity, mChannel);
-                mPattern.push_back({noteOn, tick});
-
-                // Create Note Off (duration = half of total pad duration)
-                MidiMessage noteOff = MidiMessage::NoteOff(row.pitch, mChannel);
-                mPattern.push_back({noteOff, tick + padDuration / 2});
-            }
-        }
-    }
-    TrackSet::SortTrack(mPattern);
-}
-
 void DrumMachine::AddRow(const std::string& name, ubyte pitch)
 {
     DrumRow row;
@@ -125,24 +98,6 @@ void DrumMachine::Clear()
     mPatternDirty = true;
 }
 
-void DrumMachine::InitializeDefaultRows()
-{
-    // General MIDI drum map (Channel 10 standard)
-    AddRow("Kick", 35);  // Acoustic Bass Drum
-    AddRow("Snare", 38);  // Acoustic Snare
-    AddRow("Clap", 39);  // Hand Clap
-    AddRow("Closed HH", 42);  // Closed Hi-Hat
-    AddRow("Open HH", 46);  // Open Hi-Hat
-    AddRow("Low Tom", 45);  // Low Tom
-    AddRow("Crash", 49);  // Crash Cymbal 1
-    AddRow("Ride", 51);  // Ride Cymbal 1
-}
-
-uint64_t DrumMachine::CalculatePadDuration(uint64_t loopDuration) const
-{
-	return loopDuration / mColumnCount;
-}
-
 bool DrumMachine::IsColumnOnMeasure(int column, uint64_t ticksPerMeasure) const
 {
 	uint64_t ticksPerColumn = CalculatePadDuration(mLastLoopDuration);
@@ -170,3 +125,50 @@ int DrumMachine::GetColumnAtTick(uint64_t tick, uint64_t loopStartTick) const
 
 	return column;
 }
+
+void DrumMachine::InitializeDefaultRows()
+{
+    // General MIDI drum map (Channel 10 standard)
+    AddRow("Kick", 35);  // Acoustic Bass Drum
+    AddRow("Snare", 38);  // Acoustic Snare
+    AddRow("Clap", 39);  // Hand Clap
+    AddRow("Closed HH", 42);  // Closed Hi-Hat
+    AddRow("Open HH", 46);  // Open Hi-Hat
+    AddRow("Low Tom", 45);  // Low Tom
+    AddRow("Crash", 49);  // Crash Cymbal 1
+    AddRow("Ride", 51);  // Ride Cymbal 1
+}
+
+void DrumMachine::RegeneratePattern()
+{
+    mPattern.clear();
+    uint64_t padDuration = CalculatePadDuration(mLastLoopDuration);
+
+    for (size_t rowIdx = 0; rowIdx < mRows.size(); rowIdx++)
+    {
+        const DrumRow& row = GetRow(rowIdx);
+        for (size_t colIdx = 0; colIdx < mColumnCount; colIdx++)  // Fixed: was mRows.size()
+        {
+            const DrumPad& pad = GetPad(rowIdx, colIdx);
+            if (pad.enabled)
+            {
+                uint64_t tick = colIdx * padDuration;
+                // Create Note On
+                MidiMessage noteOn = MidiMessage::NoteOn(row.pitch, pad.velocity, mChannel);
+                mPattern.push_back({noteOn, tick});
+
+                // Create Note Off (duration = half of total pad duration)
+                MidiMessage noteOff = MidiMessage::NoteOff(row.pitch, mChannel);
+                mPattern.push_back({noteOff, tick + padDuration / 2});
+            }
+        }
+    }
+    TrackSet::SortTrack(mPattern);
+}
+
+
+uint64_t DrumMachine::CalculatePadDuration(uint64_t loopDuration) const
+{
+	return loopDuration / mColumnCount;
+}
+
