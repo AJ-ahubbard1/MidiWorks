@@ -92,6 +92,7 @@ void MainFrame::CreateCallbackFunctions()
 			mAppModel->GetDrumMachine().UpdatePattern(loopDuration);
 
 			// Refresh pad colors (efficient - no widget recreation)
+			mDrumMachinePanel->UpdateTicksPerColumnDisplay();
 			mDrumMachinePanel->RefreshAllPadButtonColors();
 		}
 	});

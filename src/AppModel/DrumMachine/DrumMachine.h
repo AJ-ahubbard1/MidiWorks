@@ -36,6 +36,8 @@ public:
 	const DrumRow& GetRow(size_t index) const { return mRows[index]; }
 	DrumPad& GetPad(size_t rowIndex, size_t columnIndex) { return mRows[rowIndex].pads[columnIndex]; }
 	const DrumPad& GetPad(size_t rowIndex, size_t columnIndex) const { return mRows[rowIndex].pads[columnIndex]; }
+	ubyte GetPitch(int row) const { return mRows[row].pitch; }
+	void SetPitch(int row, ubyte pitch) { mRows[row].pitch = pitch; mPatternDirty = true; }
 
 	// Pad Manipulation
 	void TogglePad(size_t rowIndex, size_t columnIndex);
@@ -58,6 +60,8 @@ public:
 	// Get column index for a given tick position (for live recording)
 	int GetColumnAtTick(uint64_t tick, uint64_t loopStartTick) const;
 
+	// Calculate ticks per column for a given loop duration
+	uint64_t CalculatePadDuration(uint64_t loopDuration) const;
 
 private:
 	std::vector<DrumRow> mRows;
@@ -67,8 +71,7 @@ private:
 	bool mIsMuted = true;
 	bool mPatternDirty = true;
 	uint64_t mLastLoopDuration = 15360;  // Default: 4 measures (3840 * 4)
-	
+
 	void InitializeDefaultRows();
 	void RegeneratePattern();  // Actually rebuilds the pattern
-	uint64_t CalculatePadDuration(uint64_t loopDuration) const;
- };
+};

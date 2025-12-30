@@ -15,6 +15,7 @@ public:
 	void UpdateFromModel();  // Sync UI with loaded DrumMachine pattern
 	void RefreshPadButtonColor(size_t rowIndex, size_t columnIndex);  // Update single pad button color (efficient)
 	void RefreshAllPadButtonColors();  // Refresh all pad colors (efficient for loop changes)
+	void UpdateTicksPerColumnDisplay();
 
 private:
 	// Model references
@@ -25,14 +26,17 @@ private:
 	// UI Controls
 	wxCheckBox* mMuteCheckBox;
 	wxSpinCtrl* mColumnCountSpinner;
+	wxStaticText* mTicksPerColumnLabel;
 	wxChoice* mChannelChoice;
 	wxFlexGridSizer* mDrumGrid;
 	wxButton* mAddRowButton;
 	wxButton* mRemoveRowButton;
 	wxButton* mRecordButton;
+	wxButton* mClearButton;
 
 	// Grid of buttons [rowIndex][columnIndex]
 	std::vector<std::vector<wxButton*>> mPadButtons;
+	std::vector<wxSpinCtrl*> mPitchSpinners;  // One pitch spinner per row
 
 	// UI Construction
 	void CreateControls();
@@ -44,7 +48,9 @@ private:
 	void OnColumnCountChanged(wxSpinEvent& event);
 	void OnChannelChanged(wxCommandEvent& event);
 	void OnPadToggle(wxCommandEvent& event);
+	void OnPitchChanged(wxSpinEvent& event);
 	void OnAddRow(wxCommandEvent& event);
 	void OnRemoveRow(wxCommandEvent& event);
 	void OnRecordToTrack(wxCommandEvent& event);
+	void OnClear(wxCommandEvent& event);
 };

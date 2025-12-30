@@ -222,260 +222,6 @@ This is a fundamental DAW workflow feature. See `AppModel::CopyNotesToClipboard(
 
 ---
 
-### #24 - DrumMachine rows should allow pitch modification
-**Status:** Open
-**Priority:** Medium
-**Found:** 2025-12-28
-
-**Description:**
-The DrumMachine panel needs several usability improvements: customizable pitches for each row and a quick way to clear all enabled pads.
-
-**Current Limitations:**
-- Drum rows have hardcoded pitches
-- No way to change which drum sound is triggered by each row
-- Users can't adapt the DrumMachine to different drum kits or percussion setups
-- No quick way to clear all enabled pads (reset pattern)
-
-**Proposed Solutions:**
-
-**Option 1: Simple - Pitch Value Control** ⭐
-- Add a numeric spin control (wxSpinCtrl) next to each drum row
-- Range: 0-127 (full MIDI pitch range)
-- Default: GM drum map standard pitches (kick=36, snare=38, hi-hat=42, etc.)
-- Updates immediately when changed
-- Saves with project file
-
-**UI Mockup:**
-```
-[Row 0] [Pitch: 36 ▼] [████░░░░░░░░░░░░] (Kick)
-[Row 1] [Pitch: 38 ▼] [░░░░████░░░░░░░░] (Snare)
-[Row 2] [Pitch: 42 ▼] [░░████░░████░░░░] (Hi-hat)
-```
-
-**Option 2: Advanced - MIDI "Listen" Mode**
-- Add "Listen" checkbox/button next to each row
-- When enabled, clicking activates listen mode for that row
-- User plays note on MIDI keyboard → both:
-  1. Previews the sound (plays immediately)
-  2. Sets that pitch for the drum row
-- Visual feedback: row highlights while in listen mode
-- Auto-exits listen mode after pitch is captured
-
-**UI Mockup:**
-```
-[Row 0] [🎹 Listen] [Pitch: 36] [████░░░░░░░░░░░░] (Kick)
-[Row 1] [🎹 Listen] [Pitch: 38] [░░░░████░░░░░░░░] (Snare)  ← Active
-```
-
-**Option 3: Clear Button** ⭐
-- Add a "Clear" button to the DrumMachine panel (likely in header/toolbar)
-- Clicking the button sets all pad enabled states to false
-- Provides quick way to start a new pattern from scratch
-- Alternative names: "Clear All", "Reset Pattern", "Clear Pads"
-- Optional: Add confirmation dialog if pattern is not empty
-- Could also add as keyboard shortcut (e.g., Ctrl+Delete)
-
-**UI Mockup:**
-```
-DrumMachine Panel
-[Clear] [▶ Play]
-[Row 0] [Pitch: 36] [████░░░░░░░░░░░░] (Kick)
-[Row 1] [Pitch: 38] [░░░░████░░░░░░░░] (Snare)
-                         ↓ After clicking Clear
-[Row 0] [Pitch: 36] [░░░░░░░░░░░░░░░░] (Kick)
-[Row 1] [Pitch: 38] [░░░░░░░░░░░░░░░░] (Snare)
-```
-
-**Option 4: Display Ticks Per Column** ⭐
-- Add a read-only label showing calculated ticks per column
-- Updates automatically when column count or loop region changes
-- Makes subdivision flexibility discoverable to users
-- Helps users understand the relationship between columns and grid resolution
-- Educational - teaches how the tick system works
-
-**UI Mockup:**
-```
-DrumMachine Panel
-Columns: [16 ▼]    (240 ticks/column)
-                    ↑ Updates dynamically
-
-Examples based on 1 measure loop (3840 ticks):
-Columns: [16]  → 240 ticks/column  (16th notes)
-Columns: [12]  → 320 ticks/column  (triplets)
-Columns: [10]  → 384 ticks/column  (quintuplets)
-Columns: [32]  → 120 ticks/column  (32nd notes)
-```
-
-**Why This Matters:**
-The DrumMachine's adjustable column count is actually a **variable-resolution sequencer** - more powerful than traditional fixed subdivision modes. By showing ticks/column, users discover they can create:
-- Standard subdivisions (16ths, 8ths, 32nds)
-- Triplets (12 columns = 3 per beat)
-- Quintuplets (10 columns = 5 per measure)
-- Any polyrhythm imaginable
-
-This simple display makes the "quirky" design feel intentional and powerful rather than confusing.
-
-**Option 5: Mute/Solo Buttons** ⭐
-- Add mute and/or solo toggle buttons to DrumMachine panel header
-- Allows disabling playback without closing the panel
-- Keeps panel visible for editing while silencing output
-- Similar to channel mute/solo in mixer
-
-**UI Mockup:**
-```
-DrumMachine Panel
-[Mute] [Solo] [Clear] Columns: [16 ▼] (240 ticks/column)
-[Row 0] [Pitch: 36] [████░░░░░░░░░░░░] (Kick)
-[Row 1] [Pitch: 38] [░░░░████░░░░░░░░] (Snare)
-```
-
-**Implementation Options:**
-
-**Simple: Mute Only**
-- Single mute button (toggle)
-- When muted, pattern doesn't play
-- Visual feedback: button highlighted when muted
-- Pattern continues to update internally (ready when unmuted)
-
-**Advanced: Mute + Solo**
-- Mute button: Disable this drum machine
-- Solo button: Mute all other tracks, play only drum machine
-- Solo logic similar to SoundBank solo behavior
-- Requires coordination with SoundBank solo state
-
-**Recommended Approach:**
-Implement all five features - they complement each other well:
-- **Option 4** (ticks/column display) - Trivial to implement, makes design discoverable
-- **Option 5** (mute button) - Simple, essential playback control
-- **Option 3** (clear button) - Simple to implement, high usability value
-- **Option 1** (pitch control) - Essential, provides immediate value
-- **Option 2** (listen mode) - Optional enhancement for advanced workflow
-
-Priority order: Option 4 → Option 5 (mute only) → Option 3 → Option 1 → Option 2
-
-**Implementation Notes:**
-
-**For Option 1 (Pitch Control):**
-- Add `ubyte pitch` field to drum row data structure
-- Add `wxSpinCtrl` to each DrumMachineRow UI component
-- Range: 0-127, default to GM drum map
-- Store in project file (save/load)
-- Update note generation to use row's pitch value
-
-**For Option 2 (Listen Mode):**
-- Add "listen mode" state to DrumMachinePanel
-- Add `bool isListening` flag to each row
-- Hook into `AppModel::HandleIncomingMidi()` or add listener callback
-- When in listen mode and MIDI note received:
-  - Call `AppModel::PlayPreviewNote(pitch)` for audio feedback
-  - Update row pitch value
-  - Exit listen mode
-- Visual indication: highlight row border/background during listen
-
-**For Option 3 (Clear Button):**
-- Add `wxButton` to DrumMachinePanel header/toolbar area
-- Label: "Clear" or "Clear All"
-- On click event: Iterate through all rows and set `enabled = false` for all pads
-- Simple implementation:
-  ```cpp
-  void OnClear(wxCommandEvent& event)
-  {
-      for (auto& row : mDrumRows)
-      {
-          row.ClearAllPads();  // Sets all enabled[] to false
-      }
-      Refresh();  // Redraw the panel
-  }
-  ```
-- Optional: Add keyboard shortcut binding in MainFrame
-
-**For Option 4 (Ticks Per Column Display):**
-- Add `wxStaticText* mTicksPerColumnLabel` to DrumMachinePanel
-- Position next to column count spinner
-- Update whenever column count or loop region changes
-- Uses existing `CalculatePadDuration()` method from DrumMachine class
-- Simple implementation:
-  ```cpp
-  void UpdateTicksPerColumnDisplay()
-  {
-      auto loopSettings = mTransport.GetLoopSettings();
-      uint64_t loopDuration = loopSettings.endTick - loopSettings.startTick;
-      uint64_t ticksPerColumn = mDrumMachine.CalculatePadDuration(loopDuration);
-
-      mTicksPerColumnLabel->SetLabel(wxString::Format("(%llu ticks/column)", ticksPerColumn));
-  }
-  ```
-- Call from: `OnColumnCountChanged()`, `UpdateFromModel()` (catches loop region changes)
-- Note: `CalculatePadDuration()` may need to be made public or add a getter
-
-**For Option 5 (Mute/Solo Buttons):**
-- Add `bool mIsMuted` to DrumMachine class
-- Add `wxToggleButton* mMuteButton` to DrumMachinePanel header
-- Visual feedback: button pressed state when muted
-- Check mute state in AppModel playback logic
-- Simple implementation:
-  ```cpp
-  // In DrumMachine.h
-  bool IsMuted() const { return mIsMuted; }
-  void SetMuted(bool muted) { mIsMuted = muted; }
-
-  // In DrumMachinePanel
-  void OnMuteToggle(wxCommandEvent& event)
-  {
-      bool isMuted = mMuteButton->GetValue();
-      mDrumMachine.SetMuted(isMuted);
-  }
-
-  // In AppModel.cpp playback logic
-  if (loopSettings.enabled && mDrumMachine.IsEnabled() && !mDrumMachine.IsMuted())
-  {
-      auto drumMessages = PlayDrumMachinePattern(lastTick, currentTick);
-      messages.insert(messages.end(), drumMessages.begin(), drumMessages.end());
-  }
-  ```
-- For solo: Add coordination with SoundBank solo state (more complex)
-- Start with mute only - solo can be added later if needed
-
-**Use Cases:**
-- Adapt to different drum kits (acoustic vs electronic)
-- Use non-standard percussion sounds
-- Map to custom sample libraries
-- Create melodic patterns using pitched instruments
-- Match specific General MIDI or VST drum maps
-- Quickly clear pattern to start fresh (clear button)
-- Experiment with variations without manual pad-by-pad clearing
-- Discover subdivision options through ticks/column display
-- Learn tick-based timing system
-- Create polyrhythms and complex subdivisions (quintuplets, septuplets, etc.)
-- Temporarily disable drum machine during playback (mute button)
-- Keep panel open for editing while silencing output
-- A/B comparison with/without drums
-
-**Benefits:**
-- Flexibility to use any drum configuration
-- Professional DAW feature (FL Studio, Ableton have similar functionality)
-- Quick workflow for setting up custom drum patterns
-- Listen mode reduces trial-and-error (hear before assign)
-- Clear button improves workflow efficiency for pattern creation
-- Reduces repetitive clicking when starting new patterns
-- **Ticks/column display makes variable-resolution design discoverable** - transforms "quirky" into "powerful"
-- Educational - helps users understand MIDI timing and tick system
-- No UI clutter - just informative feedback
-- **Mute button provides essential playback control** - no need to close panel to silence drums
-- Standard mixer-style workflow familiar to all DAW users
-
-**Files to Modify:**
-- `src/Panels/DrumMachine/DrumMachinePanel.h` - Add pitch controls, clear button, ticks/column display, and listen mode
-- `src/AppModel/DrumMachine/DrumMachine.h` - May need to make `CalculatePadDuration()` public
-- `src/AppModel/AppModel.h` - Potentially add listener registration (for listen mode)
-- `src/AppModel/ProjectManager.cpp` - Save/load drum row pitch settings
-- `src/MainFrame/MainFrame.cpp` - Optional keyboard shortcut for clear button
-
-**Notes:**
-The DrumMachine panel was recently added (commit 69b698d). These enhancements would make it significantly more versatile and user-friendly. **Option 4 (ticks/column display) should be implemented first** - it's trivial (just a label) but transforms the user's understanding of the column count feature from "confusing" to "powerful variable-resolution sequencer." The clear button is also simple and provides immediate value, while pitch controls are essential for flexibility, and listen mode is a nice-to-have advanced feature.
-
----
-
 ### #25 - DrumMachine plays even when panel is hidden
 **Status:** Won't Fix
 **Priority:** N/A
@@ -791,6 +537,63 @@ This is related to the overall note separation refactoring using `NOTE_SEPARATIO
 ---
 
 ## Fixed Bugs
+
+### #24 - DrumMachine enhancements (pitch controls, clear button, ticks display)
+**Status:** Fixed
+**Priority:** Medium
+**Found:** 2025-12-28
+**Fixed:** 2025-12-30
+
+**Description:**
+The DrumMachine panel needed several usability improvements: customizable pitches for each row, a quick way to clear all enabled pads, and a display showing ticks per column to make the variable-resolution design discoverable.
+
+**Solution:**
+Implemented three key enhancements:
+
+**1. Pitch Controls (Option 1)** ⭐
+- Added wxSpinCtrl next to each drum row label
+- Range: 0-127 (full MIDI pitch range)
+- Initialized with row's current pitch (GM drum map defaults)
+- Updates immediately when changed
+- Marks pattern as dirty for regeneration
+
+**2. Clear Button (Option 3)** ⭐
+- Added "Clear All" button to top controls row
+- Disables all pads in all rows with single click
+- Calls `DrumMachine::Clear()` and refreshes button colors
+- Provides quick way to start fresh pattern
+
+**3. Ticks Per Column Display (Option 4)** ⭐
+- Added wxStaticText label next to column count spinner
+- Shows calculated ticks per column value
+- Updates when column count or loop region changes
+- Called from constructor, OnColumnCountChanged(), UpdateFromModel(), and loop changed callback
+- Made `CalculatePadDuration()` public in DrumMachine class
+
+**Grid Layout:**
+```
+[Empty] [Pitch] [1] [2] [3] ... [N]  (headers)
+[Kick]  [36▼]   [□] [□] [□] ... [□]  (row with pitch control)
+[Snare] [38▼]   [□] [□] [□] ... [□]
+```
+
+**Files Modified:**
+- `src/Panels/DrumMachine/DrumMachinePanel.h` - Added pitch spinner vector, clear button, ticks label
+- `src/Panels/DrumMachine/DrumMachinePanel.cpp` - Implemented all three features
+- `src/AppModel/DrumMachine/DrumMachine.h` - Added GetPitch/SetPitch, made CalculatePadDuration public
+- `src/MainFrame/MainFrame.cpp` - Added UpdateTicksPerColumnDisplay to loop changed callback
+
+**Benefits:**
+- Users can now adapt drum machine to any drum kit or percussion setup
+- Quick pattern reset with Clear button improves workflow
+- Ticks/column display makes variable-resolution design discoverable and educational
+- Pattern automatically regenerates when pitch changes (via mPatternDirty flag)
+
+**Not Implemented:**
+- Option 2 (MIDI Listen Mode) - Optional advanced feature, not needed for core functionality
+- Option 5 (Mute button) - Already existed in the panel before this bug was filed
+
+---
 
 ### #2 - Closing app very slow
 **Status:** Fixed
