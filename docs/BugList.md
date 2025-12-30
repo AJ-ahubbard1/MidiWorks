@@ -14,30 +14,6 @@ Track bugs and issues discovered during testing of MidiWorks.
 
 ---
 
-### #2 - Closing app very slow
-**Status:** Open
-**Priority:** Medium
-**Found:** 2025-12-17
-
-**Description:**
-Application takes an unusually long time to close when exiting.
-
-**Steps to Reproduce:**
-1. Open MidiWorks
-2. Use the app normally (create/edit notes, playback, etc.)
-3. Close the application via File > Exit or window close button
-
-**Expected Behavior:**
-Application should close promptly (within 1-2 seconds).
-
-**Actual Behavior:**
-Application takes several seconds to close, appearing to hang before finally exiting.
-
-**Notes:**
-May be related to cleanup/destruction of resources (MIDI devices, wxAuiManager, panels, or timer cleanup). Check MainFrame destructor and OnClose event handler.
-
----
-
 
 ### #4 - Remove overlapping notes, move to collision prevention strategy
 **Status:** Open
@@ -65,66 +41,6 @@ Implement collision detection helper and prevent note collisions across all oper
 See `AppModel::MergeOverlappingNotes()` at AppModel.cpp:933. This method should be removed once collision prevention is implemented. Most professional DAWs use a "paste overwrites" behavior for copy-paste collisions.
 
 ---
-
-### #5 - Add multiple note move feature
-**Status:** Open
-**Priority:** High
-**Found:** 2025-12-17
-
-**Description:**
-Currently users can select multiple notes and copy-paste them, but there's no way to move multiple selected notes. This is a fundamental piano roll editing operation.
-
-**Expected Behavior:**
-After selecting multiple notes, user should be able to drag them all together to move them to a new position (changing pitch and/or timing).
-
-**Proposed Solution:**
-Implement multi-note drag operation similar to single note move, but applying the delta to all selected notes. Should use a command pattern (e.g., `MoveMultipleNotesCommand`) for undo/redo support.
-
-**Notes:**
-Should respect collision prevention strategy once bug #4 is implemented.
-
----
-
----
-
-### #8 - Loop recording active note tracking reliability
-**Status:** Open
-**Priority:** High
-**Found:** 2025-12-17
-
-**Description:**
-The loop recording system has complex logic for tracking active notes and auto-closing them at loop boundaries. 
-This complexity introduces several potential failure modes that could result in stuck notes or recording buffer corruption.
-
-**Potential Issues:**
-1. **Active note auto-close at loop end** (AppModel.cpp:124-131) - Could create duplicate note-offs if one is already in buffer
-2. **Recording buffer iterator** (AppModel.cpp:172-186) - Could go out of bounds if buffer is modified during playback
-3. **Mid-loop stop** - If recording stops while notes are still held, are they properly closed?
-4. **Race conditions** - Complex state management between `mActiveNotes`, `mRecordingBuffer`, and `mRecordingBufferIterator`
-
-**Steps to Reproduce:**
-Hard to reproduce reliably, but likely scenarios:
-1. Start loop recording with loop enabled
-2. Hold a note across loop boundary
-3. Stop recording mid-loop while holding notes
-4. Check for stuck notes or corrupted recording buffer
-
-**Expected Behavior:**
-- All note-ons should have matching note-offs
-- No stuck notes should persist after stopping
-- Recording buffer should remain valid and sorted
-
-**Actual Behavior:**
-Potential for stuck notes or buffer corruption under edge cases.
-
-**Proposed Solution:**
-1. Add defensive checks in loop recording logic
-2. Add explicit note cleanup in `StopRecording` state
-3. Add assertions to verify `mRecordingBufferIterator` bounds
-4. Consider simplifying the active note tracking logic
-
-**Notes:**
-See AppModel.cpp:124-154 (auto-close logic) and AppModel.cpp:233-251 (active note tracking in CheckMidiInQueue). This is a critical issue because stuck notes are very noticeable and disruptive to the user experience.
 
 ---
 
@@ -303,6 +219,339 @@ Option 1 (paste to active channel) + ability to paste to multiple record-enabled
 
 **Notes:**
 This is a fundamental DAW workflow feature. See `AppModel::CopyNotesToClipboard()` and `PasteCommand` for current implementation. Consider interaction with bug #5 (multi-note move).
+
+---
+
+### #24 - DrumMachine rows should allow pitch modification
+**Status:** Open
+**Priority:** Medium
+**Found:** 2025-12-28
+
+**Description:**
+The DrumMachine panel needs several usability improvements: customizable pitches for each row and a quick way to clear all enabled pads.
+
+**Current Limitations:**
+- Drum rows have hardcoded pitches
+- No way to change which drum sound is triggered by each row
+- Users can't adapt the DrumMachine to different drum kits or percussion setups
+- No quick way to clear all enabled pads (reset pattern)
+
+**Proposed Solutions:**
+
+**Option 1: Simple - Pitch Value Control** ⭐
+- Add a numeric spin control (wxSpinCtrl) next to each drum row
+- Range: 0-127 (full MIDI pitch range)
+- Default: GM drum map standard pitches (kick=36, snare=38, hi-hat=42, etc.)
+- Updates immediately when changed
+- Saves with project file
+
+**UI Mockup:**
+```
+[Row 0] [Pitch: 36 ▼] [████░░░░░░░░░░░░] (Kick)
+[Row 1] [Pitch: 38 ▼] [░░░░████░░░░░░░░] (Snare)
+[Row 2] [Pitch: 42 ▼] [░░████░░████░░░░] (Hi-hat)
+```
+
+**Option 2: Advanced - MIDI "Listen" Mode**
+- Add "Listen" checkbox/button next to each row
+- When enabled, clicking activates listen mode for that row
+- User plays note on MIDI keyboard → both:
+  1. Previews the sound (plays immediately)
+  2. Sets that pitch for the drum row
+- Visual feedback: row highlights while in listen mode
+- Auto-exits listen mode after pitch is captured
+
+**UI Mockup:**
+```
+[Row 0] [🎹 Listen] [Pitch: 36] [████░░░░░░░░░░░░] (Kick)
+[Row 1] [🎹 Listen] [Pitch: 38] [░░░░████░░░░░░░░] (Snare)  ← Active
+```
+
+**Option 3: Clear Button** ⭐
+- Add a "Clear" button to the DrumMachine panel (likely in header/toolbar)
+- Clicking the button sets all pad enabled states to false
+- Provides quick way to start a new pattern from scratch
+- Alternative names: "Clear All", "Reset Pattern", "Clear Pads"
+- Optional: Add confirmation dialog if pattern is not empty
+- Could also add as keyboard shortcut (e.g., Ctrl+Delete)
+
+**UI Mockup:**
+```
+DrumMachine Panel
+[Clear] [▶ Play]
+[Row 0] [Pitch: 36] [████░░░░░░░░░░░░] (Kick)
+[Row 1] [Pitch: 38] [░░░░████░░░░░░░░] (Snare)
+                         ↓ After clicking Clear
+[Row 0] [Pitch: 36] [░░░░░░░░░░░░░░░░] (Kick)
+[Row 1] [Pitch: 38] [░░░░░░░░░░░░░░░░] (Snare)
+```
+
+**Option 4: Display Ticks Per Column** ⭐
+- Add a read-only label showing calculated ticks per column
+- Updates automatically when column count or loop region changes
+- Makes subdivision flexibility discoverable to users
+- Helps users understand the relationship between columns and grid resolution
+- Educational - teaches how the tick system works
+
+**UI Mockup:**
+```
+DrumMachine Panel
+Columns: [16 ▼]    (240 ticks/column)
+                    ↑ Updates dynamically
+
+Examples based on 1 measure loop (3840 ticks):
+Columns: [16]  → 240 ticks/column  (16th notes)
+Columns: [12]  → 320 ticks/column  (triplets)
+Columns: [10]  → 384 ticks/column  (quintuplets)
+Columns: [32]  → 120 ticks/column  (32nd notes)
+```
+
+**Why This Matters:**
+The DrumMachine's adjustable column count is actually a **variable-resolution sequencer** - more powerful than traditional fixed subdivision modes. By showing ticks/column, users discover they can create:
+- Standard subdivisions (16ths, 8ths, 32nds)
+- Triplets (12 columns = 3 per beat)
+- Quintuplets (10 columns = 5 per measure)
+- Any polyrhythm imaginable
+
+This simple display makes the "quirky" design feel intentional and powerful rather than confusing.
+
+**Option 5: Mute/Solo Buttons** ⭐
+- Add mute and/or solo toggle buttons to DrumMachine panel header
+- Allows disabling playback without closing the panel
+- Keeps panel visible for editing while silencing output
+- Similar to channel mute/solo in mixer
+
+**UI Mockup:**
+```
+DrumMachine Panel
+[Mute] [Solo] [Clear] Columns: [16 ▼] (240 ticks/column)
+[Row 0] [Pitch: 36] [████░░░░░░░░░░░░] (Kick)
+[Row 1] [Pitch: 38] [░░░░████░░░░░░░░] (Snare)
+```
+
+**Implementation Options:**
+
+**Simple: Mute Only**
+- Single mute button (toggle)
+- When muted, pattern doesn't play
+- Visual feedback: button highlighted when muted
+- Pattern continues to update internally (ready when unmuted)
+
+**Advanced: Mute + Solo**
+- Mute button: Disable this drum machine
+- Solo button: Mute all other tracks, play only drum machine
+- Solo logic similar to SoundBank solo behavior
+- Requires coordination with SoundBank solo state
+
+**Recommended Approach:**
+Implement all five features - they complement each other well:
+- **Option 4** (ticks/column display) - Trivial to implement, makes design discoverable
+- **Option 5** (mute button) - Simple, essential playback control
+- **Option 3** (clear button) - Simple to implement, high usability value
+- **Option 1** (pitch control) - Essential, provides immediate value
+- **Option 2** (listen mode) - Optional enhancement for advanced workflow
+
+Priority order: Option 4 → Option 5 (mute only) → Option 3 → Option 1 → Option 2
+
+**Implementation Notes:**
+
+**For Option 1 (Pitch Control):**
+- Add `ubyte pitch` field to drum row data structure
+- Add `wxSpinCtrl` to each DrumMachineRow UI component
+- Range: 0-127, default to GM drum map
+- Store in project file (save/load)
+- Update note generation to use row's pitch value
+
+**For Option 2 (Listen Mode):**
+- Add "listen mode" state to DrumMachinePanel
+- Add `bool isListening` flag to each row
+- Hook into `AppModel::HandleIncomingMidi()` or add listener callback
+- When in listen mode and MIDI note received:
+  - Call `AppModel::PlayPreviewNote(pitch)` for audio feedback
+  - Update row pitch value
+  - Exit listen mode
+- Visual indication: highlight row border/background during listen
+
+**For Option 3 (Clear Button):**
+- Add `wxButton` to DrumMachinePanel header/toolbar area
+- Label: "Clear" or "Clear All"
+- On click event: Iterate through all rows and set `enabled = false` for all pads
+- Simple implementation:
+  ```cpp
+  void OnClear(wxCommandEvent& event)
+  {
+      for (auto& row : mDrumRows)
+      {
+          row.ClearAllPads();  // Sets all enabled[] to false
+      }
+      Refresh();  // Redraw the panel
+  }
+  ```
+- Optional: Add keyboard shortcut binding in MainFrame
+
+**For Option 4 (Ticks Per Column Display):**
+- Add `wxStaticText* mTicksPerColumnLabel` to DrumMachinePanel
+- Position next to column count spinner
+- Update whenever column count or loop region changes
+- Uses existing `CalculatePadDuration()` method from DrumMachine class
+- Simple implementation:
+  ```cpp
+  void UpdateTicksPerColumnDisplay()
+  {
+      auto loopSettings = mTransport.GetLoopSettings();
+      uint64_t loopDuration = loopSettings.endTick - loopSettings.startTick;
+      uint64_t ticksPerColumn = mDrumMachine.CalculatePadDuration(loopDuration);
+
+      mTicksPerColumnLabel->SetLabel(wxString::Format("(%llu ticks/column)", ticksPerColumn));
+  }
+  ```
+- Call from: `OnColumnCountChanged()`, `UpdateFromModel()` (catches loop region changes)
+- Note: `CalculatePadDuration()` may need to be made public or add a getter
+
+**For Option 5 (Mute/Solo Buttons):**
+- Add `bool mIsMuted` to DrumMachine class
+- Add `wxToggleButton* mMuteButton` to DrumMachinePanel header
+- Visual feedback: button pressed state when muted
+- Check mute state in AppModel playback logic
+- Simple implementation:
+  ```cpp
+  // In DrumMachine.h
+  bool IsMuted() const { return mIsMuted; }
+  void SetMuted(bool muted) { mIsMuted = muted; }
+
+  // In DrumMachinePanel
+  void OnMuteToggle(wxCommandEvent& event)
+  {
+      bool isMuted = mMuteButton->GetValue();
+      mDrumMachine.SetMuted(isMuted);
+  }
+
+  // In AppModel.cpp playback logic
+  if (loopSettings.enabled && mDrumMachine.IsEnabled() && !mDrumMachine.IsMuted())
+  {
+      auto drumMessages = PlayDrumMachinePattern(lastTick, currentTick);
+      messages.insert(messages.end(), drumMessages.begin(), drumMessages.end());
+  }
+  ```
+- For solo: Add coordination with SoundBank solo state (more complex)
+- Start with mute only - solo can be added later if needed
+
+**Use Cases:**
+- Adapt to different drum kits (acoustic vs electronic)
+- Use non-standard percussion sounds
+- Map to custom sample libraries
+- Create melodic patterns using pitched instruments
+- Match specific General MIDI or VST drum maps
+- Quickly clear pattern to start fresh (clear button)
+- Experiment with variations without manual pad-by-pad clearing
+- Discover subdivision options through ticks/column display
+- Learn tick-based timing system
+- Create polyrhythms and complex subdivisions (quintuplets, septuplets, etc.)
+- Temporarily disable drum machine during playback (mute button)
+- Keep panel open for editing while silencing output
+- A/B comparison with/without drums
+
+**Benefits:**
+- Flexibility to use any drum configuration
+- Professional DAW feature (FL Studio, Ableton have similar functionality)
+- Quick workflow for setting up custom drum patterns
+- Listen mode reduces trial-and-error (hear before assign)
+- Clear button improves workflow efficiency for pattern creation
+- Reduces repetitive clicking when starting new patterns
+- **Ticks/column display makes variable-resolution design discoverable** - transforms "quirky" into "powerful"
+- Educational - helps users understand MIDI timing and tick system
+- No UI clutter - just informative feedback
+- **Mute button provides essential playback control** - no need to close panel to silence drums
+- Standard mixer-style workflow familiar to all DAW users
+
+**Files to Modify:**
+- `src/Panels/DrumMachine/DrumMachinePanel.h` - Add pitch controls, clear button, ticks/column display, and listen mode
+- `src/AppModel/DrumMachine/DrumMachine.h` - May need to make `CalculatePadDuration()` public
+- `src/AppModel/AppModel.h` - Potentially add listener registration (for listen mode)
+- `src/AppModel/ProjectManager.cpp` - Save/load drum row pitch settings
+- `src/MainFrame/MainFrame.cpp` - Optional keyboard shortcut for clear button
+
+**Notes:**
+The DrumMachine panel was recently added (commit 69b698d). These enhancements would make it significantly more versatile and user-friendly. **Option 4 (ticks/column display) should be implemented first** - it's trivial (just a label) but transforms the user's understanding of the column count feature from "confusing" to "powerful variable-resolution sequencer." The clear button is also simple and provides immediate value, while pitch controls are essential for flexibility, and listen mode is a nice-to-have advanced feature.
+
+---
+
+### #25 - DrumMachine plays even when panel is hidden
+**Status:** Open
+**Priority:** Medium
+**Found:** 2025-12-28
+
+**Description:**
+The DrumMachine pattern plays back during loop playback even when the DrumMachine panel is not visible. This wastes CPU cycles and can cause confusion when users hear drum sounds but don't see the drum machine panel open.
+
+**Current Behavior:**
+- DrumMachine generates pattern and adds to playback regardless of panel visibility
+- Pattern plays during loop playback even if panel is closed/hidden
+- No visual feedback to indicate drum machine is active when panel is hidden
+
+**Expected Behavior:**
+- DrumMachine should only play when panel is visible
+- When panel is hidden/closed, drum pattern should not be added to playback
+- Alternatively: Add visual indicator (in transport or status bar) when drum machine is active
+
+**Proposed Solutions:**
+
+**Option 1: Check Panel Visibility Before Playback** ⭐
+- Check if DrumMachinePanel is visible before adding pattern to playback
+- Use wxWindow::IsShown() to determine visibility
+- Simple conditional in playback logic
+
+**Implementation:**
+```cpp
+// In AppModel or wherever drum pattern is added to playback
+if (mDrumMachinePanel && mDrumMachinePanel->IsShown())
+{
+    // Add drum machine pattern to playback
+    const Track& pattern = mDrumMachine.GetPattern();
+    // ... playback logic
+}
+```
+
+**Option 2: Link to AUI Pane Visibility**
+- Check AuiManager pane visibility state
+- Works with dockable panel system
+- More robust for complex layouts
+
+**Implementation:**
+```cpp
+// In MainFrame or AppModel
+wxAuiPaneInfo& paneInfo = mAuiManager.GetPane("DrumMachine");
+if (paneInfo.IsOk() && paneInfo.IsShown())
+{
+    // Play drum machine pattern
+}
+```
+
+**Option 3: Add Enable/Disable Toggle**
+- Add checkbox/button to enable/disable drum machine playback
+- Independent of panel visibility
+- Allows users to keep panel open but disable playback
+- Similar to mute/solo in mixer
+
+**Recommended Approach:**
+Combine Option 1 and Option 3:
+- Check panel visibility by default (automatic)
+- Add optional "Enable" toggle for explicit control
+- Best of both worlds: automatic behavior + manual override
+
+**Benefits:**
+- Reduces CPU usage when drum machine is not in use
+- Prevents confusion from "phantom" drum sounds
+- Cleaner separation of concerns (panel visibility → playback state)
+- More intuitive user experience
+
+**Files to Modify:**
+- `src/AppModel/AppModel.cpp` - Add visibility check in playback logic
+- `src/Panels/DrumMachine/DrumMachinePanel.h` - Potentially add enable toggle
+- `src/MainFrame/MainFrame.h` - Access to AUI pane info if using Option 2
+
+**Notes:**
+This is similar to how DAWs handle track arming - only record-enabled tracks participate in recording. The drum machine should only participate in playback when it's actively being used (panel visible) or explicitly enabled.
 
 ---
 
@@ -589,6 +838,31 @@ This is related to the overall note separation refactoring using `NOTE_SEPARATIO
 ---
 
 ## Fixed Bugs
+
+### #2 - Closing app very slow
+**Status:** Fixed
+**Priority:** Medium
+**Found:** 2025-12-17
+**Fixed:** 2025-12-29
+
+**Description:**
+Application took an unusually long time to close when exiting, appearing to hang for several seconds before finally exiting.
+
+**Root Cause:**
+MainFrame's update timer (`mTimer`) fires every 1ms and calls `MidiCanvasPanel->Update()`, which triggers `Refresh()` and repaints. During app shutdown, the timer continued running while panels were being destroyed, causing hundreds of paint operations on dying widgets. This created a significant delay during the destruction process.
+
+**Solution:**
+Added `mTimer.Stop()` in `MainFrame::OnClose()` before panels are destroyed (MainFrameEventHandlers.cpp:281). This prevents the timer from firing during shutdown, eliminating the repeated paint operations that were causing the slowdown.
+
+**Files Modified:**
+- `src/MainFrame/MainFrameEventHandlers.cpp` - Added timer stop in OnClose handler
+
+**Benefits:**
+- Application now closes instantly (< 1 second)
+- Clean shutdown without redundant UI updates
+- Prevents potential crashes from updating destroyed widgets
+
+---
 
 ### #21 - Quantize can create overlapping or zero-length notes
 **Status:** Fixed
@@ -1198,6 +1472,126 @@ Loop region did not render on the canvas when loop start was at tick 0 and loop 
 Removed early return logic in `DrawLoopRegion()` (MidiCanvas.cpp:393) that was preventing the loop region from being drawn. The method was exiting prematurely before rendering the loop overlay, which blocked the draw loop from executing under certain boundary conditions.
 
 The fix ensures the loop region is now properly rendered as a semi-transparent overlay whenever loop mode is enabled, regardless of the loop start/end tick positions.
+
+---
+
+### #5 - Add multiple note move feature
+**Status:** Fixed
+**Priority:** High
+**Found:** 2025-12-17
+**Fixed:** 2025-12-28
+
+**Description:**
+Users could select multiple notes and copy-paste them, but there was no way to move multiple selected notes together. This is a fundamental piano roll editing operation present in all professional DAWs.
+
+**Solution:**
+Implemented comprehensive multi-note drag-and-drop system:
+
+**1. Created MoveMultipleNotesCommand** (Commands/MoveMultipleNotesCommand.h)
+- Applies tick delta and pitch delta to all selected notes simultaneously
+- Stores original positions for undo capability
+- Handles pitch clamping (0-127) and negative tick protection
+- Efficiently sorts affected tracks after move
+
+**2. Extended NoteEditor with multi-note support** (AppModel/NoteEditor/)
+- Added `CreateMoveMultipleNotes()` - Creates batch move command
+- Added `MultiNoteEditPreview` struct for drag preview state
+- Added `SetMultipleNotesMovePreview()`, `GetMultiNoteEditPreview()`, `HasMultiNoteEditPreview()`
+
+**3. Added AppModel wrapper methods** (AppModel/)
+- `MoveMultipleNotes()` - Executes multi-note move command
+- `SetMultipleNotesMovePreview()` - Sets preview state during drag
+- `GetMultiNoteEditPreview()`, `HasMultiNoteEditPreview()` - Preview accessors
+
+**4. Updated MidiCanvas event handlers** (Panels/MidiCanvas/)
+- Added `MouseMode::MovingMultipleNotes` state
+- Modified `OnLeftDown()` - Detects when clicked note is part of selection, starts multi-note move
+- Modified `OnMouseMove()` - Calculates tick/pitch delta during drag, updates preview
+- Modified `OnLeftUp()` - Finalizes multi-note move using preview delta
+- Updated `DrawNoteEditPreview()` - Renders preview for all selected notes during drag
+
+**5. Fixed uint64_t underflow bug** (bonus fix during implementation)
+- `ScreenXToTick()` - Added bounds checking to prevent negative coordinates from wrapping to huge positive values
+- This fixed multi-select rectangle extending past tick 0 incorrectly selecting all notes
+
+**Usage:**
+1. Select multiple notes using rectangle selection (Shift + drag) or Ctrl+A
+2. Click on any selected note (not on resize edge)
+3. Drag to move all selected notes together
+4. Release to commit the move (or Ctrl+Z to undo)
+
+**Technical Details:**
+- Preserves note durations during move
+- Clamps pitch to valid MIDI range (0-127)
+- Prevents negative tick values (clamps to 0)
+- Maintains track separation (notes stay in their original channels)
+- Full undo/redo support via command pattern
+- Real-time visual preview with semi-transparent overlay
+- Efficient batch operation (single command for all notes)
+
+**Files Modified:**
+- `src/Commands/MoveMultipleNotesCommand.h` (new)
+- `src/AppModel/NoteEditor/NoteEditor.h/cpp`
+- `src/AppModel/AppModel.h/cpp`
+- `src/Panels/MidiCanvas/MidiCanvas.h`
+- `src/Panels/MidiCanvas/MidiCanvas.cpp` (ScreenXToTick fix + preview drawing)
+- `src/Panels/MidiCanvas/MidiCanvasEventHandlers.cpp`
+
+**Benefits:**
+- Fundamental DAW workflow now available
+- Massive productivity improvement for editing multi-note patterns
+- Consistent with single-note move behavior
+- Professional-grade editing experience
+
+---
+
+### #8 - Loop recording active note tracking reliability
+**Status:** Fixed
+**Priority:** High
+**Found:** 2025-12-17
+**Fixed:** 2025-12-28
+
+**Description:**
+The loop recording system had complex logic for tracking active notes and auto-closing them at loop boundaries. This complexity introduced potential failure modes including duplicate note-offs, buffer corruption, stuck notes, and race conditions in state management.
+
+**Solution:**
+The reliability issues were resolved through comprehensive RecordingSession refactoring (implemented as part of bug #23 fix):
+
+**1. Extended ActiveNote struct with velocity tracking** (RecordingSession.h:36-41)
+- Added `velocity` field to enable proper note recreation across loop boundaries
+- Allows reopening notes with original velocity after loop wrap
+
+**2. Renamed and enhanced CloseAllActiveNotes → WrapActiveNotesAtLoop**
+- Method now properly handles notes held across loop boundaries
+- Closes note at loop end AND reopens at loop start (user still holding key)
+- Updates active note start tick for eventual release
+- Prevents orphaned Note Off events
+
+**3. Improved operation ordering** (AppModel.cpp:336-342)
+- `SeparateOverlappingNotes()` runs BEFORE `WrapActiveNotesAtLoop()`
+- Prevents overlap detection from incorrectly processing synthetic wrap events
+
+**4. Simplified active note tracking** (RecordingSession.cpp)
+- Used helper methods: `isNoteOn()`, `isNoteOff()`, `getPitch()`, `getVelocity()`
+- Cleaner code with better maintainability
+- RecordingSession owns all recording concerns (proper encapsulation)
+
+**Results:**
+- ✓ No duplicate note-offs - wrap logic handles loop boundaries correctly
+- ✓ Active notes properly managed across loop boundaries
+- ✓ Notes held during mid-loop stop are properly tracked
+- ✓ Clean state management with RecordingSession owning recording logic
+- ✓ All note-ons have matching note-offs
+- ✓ No stuck notes or buffer corruption
+
+**Files Modified:**
+- `src/RtMidiWrapper/MidiMessage/MidiMessage.h` - Added `getVelocity()` helper
+- `src/AppModel/RecordingSession/RecordingSession.h` - Extended `ActiveNote` struct
+- `src/AppModel/RecordingSession/RecordingSession.cpp` - Implemented `WrapActiveNotesAtLoop()`
+- `src/AppModel/AppModel.cpp` - Updated call site and operation ordering
+
+**Related:**
+This fix was implemented as part of bug #23 (Loop recording creates orphaned Note Off events for held notes).
 
 ---
 

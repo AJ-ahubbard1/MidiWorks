@@ -5,13 +5,15 @@
 
 // TIMER EVENTS
 
-// Update the App Model then necessary panels
+// Update the App Model, then necessary panels
+// Updates here should be reserved for Real-time, Continuous Data
+// Opt for event-driven callbacks for discrete state changes, every millisecond matters!
 void MainFrame::OnTimer(wxTimerEvent&)
 {
 	mAppModel->Update();
-	mTransportPanel->UpdateDisplay();
+	mTransportPanel->Update(); // Update the tick display 
 	mMidiCanvasPanel->Update();
-	// Note: Logging now handled via callback - no polling needed
+	// Note: Logging and drum machine updates now handled via callbacks - no polling needed, see MainFrame::CreateCallbackFunctions()
 }
 
 // VIEW / PANEL MANAGEMENT EVENTS
@@ -41,6 +43,9 @@ void MainFrame::OnTogglePane(wxCommandEvent& event)
 void MainFrame::OnPaneClosed(wxAuiManagerEvent& event)
 {
 	wxString name = event.GetPane()->name;
+	ClosePane(name);
+	/*
+	wxString name = event.GetPane()->name;
 
 	for (const auto& [id, info] : GetAllPanels())
 	{
@@ -51,7 +56,23 @@ void MainFrame::OnPaneClosed(wxAuiManagerEvent& event)
 			break;
 		}
 	}
+	*/
 }
+
+void MainFrame::ClosePane(const wxString& paneName)
+{
+
+	for (const auto& [id, info] : GetAllPanels())
+	{
+		if (info.name == paneName)
+		{
+			GetMenuBar()->Check(id, false);
+			SetPanelVisibility(id, false);
+			break;
+		}
+	}
+}
+
 
 // Debug display for layout
 // when docked panes are resized, the dimensions are shown in controlbar
@@ -250,11 +271,15 @@ void MainFrame::OnExit(wxCommandEvent& event)
 // Window close event (X button or Close() call)
 void MainFrame::OnClose(wxCloseEvent& event)
 {
-	if (PromptForUnsavedChanges() == UnsavedChangesAction::Cancel) 
+	if (PromptForUnsavedChanges() == UnsavedChangesAction::Cancel)
 	{
 		event.Veto();  	// Cancel the close
 		return;
 	}
+
+	// Stop the timer before destroying panels to prevent slow shutdown
+	mTimer.Stop();
+
 	event.Skip(); 		// Allow the window to close
 }
 
@@ -282,4 +307,34 @@ void MainFrame::OnPreviousMeasure(wxCommandEvent& event)
 void MainFrame::OnNextMeasure(wxCommandEvent& event)
 {
 	mAppModel->GetTransport().JumpToNextMeasure();
+}
+
+// DRUM PAD TRIGGER EVENTS
+
+// Trigger drum pad via keyboard (1-0 keys map to rows 0-9)
+void MainFrame::OnDrumPad(wxCommandEvent& event)
+{
+	int eventId = event.GetId();
+	int rowIndex = -1;
+
+	// Map event ID to drum row index
+	if (eventId >= ID_KEYBOARD_DRUM_PAD_1 && eventId <= ID_KEYBOARD_DRUM_PAD_9)
+	{
+		rowIndex = eventId - ID_KEYBOARD_DRUM_PAD_1;  // 1-9 = rows 0-8
+	}
+	else if (eventId == ID_KEYBOARD_DRUM_PAD_0)
+	{
+		rowIndex = 9;  // 0 = row 9
+	}
+
+	if (rowIndex >= 0)
+	{
+		int columnIndex = mAppModel->TriggerDrumPad(rowIndex);
+
+		// Update pad button color if a pad was enabled during loop playback
+		if (columnIndex >= 0 && mDrumMachinePanel)
+		{
+			mDrumMachinePanel->RefreshPadButtonColor(rowIndex, columnIndex);
+		}
+	}
 }

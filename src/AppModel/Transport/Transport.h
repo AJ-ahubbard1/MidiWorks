@@ -1,6 +1,7 @@
 #pragma once
 #include "wx/string.h"
 #include "MidiConstants.h"
+#include <functional>
 
 class Transport
 {
@@ -81,7 +82,9 @@ public:
 	uint64_t GetTicksPerBeat() const;
 	uint64_t GetTicksPerMeasure() const;
 
-	
+	// Callback for loop settings changes
+	using LoopChangedCallback = std::function<void()>;
+	void SetLoopChangedCallback(LoopChangedCallback callback) { mLoopChangedCallback = callback; }
 
 private:
 	State			mState = State::Stopped;
@@ -95,5 +98,7 @@ private:
 	const double	MAX_SHIFT_SPEED = 500.0;
 	double			mShiftSpeed = DEFAULT_SHIFT_SPEED;
 	double			mShiftAccel = 1.01;
+
+	LoopChangedCallback mLoopChangedCallback;
 };
 

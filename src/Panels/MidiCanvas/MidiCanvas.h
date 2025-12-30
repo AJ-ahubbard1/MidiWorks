@@ -48,6 +48,7 @@ private:
 		Idle,
 		Adding,
 		MovingNote,
+		MovingMultipleNotes,
 		ResizingNote,
 		DraggingLoopStart,
 		DraggingLoopEnd
@@ -71,6 +72,7 @@ private:
 	uint64_t mOriginalEndTick = 0;
 	ubyte mOriginalPitch = 0;
 	wxPoint mDragStartPos;       // Mouse position when drag started
+	std::vector<NoteLocation> mOriginalSelectedNotes;  // Original positions for multi-note move
 	uint64_t mPreviewStartTick = 0;  // Note creation preview (UI state for visual feedback during drag)
 
 	// ========== Debug MIDI Events State ==========

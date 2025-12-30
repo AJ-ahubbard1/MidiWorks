@@ -43,21 +43,43 @@ void Transport::SetBeatSettings(const BeatSettings& settings) { mBeatSettings = 
 
 // Loop control
 Transport::LoopSettings Transport::GetLoopSettings() const { return mLoopSettings; }
-void Transport::SetLoopSettings(const LoopSettings& settings) { mLoopSettings = settings; }
+
+void Transport::SetLoopSettings(const LoopSettings& settings)
+{
+	bool changed = (mLoopSettings.startTick != settings.startTick ||
+	                mLoopSettings.endTick != settings.endTick);
+
+	mLoopSettings = settings;
+
+	if (changed && mLoopChangedCallback)
+	{
+		mLoopChangedCallback();
+	}
+}
 
 void Transport::SetLoopStart(uint64_t tick)
 {
-	if (tick < mLoopSettings.endTick)
+	if (tick < mLoopSettings.endTick && tick != mLoopSettings.startTick)
 	{
 		mLoopSettings.startTick = tick;
+
+		if (mLoopChangedCallback)
+		{
+			mLoopChangedCallback();
+		}
 	}
 }
 
 void Transport::SetLoopEnd(uint64_t tick)
 {
-	if (tick > mLoopSettings.startTick)
+	if (tick > mLoopSettings.startTick && tick != mLoopSettings.endTick)
 	{
 		mLoopSettings.endTick = tick;
+
+		if (mLoopChangedCallback)
+		{
+			mLoopChangedCallback();
+		}
 	}
 }
 

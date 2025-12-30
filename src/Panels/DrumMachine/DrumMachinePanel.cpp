@@ -14,6 +14,10 @@ DrumMachinePanel::DrumMachinePanel(wxWindow* parent, std::shared_ptr<AppModel> a
 
 void DrumMachinePanel::CreateControls()
 {
+	// Mute checkbox
+	mMuteCheckBox = new wxCheckBox(this, wxID_ANY, "Mute");
+	mMuteCheckBox->SetValue(mDrumMachine.IsMuted());
+
 	// Column count spinner
 	mColumnCountSpinner = new wxSpinCtrl(this, wxID_ANY, "16",
 		wxDefaultPosition, wxSize(60, -1));
@@ -47,6 +51,7 @@ void DrumMachinePanel::SetupSizers()
 
 	// Top controls row
 	wxBoxSizer* topSizer = new wxBoxSizer(wxHORIZONTAL);
+	topSizer->Add(mMuteCheckBox, wxSizerFlags().CenterVertical().Border(wxRIGHT, 15));
 	topSizer->Add(new wxStaticText(this, wxID_ANY, "Columns:"), wxSizerFlags().CenterVertical().Border(wxRIGHT, 5));
 	topSizer->Add(mColumnCountSpinner, wxSizerFlags().Border(wxRIGHT, 15));
 	topSizer->Add(new wxStaticText(this, wxID_ANY, "Channel:"), wxSizerFlags().CenterVertical().Border(wxRIGHT, 5));
@@ -72,6 +77,7 @@ void DrumMachinePanel::SetupSizers()
 
 void DrumMachinePanel::BindEventHandlers()
 {
+	mMuteCheckBox->Bind(wxEVT_CHECKBOX, &DrumMachinePanel::OnMuteToggle, this);
 	mColumnCountSpinner->Bind(wxEVT_SPINCTRL, &DrumMachinePanel::OnColumnCountChanged, this);
 	mChannelChoice->Bind(wxEVT_CHOICE, &DrumMachinePanel::OnChannelChanged, this);
 	mAddRowButton->Bind(wxEVT_BUTTON, &DrumMachinePanel::OnAddRow, this);
@@ -130,7 +136,18 @@ void DrumMachinePanel::RebuildGrid()
 			}
 			else
 			{
-				padButton->SetBackgroundColour(wxColour(80, 80, 80));     // Dark gray when disabled
+				// Check if column lands on a measure boundary
+				uint64_t ticksPerMeasure = mTransport.GetTicksPerMeasure();
+				bool isOnMeasure = mDrumMachine.IsColumnOnMeasure(col, ticksPerMeasure);
+
+				if (isOnMeasure)
+				{
+					padButton->SetBackgroundColour(wxColour(140, 140, 140));  // Much lighter gray on measure
+				}
+				else
+				{
+					padButton->SetBackgroundColour(wxColour(80, 80, 80));     // Dark gray otherwise
+				}
 			}
 
 			// Store row/column indices as client data for event handling
@@ -154,6 +171,12 @@ void DrumMachinePanel::RebuildGrid()
 	Layout();
 }
 
+void DrumMachinePanel::OnMuteToggle(wxCommandEvent& event)
+{
+	bool isMuted = mMuteCheckBox->GetValue();
+	mDrumMachine.SetMuted(isMuted);
+}
+
 void DrumMachinePanel::OnPadToggle(wxCommandEvent& event)
 {
 	wxButton* button = static_cast<wxButton*>(event.GetEventObject());
@@ -174,7 +197,18 @@ void DrumMachinePanel::OnPadToggle(wxCommandEvent& event)
 	}
 	else
 	{
-		button->SetBackgroundColour(wxColour(80, 80, 80));     // Dark gray when disabled
+		// Check if column lands on a measure boundary
+		uint64_t ticksPerMeasure = mTransport.GetTicksPerMeasure();
+		bool isOnMeasure = mDrumMachine.IsColumnOnMeasure(col, ticksPerMeasure);
+
+		if (isOnMeasure)
+		{
+			button->SetBackgroundColour(wxColour(140, 140, 140));  // Much lighter gray on measure
+		}
+		else
+		{
+			button->SetBackgroundColour(wxColour(80, 80, 80));     // Dark gray otherwise
+		}
 	}
 	button->Refresh();  // Force button to redraw with new color
 }
@@ -221,8 +255,53 @@ void DrumMachinePanel::OnRecordToTrack(wxCommandEvent& event)
 void DrumMachinePanel::UpdateFromModel()
 {
 	// Sync UI with loaded pattern
+	mMuteCheckBox->SetValue(mDrumMachine.IsMuted());
 	mColumnCountSpinner->SetValue(mDrumMachine.GetColumnCount());
 	mChannelChoice->SetSelection(mDrumMachine.GetChannel());
 	mRecordButton->SetLabel(wxString::Format("Record to Channel %d", mDrumMachine.GetChannel() + 1));
 	RebuildGrid();
+}
+
+void DrumMachinePanel::RefreshPadButtonColor(size_t rowIndex, size_t columnIndex)
+{
+	// Validate indices
+	if (rowIndex >= mPadButtons.size() || columnIndex >= mPadButtons[rowIndex].size())
+		return;
+
+	wxButton* button = mPadButtons[rowIndex][columnIndex];
+	if (!button) return;
+
+	// Update color based on enabled state
+	if (mDrumMachine.IsPadEnabled(rowIndex, columnIndex))
+	{
+		button->SetBackgroundColour(wxColour(100, 200, 100));  // Green when enabled
+	}
+	else
+	{
+		// Check if column lands on a measure boundary
+		uint64_t ticksPerMeasure = mTransport.GetTicksPerMeasure();
+		bool isOnMeasure = mDrumMachine.IsColumnOnMeasure(columnIndex, ticksPerMeasure);
+
+		if (isOnMeasure)
+		{
+			button->SetBackgroundColour(wxColour(140, 140, 140));  // Lighter gray on measure
+		}
+		else
+		{
+			button->SetBackgroundColour(wxColour(80, 80, 80));  // Dark gray otherwise
+		}
+	}
+	button->Refresh();  // Force button to redraw
+}
+
+void DrumMachinePanel::RefreshAllPadButtonColors()
+{
+	// Iterate through all pad buttons and refresh their colors
+	for (size_t row = 0; row < mPadButtons.size(); ++row)
+	{
+		for (size_t col = 0; col < mPadButtons[row].size(); ++col)
+		{
+			RefreshPadButtonColor(row, col);
+		}
+	}
 }

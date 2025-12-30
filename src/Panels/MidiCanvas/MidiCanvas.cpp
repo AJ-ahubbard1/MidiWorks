@@ -157,7 +157,16 @@ int MidiCanvasPanel::FlipY(int y) const
 uint64_t MidiCanvasPanel::ScreenXToTick(int screenX) const
 {
 	int x = screenX - mOriginOffset.x;
-	return x * mTicksPerPixel;
+
+	// Prevent negative coordinates from causing uint64_t underflow
+	if (x < 0) return 0;
+
+	uint64_t tick = static_cast<uint64_t>(x) * mTicksPerPixel;
+
+	// Clamp to MAX_TICK_VALUE to prevent overflow (also catches any underflow edge cases)
+	if (tick > MidiConstants::MAX_TICK_VALUE) return 0;
+
+	return tick;
 }
 
 ubyte MidiCanvasPanel::ScreenYToPitch(int screenY) const
@@ -451,28 +460,66 @@ void MidiCanvasPanel::DrawNoteAddPreview(wxGraphicsContext* gc)
 
 void MidiCanvasPanel::DrawNoteEditPreview(wxGraphicsContext* gc)
 {
-	if (!mAppModel->HasNoteEditPreview()) return;
+	// Draw single note preview
+	if (mAppModel->HasNoteEditPreview())
+	{
+		const auto& preview = mAppModel->GetNoteEditPreview();
+		const auto& originalNote = preview.originalNote;
 
-	const auto& preview = mAppModel->GetNoteEditPreview();
-	const auto& originalNote = preview.originalNote;
+		// Determine color based on track (match original note color with transparency)
+		wxColour previewColor = TRACK_COLORS[originalNote.trackIndex];
+		previewColor.Set(
+			previewColor.Red(),
+			previewColor.Green(),
+			previewColor.Blue(),
+			NOTE_EDIT_PREVIEW_ALPHA
+		);
 
-	// Determine color based on track (match original note color with transparency)
-	wxColour previewColor = TRACK_COLORS[originalNote.trackIndex];
-	previewColor.Set(
-		previewColor.Red(),
-		previewColor.Green(),
-		previewColor.Blue(),
-		NOTE_EDIT_PREVIEW_ALPHA
-	);
+		gc->SetBrush(wxBrush(previewColor));
+		gc->SetPen(wxPen(PREVIEW_BORDER, PREVIEW_BORDER_WIDTH));
 
-	gc->SetBrush(wxBrush(previewColor));
-	gc->SetPen(wxPen(PREVIEW_BORDER, PREVIEW_BORDER_WIDTH));
+		int x = TickToScreenX(preview.previewStartTick);
+		int y = PitchToScreenY(preview.previewPitch);
+		int w = TicksToWidth(preview.previewEndTick - preview.previewStartTick);
 
-	int x = TickToScreenX(preview.previewStartTick);
-	int y = PitchToScreenY(preview.previewPitch);
-	int w = TicksToWidth(preview.previewEndTick - preview.previewStartTick);
+		gc->DrawRectangle(x, y, w, mNoteHeight);
+	}
 
-	gc->DrawRectangle(x, y, w, mNoteHeight);
+	// Draw multi-note preview
+	if (mAppModel->HasMultiNoteEditPreview())
+	{
+		const auto& preview = mAppModel->GetMultiNoteEditPreview();
+
+		for (const auto& originalNote : preview.originalNotes)
+		{
+			// Calculate new position with delta
+			int64_t newTickSigned = static_cast<int64_t>(originalNote.startTick) + preview.tickDelta;
+			uint64_t newTick = (newTickSigned < 0) ? 0 : static_cast<uint64_t>(newTickSigned);
+
+			int newPitchSigned = static_cast<int>(originalNote.pitch) + preview.pitchDelta;
+			ubyte newPitch = std::clamp(newPitchSigned, 0, MidiConstants::MAX_MIDI_NOTE);
+
+			uint64_t duration = originalNote.endTick - originalNote.startTick;
+
+			// Determine color based on track (match original note color with transparency)
+			wxColour previewColor = TRACK_COLORS[originalNote.trackIndex];
+			previewColor.Set(
+				previewColor.Red(),
+				previewColor.Green(),
+				previewColor.Blue(),
+				NOTE_EDIT_PREVIEW_ALPHA
+			);
+
+			gc->SetBrush(wxBrush(previewColor));
+			gc->SetPen(wxPen(PREVIEW_BORDER, PREVIEW_BORDER_WIDTH));
+
+			int x = TickToScreenX(newTick);
+			int y = PitchToScreenY(newPitch);
+			int w = TicksToWidth(duration);
+
+			gc->DrawRectangle(x, y, w, mNoteHeight);
+		}
+	}
 }
 
 void MidiCanvasPanel::DrawSelectedNotes(wxGraphicsContext* gc)

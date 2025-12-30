@@ -88,6 +88,18 @@ void DrumMachine::TogglePad(size_t rowIndex, size_t columnIndex)
     mPatternDirty = true;
 }
 
+void DrumMachine::EnablePad(size_t rowIndex, size_t columnIndex)
+{
+    if (rowIndex >= mRows.size() || columnIndex >= mColumnCount) return;
+
+    DrumPad& pad = GetPad(rowIndex, columnIndex);
+    if (!pad.enabled)  // Only enable if not already enabled
+    {
+        pad.enabled = true;
+        mPatternDirty = true;
+    }
+}
+
 void DrumMachine::SetPadVelocity(size_t rowIndex, size_t columnIndex, ubyte velocity)
 {
     DrumPad& pad = GetPad(rowIndex, columnIndex);
@@ -129,4 +141,32 @@ void DrumMachine::InitializeDefaultRows()
 uint64_t DrumMachine::CalculatePadDuration(uint64_t loopDuration) const
 {
 	return loopDuration / mColumnCount;
+}
+
+bool DrumMachine::IsColumnOnMeasure(int column, uint64_t ticksPerMeasure) const
+{
+	uint64_t ticksPerColumn = CalculatePadDuration(mLastLoopDuration);
+	uint64_t columnTick = column * ticksPerColumn;
+
+	return columnTick % ticksPerMeasure == 0;
+}
+
+int DrumMachine::GetColumnAtTick(uint64_t tick, uint64_t loopStartTick) const
+{
+	// Calculate tick position relative to loop start
+	if (tick < loopStartTick) return -1;
+
+	uint64_t tickInLoop = tick - loopStartTick;
+	uint64_t ticksPerColumn = CalculatePadDuration(mLastLoopDuration);
+
+	if (ticksPerColumn == 0) return -1;
+
+	// Round to nearest column instead of truncating
+	int column = static_cast<int>(std::round(static_cast<double>(tickInLoop) / ticksPerColumn));
+
+	// Clamp to valid column range
+	if (column < 0 || column >= mColumnCount)
+		return -1;
+
+	return column;
 }

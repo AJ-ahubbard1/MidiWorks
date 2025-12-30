@@ -77,18 +77,30 @@ void MidiCanvasPanel::OnLeftDown(wxMouseEvent& event)
 		// Check if clicking on resize edge
 		if (IsOnResizeEdge(pos.x, clickedNote))
 		{
-			// Start resizing
+			// Start resizing (single note only, not supported for multi-select)
 			mMouseMode = MouseMode::ResizingNote;
 			mOriginalStartTick = clickedNote.startTick;
 			mOriginalEndTick = clickedNote.endTick;
 		}
 		else
 		{
-			// Start moving
-			mMouseMode = MouseMode::MovingNote;
-			mOriginalStartTick = clickedNote.startTick;
-			mOriginalEndTick = clickedNote.endTick;
-			mOriginalPitch = clickedNote.pitch;
+			// Check if clicked note is part of current selection
+			bool isPartOfSelection = IsNoteSelected(clickedNote);
+
+			if (isPartOfSelection && !mSelectedNotes.empty())
+			{
+				// Start multi-note move
+				mMouseMode = MouseMode::MovingMultipleNotes;
+				mOriginalSelectedNotes = mSelectedNotes;  // Store original positions
+			}
+			else
+			{
+				// Start single-note move
+				mMouseMode = MouseMode::MovingNote;
+				mOriginalStartTick = clickedNote.startTick;
+				mOriginalEndTick = clickedNote.endTick;
+				mOriginalPitch = clickedNote.pitch;
+			}
 		}
 	}
 	else
@@ -161,6 +173,18 @@ void MidiCanvasPanel::OnLeftUp(wxMouseEvent& event)
 			mAppModel->ClearNoteEditPreview();
 		}
 		mSelectedNote.found = false;
+	}
+	else if (mMouseMode == MouseMode::MovingMultipleNotes && !mOriginalSelectedNotes.empty())
+	{
+		// Finalize multi-note move using preview state (track data was never modified)
+		if (mAppModel->HasMultiNoteEditPreview())
+		{
+			const auto& preview = mAppModel->GetMultiNoteEditPreview();
+			mAppModel->MoveMultipleNotes(preview.originalNotes, preview.tickDelta, preview.pitchDelta);
+			mAppModel->ClearNoteEditPreview();
+		}
+		mOriginalSelectedNotes.clear();
+		ClearSelection();  // Clear stale selection (old positions no longer valid)
 	}
 	else if (mMouseMode == MouseMode::ResizingNote && mSelectedNote.found)
 	{
@@ -330,6 +354,23 @@ void MidiCanvasPanel::OnMouseMove(wxMouseEvent& event)
 
 		// Store preview state in model (doesn't modify track data)
 		mAppModel->SetNoteMovePreview(mSelectedNote, newTick, static_cast<ubyte>(newPitch));
+
+		Refresh();
+		return;
+	}
+
+	// Handle moving multiple notes
+	if (mMouseMode == MouseMode::MovingMultipleNotes && !mOriginalSelectedNotes.empty())
+	{
+		// Calculate delta from drag start
+		int deltaX = pos.x - mDragStartPos.x;
+		int deltaY = pos.y - mDragStartPos.y;
+
+		int64_t tickDelta = deltaX * mTicksPerPixel;
+		int pitchDelta = -deltaY / mNoteHeight;  // Negative because Y is flipped
+
+		// Store preview state in model (doesn't modify track data)
+		mAppModel->SetMultipleNotesMovePreview(mOriginalSelectedNotes, tickDelta, pitchDelta);
 
 		Refresh();
 		return;

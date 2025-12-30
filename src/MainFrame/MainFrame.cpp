@@ -11,6 +11,7 @@ MainFrame::MainFrame()
 	mAuiManager.SetManagedWindow(this);
 
 	CreateDockablePanes();
+	CreateCallbackFunctions();
 	CreateMenuBar();
 	SyncMenuChecks();
 	CreateSizer();
@@ -60,6 +61,11 @@ void MainFrame::CreateDockablePanes()
 	mDrumMachinePanel = new DrumMachinePanel(this, mAppModel);
 	RegisterPanel({"Drum Machine", mDrumMachinePanel, PanePosition::Float, wxSize(600, 400), false});
 
+}
+// Event-driven callback functions for discrete state changes
+// Add callback functions here
+void MainFrame::CreateCallbackFunctions()
+{
 	// Register log callback for MIDI event logging
 	mAppModel->GetMidiInputManager().SetLogCallback([this](const TimedMidiEvent& event)
 	{
@@ -70,10 +76,26 @@ void MainFrame::CreateDockablePanes()
 	});
 
 	// Register dirty state callback for title bar updates
-	mAppModel->SetDirtyStateCallback([this](bool isDirty) 
+	mAppModel->SetDirtyStateCallback([this](bool isDirty)
 	{
 		UpdateTitle();
 	});
+
+	// Register loop changed callback for drum machine grid updates
+	mAppModel->GetTransport().SetLoopChangedCallback([this]()
+	{
+		if (mDrumMachinePanel)
+		{
+			// Update pattern with new loop duration first
+			auto loopSettings = mAppModel->GetTransport().GetLoopSettings();
+			uint64_t loopDuration = loopSettings.endTick - loopSettings.startTick;
+			mAppModel->GetDrumMachine().UpdatePattern(loopDuration);
+
+			// Refresh pad colors (efficient - no widget recreation)
+			mDrumMachinePanel->RefreshAllPadButtonColors();
+		}
+	});
+
 }
 
 // Add Panels to map, used to toggle visibility
@@ -89,6 +111,18 @@ void MainFrame::RegisterPanel(PanelInfo info)
 std::unordered_map<int, PanelInfo>& MainFrame::GetAllPanels() 
 { 
 	return mPanels; 
+}
+
+bool MainFrame::CheckPanelVisibility(const wxString& panelName)
+{
+	for (const auto& [id, info] : GetAllPanels())
+	{
+		if (info.name == panelName)
+		{
+			return info.isVisible;
+		}
+	}
+	return false;
 }
 
 void MainFrame::SetPanelVisibility(int id, bool vis) 

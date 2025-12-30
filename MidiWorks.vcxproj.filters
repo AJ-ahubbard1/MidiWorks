@@ -218,5 +218,11 @@
     <ClInclude Include="src\MainFrame\MainFrameIDs.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="src\Commands\MoveMultipleNotesCommand.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="src\Commands\DeleteMultipleNotesCommand.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
 </Project>

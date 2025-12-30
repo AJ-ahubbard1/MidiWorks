@@ -15,10 +15,10 @@ public:
 		CreateControls();
 		SetupSizers();
 		BindEventHandlers();
-		UpdateDisplay();
+		Update();
 	}
 
-	void UpdateDisplay()
+	void Update()
 	{
 		unsigned int ticks = mTransport.GetCurrentTick();
 		mTickDisplay->SetLabel(wxString::Format("Ticks: %d", ticks));

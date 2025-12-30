@@ -49,14 +49,18 @@ public:
 
 	// Note Editing - Move and Resize
 	void MoveNote(const NoteLocation& note, uint64_t newStartTick, ubyte newPitch);
+	void MoveMultipleNotes(const std::vector<NoteLocation>& notes, int64_t tickDelta, int pitchDelta);
 	void ResizeNote(const NoteLocation& note, uint64_t newDuration);
 
 	// Note Edit Preview (for drag operations)
 	void SetNoteMovePreview(const NoteLocation& note, uint64_t newStartTick, ubyte newPitch);
+	void SetMultipleNotesMovePreview(const std::vector<NoteLocation>& notes, int64_t tickDelta, int pitchDelta);
 	void SetNoteResizePreview(const NoteLocation& note, uint64_t newEndTick);
 	void ClearNoteEditPreview();
 	const NoteEditor::NoteEditPreview& GetNoteEditPreview() const;
+	const NoteEditor::MultiNoteEditPreview& GetMultiNoteEditPreview() const;
 	bool HasNoteEditPreview() const;
+	bool HasMultiNoteEditPreview() const;
 
 	// Callbacks
 	using DirtyStateCallback = std::function<void(bool isDirty)>;
@@ -68,6 +72,8 @@ public:
 
 	// Drum Machine
 	void RecordDrumPatternToTrack();
+	int TriggerDrumPad(int rowIndex);  // Trigger drum pad via keyboard (returns column index if pad enabled, -1 otherwise)
+	void ReleaseDrumPad(int rowIndex);
 
 
 private:

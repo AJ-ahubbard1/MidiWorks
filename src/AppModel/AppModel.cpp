@@ -121,6 +121,15 @@ void AppModel::MoveNote(const NoteLocation& note, uint64_t newStartTick, ubyte n
 	}
 }
 
+void AppModel::MoveMultipleNotes(const std::vector<NoteLocation>& notes, int64_t tickDelta, int pitchDelta)
+{
+	auto cmd = mNoteEditor.CreateMoveMultipleNotes(notes, tickDelta, pitchDelta);
+	if (cmd)
+	{
+		mUndoRedoManager.ExecuteCommand(std::move(cmd));
+	}
+}
+
 void AppModel::ResizeNote(const NoteLocation& note, uint64_t newDuration)
 {
 	auto cmd = mNoteEditor.CreateResizeNote(note, newDuration);
@@ -133,6 +142,11 @@ void AppModel::ResizeNote(const NoteLocation& note, uint64_t newDuration)
 void AppModel::SetNoteMovePreview(const NoteLocation& note, uint64_t newStartTick, ubyte newPitch)
 {
 	mNoteEditor.SetNoteMovePreview(note, newStartTick, newPitch);
+}
+
+void AppModel::SetMultipleNotesMovePreview(const std::vector<NoteLocation>& notes, int64_t tickDelta, int pitchDelta)
+{
+	mNoteEditor.SetMultipleNotesMovePreview(notes, tickDelta, pitchDelta);
 }
 
 void AppModel::SetNoteResizePreview(const NoteLocation& note, uint64_t newEndTick)
@@ -150,9 +164,19 @@ const NoteEditor::NoteEditPreview& AppModel::GetNoteEditPreview() const
 	return mNoteEditor.GetNoteEditPreview();
 }
 
+const NoteEditor::MultiNoteEditPreview& AppModel::GetMultiNoteEditPreview() const
+{
+	return mNoteEditor.GetMultiNoteEditPreview();
+}
+
 bool AppModel::HasNoteEditPreview() const
 {
 	return mNoteEditor.HasNoteEditPreview();
+}
+
+bool AppModel::HasMultiNoteEditPreview() const
+{
+	return mNoteEditor.HasMultiNoteEditPreview();
 }
 
 // Dirty state notification
@@ -203,6 +227,55 @@ void AppModel::RecordDrumPatternToTrack()
 	// Use existing RecordCommand for undo/redo support
 	auto cmd = std::make_unique<RecordCommand>(mTrackSet, buffer);
 	mUndoRedoManager.ExecuteCommand(std::move(cmd));
+}
+
+// Trigger drum pad via keyboard - plays sound immediately and enables pad if loop is playing
+int AppModel::TriggerDrumPad(int rowIndex)
+{
+	// Respect mute state
+	if (mDrumMachine.IsMuted()) return -1;
+
+	// Validate row index
+	if (rowIndex < 0 || rowIndex >= static_cast<int>(mDrumMachine.GetRowCount())) return -1;
+
+	// Get drum row info
+	const DrumRow& row = mDrumMachine.GetRow(rowIndex);
+	ubyte channel = mDrumMachine.GetChannel();
+
+	// Play sound immediately (NoteOn only - let drum sound decay naturally)
+	MidiMessage noteOn = MidiMessage::NoteOn(row.pitch, 100, channel);  // Default velocity 100
+	mSoundBank.GetMidiOutDevice()->sendMessage(noteOn);
+
+	// If loop is playing, enable the pad at the quantized column position
+	if (mTransport.IsPlaying() && mTransport.GetLoopSettings().enabled)
+	{
+		uint64_t currentTick = mTransport.GetCurrentTick();
+		uint64_t loopStart = mTransport.GetLoopSettings().startTick;
+
+		int column = mDrumMachine.GetColumnAtTick(currentTick, loopStart);
+		if (column >= 0)  // Valid column
+		{
+			mDrumMachine.EnablePad(rowIndex, column);
+			return column;  // Return column index
+		}
+	}
+
+	return -1;  // No pad was enabled
+}
+
+// Send NoteOff for drum pad when key is released
+void AppModel::ReleaseDrumPad(int rowIndex)
+{
+	// Validate row index
+	if (rowIndex < 0 || rowIndex >= static_cast<int>(mDrumMachine.GetRowCount())) return;
+
+	// Get drum row info
+	const DrumRow& row = mDrumMachine.GetRow(rowIndex);
+	ubyte channel = mDrumMachine.GetChannel();
+
+	// Send NoteOff
+	MidiMessage noteOff = MidiMessage::NoteOff(row.pitch, channel);
+	mSoundBank.GetMidiOutDevice()->sendMessage(noteOff);
 }
 
 // Private Methods
@@ -278,7 +351,7 @@ std::vector<MidiMessage> AppModel::PlayDrumMachinePattern(uint64_t lastTick, uin
 	// Find events between lastTick and currentTick (prevents missing events if tick jumps)
 	for (const auto& event : pattern)
 	{
-		if (event.tick >= lastTick && event.tick <= currentTick)
+		if (event.tick >= lastTick && event.tick < currentTick)
 		{
 			messages.push_back(event.mm);
 		}
@@ -426,7 +499,7 @@ void AppModel::HandlePlaybackCore(bool isRecording)
 	}
 
 	// Play drum machine pattern during loop playback
-	if (loopSettings.enabled)
+	if (loopSettings.enabled && !mDrumMachine.IsMuted())
 	{
 		auto drumMessages = PlayDrumMachinePattern(lastTick, currentTick);
 		messages.insert(messages.end(), drumMessages.begin(), drumMessages.end());

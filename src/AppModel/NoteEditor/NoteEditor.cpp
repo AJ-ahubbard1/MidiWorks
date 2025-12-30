@@ -2,6 +2,7 @@
 #include "NoteEditor.h"
 #include "Commands/NoteEditCommands.h"
 #include "Commands/DeleteMultipleNotesCommand.h"
+#include "Commands/MoveMultipleNotesCommand.h"
 #include "Commands/QuantizeCommand.h"
 #include "MidiConstants.h"
 
@@ -141,6 +142,7 @@ void NoteEditor::SetNoteResizePreview(const NoteLocation& note, uint64_t newEndT
 void NoteEditor::ClearNoteEditPreview()
 {
 	mNoteEditPreview.isActive = false;
+	mMultiNoteEditPreview.isActive = false;
 }
 
 const NoteEditor::NoteEditPreview& NoteEditor::GetNoteEditPreview() const
@@ -167,4 +169,56 @@ std::vector<std::unique_ptr<Command>> NoteEditor::CreateQuantizeAllTracks(uint64
 	}
 
 	return commands;
+}
+
+std::unique_ptr<Command> NoteEditor::CreateMoveMultipleNotes(
+	const std::vector<NoteLocation>& notes,
+	int64_t tickDelta,
+	int pitchDelta)
+{
+	if (notes.empty()) return nullptr;
+
+	// Don't create command if no movement
+	if (tickDelta == 0 && pitchDelta == 0)
+		return nullptr;
+
+	// Build move list
+	std::vector<MoveMultipleNotesCommand::NoteToMove> notesToMove;
+	notesToMove.reserve(notes.size());
+
+	for (const auto& note : notes)
+	{
+		Track& track = mTrackSet.GetTrack(note.trackIndex);
+
+		MoveMultipleNotesCommand::NoteToMove noteData;
+		noteData.trackIndex = note.trackIndex;
+		noteData.noteOnIndex = note.noteOnIndex;
+		noteData.noteOffIndex = note.noteOffIndex;
+		noteData.originalStartTick = note.startTick;
+		noteData.originalPitch = note.pitch;
+		noteData.duration = note.endTick - note.startTick;
+
+		notesToMove.push_back(noteData);
+	}
+
+	// Create single batch command
+	return std::make_unique<MoveMultipleNotesCommand>(mTrackSet, notesToMove, tickDelta, pitchDelta);
+}
+
+void NoteEditor::SetMultipleNotesMovePreview(const std::vector<NoteLocation>& notes, int64_t tickDelta, int pitchDelta)
+{
+	mMultiNoteEditPreview.isActive = true;
+	mMultiNoteEditPreview.originalNotes = notes;
+	mMultiNoteEditPreview.tickDelta = tickDelta;
+	mMultiNoteEditPreview.pitchDelta = pitchDelta;
+}
+
+const NoteEditor::MultiNoteEditPreview& NoteEditor::GetMultiNoteEditPreview() const
+{
+	return mMultiNoteEditPreview;
+}
+
+bool NoteEditor::HasMultiNoteEditPreview() const
+{
+	return mMultiNoteEditPreview.isActive;
 }

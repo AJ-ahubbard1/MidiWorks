@@ -37,8 +37,10 @@ private:
 
     // METHODS - Implemented in MainFrame.cpp
     void CreateDockablePanes();
+    void CreateCallbackFunctions();
     void RegisterPanel(PanelInfo info);
     std::unordered_map<int, PanelInfo>& GetAllPanels();
+    bool CheckPanelVisibility(const wxString& panelName);
     void SetPanelVisibility(int id, bool vis);
     void CreateMenuBar();
     void CreateSizer();
@@ -51,6 +53,7 @@ private:
     // View / Panel Management Events
     void OnTogglePane(wxCommandEvent& event);
     void OnPaneClosed(wxAuiManagerEvent& event);
+    void ClosePane(const wxString& paneName);
     void OnAuiRender(wxAuiManagerEvent& event);
 
     // Edit Menu Events
@@ -76,4 +79,7 @@ private:
     void OnStartRecord(wxCommandEvent& event);
     void OnPreviousMeasure(wxCommandEvent& event);
     void OnNextMeasure(wxCommandEvent& event);
+
+    // Drum Pad Trigger Events (Keys 1-0)
+    void OnDrumPad(wxCommandEvent& event);
 };

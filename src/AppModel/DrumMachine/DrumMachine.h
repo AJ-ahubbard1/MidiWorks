@@ -38,6 +38,7 @@ public:
 
 	// Pad Manipulation
 	void TogglePad(size_t rowIndex, size_t columnIndex);
+	void EnablePad(size_t rowIndex, size_t columnIndex);  // Enable specific pad (for live recording)
 	void SetPadVelocity(size_t rowIndex, size_t columnIndex, ubyte velocity);
 	bool IsPadEnabled(size_t rowIndex, size_t columnIndex) const;
 
@@ -48,19 +49,29 @@ public:
 	// Playback Integration
 	const Track& GetPattern();  // Returns pattern, regenerates if dirty
 
+	// Grid Visualization Helper
+	bool IsColumnOnMeasure(int column, uint64_t ticksPerMeasure) const;
+
+	// Get column index for a given tick position (for live recording)
+	int GetColumnAtTick(uint64_t tick, uint64_t loopStartTick) const;
+
 	// Persistence
 	void Clear();
+
+	// 
+	bool IsMuted() const { return mIsMuted; }
+	void SetMuted(bool isMuted) { mIsMuted = isMuted; }
 
 private:
 	std::vector<DrumRow> mRows;
 	Track mPattern;		// Generated from pads for playback
 	int mColumnCount = 16;
 	ubyte mChannel = 9;	// Channel 10 (index 9) for GM Drums
-
+	bool mIsMuted = true;
 	bool mPatternDirty = true;
 	uint64_t mLastLoopDuration = 15360;  // Default: 4 measures (3840 * 4)
-
+	
 	void InitializeDefaultRows();
 	void RegeneratePattern();  // Actually rebuilds the pattern
 	uint64_t CalculatePadDuration(uint64_t loopDuration) const;
-};
+ };
