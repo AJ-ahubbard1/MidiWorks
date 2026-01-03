@@ -73,6 +73,7 @@ MidiCanvasPanel::MidiCanvasPanel(wxWindow* parent, std::shared_ptr<AppModel> app
 	// Apply the sizer to the panel
 	SetSizer(mainSizer);
 
+	// Bind all Event Handlers
 	Bind(wxEVT_PAINT, &MidiCanvasPanel::Draw, this);
 	Bind(wxEVT_MOUSEWHEEL, &MidiCanvasPanel::OnMouseWheel, this);
 	Bind(wxEVT_LEFT_DOWN, &MidiCanvasPanel::OnLeftDown, this);
@@ -213,6 +214,7 @@ uint64_t MidiCanvasPanel::ApplyGridSnap(uint64_t tick) const
 	if (!mGridSnapCheckbox->GetValue()) return tick;
 
 	uint64_t duration = GetSelectedDuration();
+	// @TODO: Always rounding down, might consider using round function to allow rounding up when greater than half of the duration
 	return (tick / duration) * duration;  // Round down to nearest multiple
 }
 
@@ -285,7 +287,7 @@ void MidiCanvasPanel::ClampOffset()
 	int canvasWidth = GetSize().GetWidth();
 	int canvasHeight = GetSize().GetHeight();
 
-	// Horizontal limits (time axis)
+	// Horizontal limits: ticks [0, MAX_TICK_VALUE] gets mapped to pixels [0, minOffsetX]
 	// When offset.x = 0, tick 0 is at left edge
 	// When offset.x < 0, we've scrolled right (tick 0 is off-screen left)
 

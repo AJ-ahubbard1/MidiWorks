@@ -53,12 +53,14 @@ void TrackSet::FindStart(uint64_t startTick)
 	}
 }
 
-NoteLocation TrackSet::FindNoteAt(uint64_t tick, ubyte pitch)
+NoteLocation TrackSet::FindNoteAt(uint64_t tick, ubyte pitch) const
 {
 	auto allNotes = GetAllNotes();
 	for (const NoteLocation& note : allNotes)
 	{
-		if (note.pitch == pitch && tick >= note.startTick && tick <= note.endTick)
+		// comparision shouldn't include when tick == startTick because all mouse positions left of 0 default to 0.
+		// if included, you could delete notes that start at 0 by mid clicking left of note
+		if (note.pitch == pitch && tick > note.startTick && tick <= note.endTick)
 		{
 			return note;
 		}
@@ -67,7 +69,7 @@ NoteLocation TrackSet::FindNoteAt(uint64_t tick, ubyte pitch)
 }
 
 std::vector<NoteLocation> TrackSet::FindNotesInRegion(
-	uint64_t minTick, uint64_t maxTick, ubyte minPitch, ubyte maxPitch)
+	uint64_t minTick, uint64_t maxTick, ubyte minPitch, ubyte maxPitch) const
 {
 	auto allNotes = GetAllNotes();
 	std::vector<NoteLocation> result;
@@ -121,13 +123,13 @@ std::vector<NoteLocation> TrackSet::GetNotesFromTrack(const Track& track, int tr
 	return result;
 }
 
-std::vector<NoteLocation> TrackSet::GetAllNotes()
+std::vector<NoteLocation> TrackSet::GetAllNotes() const
 {
 	std::vector<NoteLocation> result;
 
 	for (int trackIndex = 0; trackIndex < MidiConstants::CHANNEL_COUNT; trackIndex++)
 	{
-		Track& track = mTracks[trackIndex];
+		const Track& track = mTracks[trackIndex];
 		std::vector<NoteLocation> trackNotes = GetNotesFromTrack(track, trackIndex);
 		result.insert(result.end(), trackNotes.begin(), trackNotes.end());
 	}

@@ -479,6 +479,7 @@ void MidiCanvasPanel::OnMouseLeave(wxMouseEvent& event)
 
 void MidiCanvasPanel::OnKeyDown(wxKeyEvent& event)
 {
+
 	int keyCode = event.GetKeyCode();
 
 	// Delete - Delete selected notes

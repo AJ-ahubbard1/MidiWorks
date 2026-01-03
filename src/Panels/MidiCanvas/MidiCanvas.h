@@ -21,6 +21,8 @@ public:
 	MidiCanvasPanel(wxWindow* parent, std::shared_ptr<AppModel> appModel, const wxString& label);
 
 	void Update();
+
+	// Value used for quantizing notes
 	uint64_t GetGridSize() const { return GetSelectedDuration(); }
 
 private:
@@ -44,7 +46,8 @@ private:
 	wxPoint mOriginOffset;       // Pan offset for scrolling
 
 	// ========== Mouse/Interaction State ==========
-	enum class MouseMode {
+	enum class MouseMode 
+	{
 		Idle,
 		Adding,
 		MovingNote,
@@ -76,7 +79,8 @@ private:
 	uint64_t mPreviewStartTick = 0;  // Note creation preview (UI state for visual feedback during drag)
 
 	// ========== Debug MIDI Events State ==========
-	struct MidiEventDebugInfo {
+	struct MidiEventDebugInfo 
+	{
 		TimedMidiEvent timedEvent;
 		int screenX;
 		int screenY;
@@ -136,22 +140,14 @@ private:
 	// EVENT HANDLERS - Implemented in MidiCanvasEventHandlers.cpp
 	// ========================================================================
 
-	// Mouse Wheel - Zoom
-	void OnMouseWheel(wxMouseEvent& event);
-
-	// Left Mouse Button - Note Add/Move/Resize
-	void OnLeftDown(wxMouseEvent& event);
+	// Mouse 
+	void OnMouseWheel(wxMouseEvent& event);			// Zooming
+	void OnLeftDown(wxMouseEvent& event);			// Note Add/Move/Resize
 	void OnLeftUp(wxMouseEvent& event);
-
-	// Middle Mouse Button - Delete Note / Move Playhead
-	void OnMiddleDown(wxMouseEvent& event);
-
-	// Right Mouse Button - Panning
-	void OnRightDown(wxMouseEvent& event);
+	void OnMiddleDown(wxMouseEvent& event);			// Delete Note / Move Playhead
+	void OnRightDown(wxMouseEvent& event);			// Panning
 	void OnRightUp(wxMouseEvent& event);
-
-	// Mouse Move - Drag Operations
-	void OnMouseMove(wxMouseEvent& event);
+	void OnMouseMove(wxMouseEvent& event);			// Drag Operations
 
 	// Window Events
 	void OnSize(wxSizeEvent& event);

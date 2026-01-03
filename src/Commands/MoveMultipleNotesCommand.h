@@ -69,10 +69,7 @@ public:
 		for (int trackIndex : affectedTracks)
 		{
 			Track& track = mTrackSet.GetTrack(trackIndex);
-			std::sort(track.begin(), track.end(),
-				[](const TimedMidiEvent& a, const TimedMidiEvent& b) {
-					return a.tick < b.tick;
-				});
+			TrackSet::SortTrack(track);
 		}
 	}
 
@@ -129,10 +126,7 @@ public:
 		for (int trackIndex : affectedTracks)
 		{
 			Track& track = mTrackSet.GetTrack(trackIndex);
-			std::sort(track.begin(), track.end(),
-				[](const TimedMidiEvent& a, const TimedMidiEvent& b) {
-					return a.tick < b.tick;
-				});
+			TrackSet::SortTrack(track);
 		}
 	}
 

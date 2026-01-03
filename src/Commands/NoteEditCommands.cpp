@@ -8,9 +8,7 @@ void AddNoteCommand::Execute()
 	mTrack.push_back(mNoteOff);
 
 	// Sort track by tick to maintain chronological order
-	std::sort(mTrack.begin(), mTrack.end(), [](const TimedMidiEvent& a, const TimedMidiEvent& b) {
-		return a.tick < b.tick;
-	});
+	TrackSet::SortTrack(mTrack);
 
 	// Store indices after sorting for undo
 	FindNoteIndices();
@@ -79,9 +77,7 @@ void DeleteNoteCommand::Undo()
 	mTrack.push_back(mNoteOff);
 
 	// Re-sort to maintain chronological order
-	std::sort(mTrack.begin(), mTrack.end(), [](const TimedMidiEvent& a, const TimedMidiEvent& b) {
-		return a.tick < b.tick;
-	});
+	TrackSet::SortTrack(mTrack);
 }
 
 std::string DeleteNoteCommand::GetDescription() const
@@ -108,9 +104,7 @@ void MoveNoteCommand::Execute()
 	}
 
 	// Re-sort track after moving
-	std::sort(mTrack.begin(), mTrack.end(), [](const TimedMidiEvent& a, const TimedMidiEvent& b) {
-		return a.tick < b.tick;
-	});
+	TrackSet::SortTrack(mTrack);
 }
 
 void MoveNoteCommand::Undo()
@@ -133,9 +127,7 @@ void MoveNoteCommand::Undo()
 	}
 
 	// Re-sort track
-	std::sort(mTrack.begin(), mTrack.end(), [](const TimedMidiEvent& a, const TimedMidiEvent& b) {
-		return a.tick < b.tick;
-	});
+	TrackSet::SortTrack(mTrack);
 }
 
 std::string MoveNoteCommand::GetDescription() const
@@ -168,9 +160,7 @@ void ResizeNoteCommand::Execute()
 	}
 
 	// Re-sort track (note-off might have moved)
-	std::sort(mTrack.begin(), mTrack.end(), [](const TimedMidiEvent& a, const TimedMidiEvent& b) {
-		return a.tick < b.tick;
-	});
+	TrackSet::SortTrack(mTrack);
 }
 
 void ResizeNoteCommand::Undo()
@@ -185,9 +175,7 @@ void ResizeNoteCommand::Undo()
 	}
 
 	// Re-sort track
-	std::sort(mTrack.begin(), mTrack.end(), [](const TimedMidiEvent& a, const TimedMidiEvent& b) {
-		return a.tick < b.tick;
-	});
+	TrackSet::SortTrack(mTrack);
 }
 
 std::string ResizeNoteCommand::GetDescription() const

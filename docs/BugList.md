@@ -15,33 +15,6 @@ Track bugs and issues discovered during testing of MidiWorks.
 ---
 
 
-### #4 - Remove overlapping notes, move to collision prevention strategy
-**Status:** Open
-**Priority:** Medium
-**Found:** 2025-12-17
-
-**Description:**
-Current implementation uses `MergeOverlappingNotes()` to merge overlapping notes during loop recording. This approach is inconsistent and should be replaced with a collision prevention strategy across all note operations.
-
-**Current Issues:**
-- Loop recording merges consecutive NoteOns of same pitch/channel
-- Mouse-click note addition doesn't check for collisions
-- Drag operations don't validate collision-free destination
-- Copy-paste operations don't handle colliding notes
-
-**Proposed Solution:**
-Implement collision detection helper and prevent note collisions across all operations:
-1. Mouse click to add note - check before adding
-2. Dragging existing note - validate destination before move
-3. Resizing note - check if extended duration would overlap
-4. Loop recording - prevent recording over existing notes
-5. Copy-paste - replace/overwrite strategy (delete colliding notes, then paste)
-
-**Notes:**
-See `AppModel::MergeOverlappingNotes()` at AppModel.cpp:933. This method should be removed once collision prevention is implemented. Most professional DAWs use a "paste overwrites" behavior for copy-paste collisions.
-
----
-
 ---
 
 ### #10 - Add ability to hide/show soundbank channels
@@ -537,6 +510,73 @@ This is related to the overall note separation refactoring using `NOTE_SEPARATIO
 ---
 
 ## Fixed Bugs
+
+### #4 - Collision prevention strategy for all note operations
+**Status:** Fixed
+**Priority:** Medium
+**Found:** 2025-12-17
+**Fixed:** 2026-01-02
+
+**Description:**
+Implemented a comprehensive collision prevention strategy across all note operations to replace the inconsistent overlap handling during loop recording.
+
+**Solution:**
+Implemented collision detection and prevention across all note editing operations:
+
+**1. Collision Detection Helper Methods** (AppModel.h/cpp)
+- Added `IsRegionCollisionFree()` with two overloads:
+  - Single note version for move/resize operations
+  - Multi-note version for batch move operations
+- Both methods use `TrackSet::FindNotesInRegion()` to check for overlaps
+- Made as const methods for better encapsulation
+
+**2. Preview Collision Prevention**
+- **`SetNoteMovePreview()`** - Prevents showing preview if destination collides
+- **`SetMultipleNotesMovePreview()`** - All-or-nothing collision validation:
+  - Checks each note in selection for collisions
+  - Excludes all selected notes from collision check (allows notes to swap positions)
+  - Rejects entire move if ANY note would collide with non-selected notes
+  - Validates bounds (pitch 0-127, tick >= 0)
+- **`SetNoteResizePreview()`** - Prevents resize preview if extension would overlap
+
+**3. Mouse Click Note Addition** - Inherently handled
+- Clicking on existing note starts move operation instead of adding
+- No collision possible when clicking empty space
+
+**4. Copy-Paste with Overdub Behavior** (PasteCommand.h)
+- Paste now calls `TrackSet::SeparateOverlappingNotes()` after adding notes
+- Uses same collision resolution as loop recording (consistent behavior)
+- Stores complete track snapshots of affected tracks for undo
+- Trade-off: Memory-intensive for very large projects, but simple and correct for typical use
+
+**5. TrackSet Method Improvements**
+- Made `FindNoteAt()`, `FindNotesInRegion()`, and `GetAllNotes()` const (read-only operations)
+
+**6. Code Cleanup**
+- Replaced 13 instances of manual `std::sort()` with `TrackSet::SortTrack()` across 6 command files
+- Eliminated code duplication and improved maintainability
+
+**Files Modified:**
+- `src/AppModel/AppModel.h/cpp` - Added collision detection helpers
+- `src/AppModel/TrackSet/TrackSet.h/cpp` - Made query methods const
+- `src/Commands/PasteCommand.h` - Implemented overdub with track snapshots
+- `src/Commands/DeleteMultipleNotesCommand.h` - Use TrackSet::SortTrack
+- `src/Commands/MoveMultipleNotesCommand.h` - Use TrackSet::SortTrack
+- `src/Commands/QuantizeCommand.h` - Use TrackSet::SortTrack
+- `src/Commands/RecordCommand.h` - Use TrackSet::SortTrack
+- `src/Commands/NoteEditCommands.cpp` - Use TrackSet::SortTrack
+
+**Benefits:**
+- ✓ Consistent collision handling across all note operations
+- ✓ Prevents invalid MIDI data (overlapping notes)
+- ✓ Matches professional DAW behavior (overdub paste)
+- ✓ Cleaner codebase with reduced duplication
+- ✓ Better encapsulation with const-correct methods
+
+**Known Limitation:**
+Paste undo stores complete track snapshots, which may use significant memory in very large projects (thousands of events per track). This is acceptable for typical projects and can be optimized later if needed.
+
+---
 
 ### #24 - DrumMachine enhancements (pitch controls, clear button, ticks display)
 **Status:** Fixed

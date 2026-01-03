@@ -141,17 +141,44 @@ void AppModel::ResizeNote(const NoteLocation& note, uint64_t newDuration)
 
 void AppModel::SetNoteMovePreview(const NoteLocation& note, uint64_t newStartTick, ubyte newPitch)
 {
-	mNoteEditor.SetNoteMovePreview(note, newStartTick, newPitch);
+	uint64_t newEndTick = newStartTick + note.endTick - note.startTick;
+
+	if (IsRegionCollisionFree(newStartTick, newEndTick, newPitch, &note))
+	{
+		mNoteEditor.SetNoteMovePreview(note, newStartTick, newPitch);
+	}
 }
 
 void AppModel::SetMultipleNotesMovePreview(const std::vector<NoteLocation>& notes, int64_t tickDelta, int pitchDelta)
 {
+	// Check each note for collisions
+	for (const auto& note : notes)
+	{
+		// Calculate new position
+		int64_t newStartTick = static_cast<int64_t>(note.startTick) + tickDelta;
+		int newPitch = static_cast<int>(note.pitch) + pitchDelta;
+
+		// Validate bounds
+		if (newStartTick < 0 || newPitch < 0 || newPitch > 127)
+			return;  // Out of bounds, reject entire move
+
+		uint64_t newEndTick = newStartTick + (note.endTick - note.startTick);
+
+		// Check if this note would collide (excluding all notes being moved)
+		if (!IsRegionCollisionFree(newStartTick, newEndTick, static_cast<ubyte>(newPitch), notes))
+			return;  // Collision detected, reject entire move
+	}
+
+	// All notes are collision-free, allow preview
 	mNoteEditor.SetMultipleNotesMovePreview(notes, tickDelta, pitchDelta);
 }
 
 void AppModel::SetNoteResizePreview(const NoteLocation& note, uint64_t newEndTick)
 {
-	mNoteEditor.SetNoteResizePreview(note, newEndTick);
+	if (IsRegionCollisionFree(note.startTick, newEndTick, note.pitch, &note))
+	{
+		mNoteEditor.SetNoteResizePreview(note, newEndTick);
+	}
 }
 
 void AppModel::ClearNoteEditPreview()
@@ -365,6 +392,50 @@ std::vector<MidiMessage> AppModel::PlayDrumMachinePattern(uint64_t lastTick, uin
 	}
 
 	return messages;
+}
+
+// Collision detection helper - single note exclusion
+bool AppModel::IsRegionCollisionFree(uint64_t startTick, uint64_t endTick, ubyte pitch, const NoteLocation* excludeNote) const
+{
+	auto collisions = mTrackSet.FindNotesInRegion(startTick, endTick, pitch, pitch);
+
+	if (collisions.empty())
+		return true;
+
+	// If there's only one collision and it's the note we're excluding, that's fine
+	if (excludeNote && collisions.size() == 1 &&
+	    collisions[0].noteOnIndex == excludeNote->noteOnIndex)
+		return true;
+
+	return false;
+}
+
+// Collision detection helper - multiple note exclusion
+bool AppModel::IsRegionCollisionFree(uint64_t startTick, uint64_t endTick, ubyte pitch, const std::vector<NoteLocation>& excludeNotes) const
+{
+	auto collisions = mTrackSet.FindNotesInRegion(startTick, endTick, pitch, pitch);
+
+	if (collisions.empty())
+		return true;
+
+	// Check if all collisions are in the exclude list
+	for (const auto& collision : collisions)
+	{
+		bool isExcluded = false;
+		for (const auto& exclude : excludeNotes)
+		{
+			if (collision.noteOnIndex == exclude.noteOnIndex)
+			{
+				isExcluded = true;
+				break;
+			}
+		}
+
+		if (!isExcluded)
+			return false;  // Found a collision that's not excluded
+	}
+
+	return true;
 }
 
 // TRANSPORT STATE HANDLERS

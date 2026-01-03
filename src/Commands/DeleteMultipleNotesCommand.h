@@ -77,10 +77,7 @@ public:
 			track.push_back(note.noteOff);
 
 			// Re-sort track by tick
-			std::sort(track.begin(), track.end(),
-				[](const TimedMidiEvent& a, const TimedMidiEvent& b) {
-					return a.tick < b.tick;
-				});
+			TrackSet::SortTrack(track);
 		}
 	}
 

@@ -98,6 +98,12 @@ private:
 	void HandleIncomingMidi();
 	std::vector<MidiMessage> PlayDrumMachinePattern(uint64_t lastTick, uint64_t currentTick);
 
+	// Collision detection helpers
+	bool IsRegionCollisionFree(uint64_t startTick, uint64_t endTick, ubyte pitch,
+	                           const NoteLocation* excludeNote = nullptr) const;
+	bool IsRegionCollisionFree(uint64_t startTick, uint64_t endTick, ubyte pitch,
+	                           const std::vector<NoteLocation>& excludeNotes) const;
+
 	// Transport state handlers
 	void HandleStopRecording();
 	void HandleStopPlaying();

@@ -46,12 +46,12 @@ public:
 
 	void FindStart(uint64_t startTick);
 
-	NoteLocation FindNoteAt(uint64_t tick, ubyte pitch);
+	NoteLocation FindNoteAt(uint64_t tick, ubyte pitch) const;
 
 	std::vector<NoteLocation> FindNotesInRegion(uint64_t minTick, uint64_t maxTick,
-			ubyte minPitch, ubyte maxPitch);
+			ubyte minPitch, ubyte maxPitch) const;
 
-	std::vector<NoteLocation> GetAllNotes();
+	std::vector<NoteLocation> GetAllNotes() const;
 
 	// Get all raw MIDI events from all tracks (for debugging)
 	std::vector<TimedMidiEvent> GetAllTimedMidiEvents();

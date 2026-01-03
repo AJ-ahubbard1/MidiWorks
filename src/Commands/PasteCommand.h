@@ -4,12 +4,14 @@
 #include "AppModel/Clipboard/Clipboard.h"
 #include <algorithm>
 #include <vector>
+#include <set>
 using namespace MidiInterface;
 
 /// <summary>
-/// Command to paste clipboard notes into tracks.
+/// Command to paste clipboard notes into tracks with overdub behavior.
 /// Takes clipboard notes (with relative timing) and pastes them at a target tick position.
-/// Stores pasted note indices for undo.
+/// Uses SeparateOverlappingNotes to handle collisions (like loop recording overdub).
+/// Stores complete track snapshots for undo to handle all modifications.
 /// </summary>
 class PasteCommand : public Command
 {
@@ -30,7 +32,23 @@ public:
 	void Execute() override
 	{
 		// Clear any previous paste data (for redo)
-		mPastedNotes.clear();
+		mTrackSnapshots.clear();
+
+		// Determine which tracks will be affected
+		std::set<int> affectedTracks;
+		for (const auto& clipNote : mClipboardNotes)
+		{
+			affectedTracks.insert(clipNote.trackIndex);
+		}
+
+		// Store complete snapshot of each affected track BEFORE pasting
+		for (int trackIndex : affectedTracks)
+		{
+			TrackSnapshot snapshot;
+			snapshot.trackIndex = trackIndex;
+			snapshot.originalTrack = mTrackSet.GetTrack(trackIndex);  // Copy entire track
+			mTrackSnapshots.push_back(snapshot);
+		}
 
 		// Add each clipboard note to its track
 		for (const auto& clipNote : mClipboardNotes)
@@ -54,66 +72,22 @@ public:
 			// Add to track
 			track.push_back(noteOn);
 			track.push_back(noteOff);
+		}
 
-			// Re-sort track by tick to maintain chronological order
-			std::sort(track.begin(), track.end(),
-				[](const TimedMidiEvent& a, const TimedMidiEvent& b) {
-					return a.tick < b.tick;
-				});
-
-			// Find indices of the added notes (for undo)
-			size_t noteOnIndex = 0;
-			size_t noteOffIndex = 0;
-			for (size_t i = 0; i < track.size(); i++)
-			{
-				const auto& event = track[i];
-				if (event.tick == noteOnTick && event.mm.isNoteOn() && event.mm.getPitch() == clipNote.pitch)
-				{
-					noteOnIndex = i;
-				}
-				if (event.tick == noteOffTick && event.mm.isNoteOff() && event.mm.getPitch() == clipNote.pitch)
-				{
-					noteOffIndex = i;
-					break;
-				}
-			}
-
-			// Store pasted note info for undo
-			PastedNoteInfo pastedInfo;
-			pastedInfo.trackIndex = clipNote.trackIndex;
-			pastedInfo.noteOnIndex = noteOnIndex;
-			pastedInfo.noteOffIndex = noteOffIndex;
-			pastedInfo.noteOn = noteOn;
-			pastedInfo.noteOff = noteOff;
-			mPastedNotes.push_back(pastedInfo);
+		// Separate overlapping notes (like loop recording overdub)
+		for (int trackIndex : affectedTracks)
+		{
+			Track& track = mTrackSet.GetTrack(trackIndex);
+			TrackSet::SeparateOverlappingNotes(track);
 		}
 	}
 
 	void Undo() override
 	{
-		// Remove pasted notes in reverse order (to maintain indices)
-		// Group by track and sort descending
-		std::vector<PastedNoteInfo> sortedNotes = mPastedNotes;
-		std::sort(sortedNotes.begin(), sortedNotes.end(),
-			[](const PastedNoteInfo& a, const PastedNoteInfo& b) {
-				if (a.trackIndex != b.trackIndex)
-					return a.trackIndex > b.trackIndex;
-				return a.noteOnIndex > b.noteOnIndex;
-			});
-
-		for (const auto& pastedInfo : sortedNotes)
+		// Restore each affected track to its pre-paste state
+		for (const auto& snapshot : mTrackSnapshots)
 		{
-			Track& track = mTrackSet.GetTrack(pastedInfo.trackIndex);
-
-			// Delete in reverse order (noteOff first, then noteOn) to maintain indices
-			if (pastedInfo.noteOffIndex < track.size())
-			{
-				track.erase(track.begin() + pastedInfo.noteOffIndex);
-			}
-			if (pastedInfo.noteOnIndex < track.size())
-			{
-				track.erase(track.begin() + pastedInfo.noteOnIndex);
-			}
+			mTrackSet.GetTrack(snapshot.trackIndex) = snapshot.originalTrack;
 		}
 	}
 
@@ -124,16 +98,13 @@ public:
 	}
 
 private:
-	struct PastedNoteInfo {
+	struct TrackSnapshot {
 		int trackIndex = 0;
-		size_t noteOnIndex = 0;
-		size_t noteOffIndex = 0;
-		TimedMidiEvent noteOn;
-		TimedMidiEvent noteOff;
+		Track originalTrack;  // Complete copy of track before paste
 	};
 
 	TrackSet& mTrackSet;
 	std::vector<Clipboard::ClipboardNote> mClipboardNotes;
 	uint64_t mPasteTick;
-	std::vector<PastedNoteInfo> mPastedNotes;  // Indices of pasted notes for undo
+	std::vector<TrackSnapshot> mTrackSnapshots;  // Track snapshots for undo
 };

@@ -47,10 +47,7 @@ public:
 		for (int i = 0; i < 15; i++)
 		{
 			auto& track = mTrackSet.GetTrack(i);
-			std::sort(track.begin(), track.end(),
-				[](const TimedMidiEvent& a, const TimedMidiEvent& b) {
-					return a.tick < b.tick;
-				});
+			TrackSet::SortTrack(track);
 		}
 	}
 

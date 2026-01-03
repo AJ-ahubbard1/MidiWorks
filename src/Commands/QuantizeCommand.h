@@ -79,10 +79,7 @@ public:
 		TrackSet::SeparateOverlappingNotes(mTrack);
 
 		// Re-sort track by tick to maintain chronological order
-		std::sort(mTrack.begin(), mTrack.end(),
-			[](const TimedMidiEvent& a, const TimedMidiEvent& b) {
-				return a.tick < b.tick;
-			});
+		TrackSet::SortTrack(mTrack);
 	}
 
 	void Undo() override
@@ -100,10 +97,7 @@ public:
 		}
 
 		// Re-sort track by tick to maintain chronological order
-		std::sort(mTrack.begin(), mTrack.end(),
-			[](const TimedMidiEvent& a, const TimedMidiEvent& b) {
-				return a.tick < b.tick;
-			});
+		TrackSet::SortTrack(mTrack);
 	}
 
 	std::string GetDescription() const override
