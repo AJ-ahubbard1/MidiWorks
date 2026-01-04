@@ -1,5 +1,7 @@
 #pragma once
 #include <span>
+#include <string>
+#include <wx/colour.h>
 #include "RtMidiWrapper/RtMidiWrapper.h"
 #include "MidiConstants.h"
 #include <memory>
@@ -12,6 +14,9 @@ struct MidiChannel
 	bool mute = false;
 	bool solo = false;
 	bool record = false;
+	bool minimized = false;
+	std::string customName = "";  // Custom channel name (empty = use default "Channel N")
+	wxColour customColor;  // Custom channel color (initialized in SoundBank constructor)
 };
 
 class SoundBank
@@ -22,8 +27,9 @@ public:
 	void SetMidiOutDevice(std::shared_ptr<MidiOut> device);
 	std::shared_ptr<MidiOut> GetMidiOutDevice() const;
 	void ApplyChannelSettings();
-	MidiChannel& GetChannel(ubyte c); 
+	MidiChannel& GetChannel(ubyte c);
 	std::span<MidiChannel> GetAllChannels();
+	wxColour GetChannelColor(ubyte channelNumber) const;
 	bool SolosFound() const;
 	std::vector<MidiChannel*> GetRecordEnabledChannels();
 	bool ShouldChannelPlay(const MidiChannel& channel, bool checkRecord = false) const;

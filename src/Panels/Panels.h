@@ -1,7 +1,5 @@
 #pragma once
-#include "Dummy.h"
 #include "MidiSettings.h"
-#include "ChannelControls.h"
 #include "SoundBankPanel.h"
 #include "TransportPanel.h"
 #include "MidiCanvas/MidiCanvas.h"

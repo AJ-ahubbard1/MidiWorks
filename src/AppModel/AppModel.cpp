@@ -6,6 +6,7 @@
 #include "Commands/NoteEditCommands.h"
 #include "Commands/DeleteMultipleNotesCommand.h"
 #include "Commands/PasteCommand.h"
+#include "Commands/PasteToTracksCommand.h"
 
 AppModel::AppModel()
 	: mNoteEditor(mTrackSet, mSoundBank)
@@ -143,7 +144,7 @@ void AppModel::SetNoteMovePreview(const NoteLocation& note, uint64_t newStartTic
 {
 	uint64_t newEndTick = newStartTick + note.endTick - note.startTick;
 
-	if (IsRegionCollisionFree(newStartTick, newEndTick, newPitch, &note))
+	if (IsRegionCollisionFree(newStartTick, newEndTick, newPitch, note.trackIndex, &note))
 	{
 		mNoteEditor.SetNoteMovePreview(note, newStartTick, newPitch);
 	}
@@ -165,7 +166,7 @@ void AppModel::SetMultipleNotesMovePreview(const std::vector<NoteLocation>& note
 		uint64_t newEndTick = newStartTick + (note.endTick - note.startTick);
 
 		// Check if this note would collide (excluding all notes being moved)
-		if (!IsRegionCollisionFree(newStartTick, newEndTick, static_cast<ubyte>(newPitch), notes))
+		if (!IsRegionCollisionFree(newStartTick, newEndTick, static_cast<ubyte>(newPitch), note.trackIndex, notes))
 			return;  // Collision detected, reject entire move
 	}
 
@@ -175,7 +176,7 @@ void AppModel::SetMultipleNotesMovePreview(const std::vector<NoteLocation>& note
 
 void AppModel::SetNoteResizePreview(const NoteLocation& note, uint64_t newEndTick)
 {
-	if (IsRegionCollisionFree(note.startTick, newEndTick, note.pitch, &note))
+	if (IsRegionCollisionFree(note.startTick, newEndTick, note.pitch, note.trackIndex, &note))
 	{
 		mNoteEditor.SetNoteResizePreview(note, newEndTick);
 	}
@@ -206,6 +207,26 @@ bool AppModel::HasMultiNoteEditPreview() const
 	return mNoteEditor.HasMultiNoteEditPreview();
 }
 
+void AppModel::SetNoteAddPreview(ubyte pitch, uint64_t tick, uint64_t snappedTick, uint64_t duration)
+{
+	mNoteEditor.SetNoteAddPreview(pitch, tick, snappedTick, duration);
+}
+
+void AppModel::ClearNoteAddPreview()
+{
+	mNoteEditor.ClearNoteAddPreview();
+}
+
+const NoteEditor::NoteAddPreview& AppModel::GetNoteAddPreview() const
+{
+	return mNoteEditor.GetNoteAddPreview();
+}
+
+bool AppModel::HasNoteAddPreview() const
+{
+	return mNoteEditor.HasNoteAddPreview();
+}
+
 // Dirty state notification
 void AppModel::SetDirtyStateCallback(DirtyStateCallback callback)
 {
@@ -221,15 +242,34 @@ void AppModel::CopyNotesToClipboard(const std::vector<NoteLocation>& notes)
 
 // Paste Clipboard notes at given tick position
 // param optional: default pasteTick is the transport's playhead
-void AppModel::PasteNotes(uint64_t pasteTick)
+void AppModel::PasteNotes(std::optional<uint64_t> pasteTick)
 {
 	if (!mClipboard.HasData()) return;
 
-	if (pasteTick == UINT64_MAX)
+	uint64_t tick = pasteTick.value_or(mTransport.GetCurrentTick());
+	auto cmd = std::make_unique<PasteCommand>(mTrackSet, mClipboard.GetNotes(), tick);
+	mUndoRedoManager.ExecuteCommand(std::move(cmd));
+}
+
+// Paste Clipboard notes to record-enabled tracks at given tick position
+// param optional: default pasteTick is the transport's playhead
+void AppModel::PasteNotesToRecordTracks(std::optional<uint64_t> pasteTick)
+{
+	if (!mClipboard.HasData()) return;
+
+	// Get record-enabled channels and convert to track indices
+	auto recordChannels = mSoundBank.GetRecordEnabledChannels();
+	if (recordChannels.empty()) return;  // No record-enabled tracks
+
+	std::vector<int> targetTracks;
+	for (MidiChannel* channel : recordChannels)
 	{
-		pasteTick = mTransport.GetCurrentTick();
+		targetTracks.push_back(static_cast<int>(channel->channelNumber));
 	}
-	auto cmd = std::make_unique<PasteCommand>(mTrackSet, mClipboard.GetNotes(), pasteTick);
+
+	// Create and execute paste command
+	uint64_t tick = pasteTick.value_or(mTransport.GetCurrentTick());
+	auto cmd = std::make_unique<PasteToTracksCommand>(mTrackSet, mClipboard.GetNotes(), tick, targetTracks);
 	mUndoRedoManager.ExecuteCommand(std::move(cmd));
 }
 
@@ -303,6 +343,50 @@ void AppModel::ReleaseDrumPad(int rowIndex)
 	// Send NoteOff
 	MidiMessage noteOff = MidiMessage::NoteOff(row.pitch, channel);
 	mSoundBank.GetMidiOutDevice()->sendMessage(noteOff);
+}
+
+// Collision detection helper - single note exclusion
+bool AppModel::IsRegionCollisionFree(uint64_t startTick, uint64_t endTick, ubyte pitch, int channel, const NoteLocation* excludeNote) const
+{
+	auto collisions = mTrackSet.FindNotesInRegion(startTick, endTick, pitch, pitch, channel);
+
+	if (collisions.empty())
+		return true;
+
+	// If there's only one collision and it's the note we're excluding, that's fine
+	if (excludeNote && collisions.size() == 1 &&
+	    collisions[0].noteOnIndex == excludeNote->noteOnIndex)
+		return true;
+
+	return false;
+}
+
+// Collision detection helper - multiple note exclusion
+bool AppModel::IsRegionCollisionFree(uint64_t startTick, uint64_t endTick, ubyte pitch, int channel, const std::vector<NoteLocation>& excludeNotes) const
+{
+	auto collisions = mTrackSet.FindNotesInRegion(startTick, endTick, pitch, pitch, channel);
+
+	if (collisions.empty())
+		return true;
+
+	// Check if all collisions are in the exclude list
+	for (const auto& collision : collisions)
+	{
+		bool isExcluded = false;
+		for (const auto& exclude : excludeNotes)
+		{
+			if (collision.noteOnIndex == exclude.noteOnIndex)
+			{
+				isExcluded = true;
+				break;
+			}
+		}
+
+		if (!isExcluded)
+			return false;  // Found a collision that's not excluded
+	}
+
+	return true;
 }
 
 // Private Methods
@@ -394,50 +478,6 @@ std::vector<MidiMessage> AppModel::PlayDrumMachinePattern(uint64_t lastTick, uin
 	return messages;
 }
 
-// Collision detection helper - single note exclusion
-bool AppModel::IsRegionCollisionFree(uint64_t startTick, uint64_t endTick, ubyte pitch, const NoteLocation* excludeNote) const
-{
-	auto collisions = mTrackSet.FindNotesInRegion(startTick, endTick, pitch, pitch);
-
-	if (collisions.empty())
-		return true;
-
-	// If there's only one collision and it's the note we're excluding, that's fine
-	if (excludeNote && collisions.size() == 1 &&
-	    collisions[0].noteOnIndex == excludeNote->noteOnIndex)
-		return true;
-
-	return false;
-}
-
-// Collision detection helper - multiple note exclusion
-bool AppModel::IsRegionCollisionFree(uint64_t startTick, uint64_t endTick, ubyte pitch, const std::vector<NoteLocation>& excludeNotes) const
-{
-	auto collisions = mTrackSet.FindNotesInRegion(startTick, endTick, pitch, pitch);
-
-	if (collisions.empty())
-		return true;
-
-	// Check if all collisions are in the exclude list
-	for (const auto& collision : collisions)
-	{
-		bool isExcluded = false;
-		for (const auto& exclude : excludeNotes)
-		{
-			if (collision.noteOnIndex == exclude.noteOnIndex)
-			{
-				isExcluded = true;
-				break;
-			}
-		}
-
-		if (!isExcluded)
-			return false;  // Found a collision that's not excluded
-	}
-
-	return true;
-}
-
 // TRANSPORT STATE HANDLERS
 
 void AppModel::HandleStopRecording()
@@ -521,7 +561,7 @@ void AppModel::HandlePlaybackCore(bool isRecording)
 	const auto& loopSettings = mTransport.GetLoopSettings();
 
 	// Loop-back logic (check BEFORE metronome to avoid double-click at loop boundary)
-	if (loopSettings.enabled && currentTick >= loopSettings.endTick)
+	if (mTransport.ShouldLoopBack(currentTick))
 	{
 		// === RECORDING-SPECIFIC: Pre-wrap cleanup ===
 		// Must happen BEFORE the wrap to finalize events at the old loop end position

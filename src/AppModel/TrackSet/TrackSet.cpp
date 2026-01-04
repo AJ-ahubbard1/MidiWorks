@@ -58,9 +58,22 @@ NoteLocation TrackSet::FindNoteAt(uint64_t tick, ubyte pitch) const
 	auto allNotes = GetAllNotes();
 	for (const NoteLocation& note : allNotes)
 	{
-		// comparision shouldn't include when tick == startTick because all mouse positions left of 0 default to 0.
-		// if included, you could delete notes that start at 0 by mid clicking left of note
-		if (note.pitch == pitch && tick > note.startTick && tick <= note.endTick)
+		if (note.pitch == pitch && tick >= note.startTick && tick <= note.endTick)
+		{
+			return note;
+		}
+	}
+	return NoteLocation{}; // Note not found
+}
+
+NoteLocation TrackSet::FindNoteInTrack(int trackIndex, uint64_t startTick, uint64_t endTick, ubyte pitch) const
+{
+	const Track& track = mTracks[trackIndex];
+	auto trackNotes = GetNotesFromTrack(track, trackIndex);
+
+	for (const NoteLocation& note : trackNotes)
+	{
+		if (note.pitch == pitch && note.startTick == startTick && note.endTick == endTick)
 		{
 			return note;
 		}
@@ -69,9 +82,20 @@ NoteLocation TrackSet::FindNoteAt(uint64_t tick, ubyte pitch) const
 }
 
 std::vector<NoteLocation> TrackSet::FindNotesInRegion(
-	uint64_t minTick, uint64_t maxTick, ubyte minPitch, ubyte maxPitch) const
+	uint64_t minTick, uint64_t maxTick, ubyte minPitch, ubyte maxPitch, int trackIndex) const
 {
-	auto allNotes = GetAllNotes();
+	std::vector<NoteLocation> allNotes;
+
+	// If trackIndex specified, only search that track. Otherwise search all tracks.
+	if (trackIndex >= 0 && trackIndex < MidiConstants::CHANNEL_COUNT)
+	{
+		allNotes = GetNotesFromTrack(mTracks[trackIndex], trackIndex);
+	}
+	else
+	{
+		allNotes = GetAllNotes();
+	}
+
 	std::vector<NoteLocation> result;
 
 	for (const NoteLocation& note : allNotes)

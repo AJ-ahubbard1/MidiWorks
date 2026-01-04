@@ -228,3 +228,8 @@ uint64_t Transport::GetTicksPerMeasure() const
 {
 	return GetTicksPerBeat() * mBeatSettings.timeSignatureNumerator;
 }
+
+bool Transport::ShouldLoopBack(uint64_t currentTick) const
+{
+	return mLoopSettings.enabled && currentTick >= mLoopSettings.endTick;
+}

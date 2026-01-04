@@ -48,8 +48,10 @@ public:
 
 	NoteLocation FindNoteAt(uint64_t tick, ubyte pitch) const;
 
+	NoteLocation FindNoteInTrack(int trackIndex, uint64_t startTick, uint64_t endTick, ubyte pitch) const;
+
 	std::vector<NoteLocation> FindNotesInRegion(uint64_t minTick, uint64_t maxTick,
-			ubyte minPitch, ubyte maxPitch) const;
+			ubyte minPitch, ubyte maxPitch, int trackIndex = -1) const;
 
 	std::vector<NoteLocation> GetAllNotes() const;
 

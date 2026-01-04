@@ -46,7 +46,7 @@ private:
 	wxPoint mOriginOffset;       // Pan offset for scrolling
 
 	// ========== Mouse/Interaction State ==========
-	enum class MouseMode 
+	enum class MouseMode
 	{
 		Idle,
 		Adding,
@@ -58,7 +58,6 @@ private:
 	};
 	MouseMode mMouseMode = MouseMode::Idle;
 	bool mIsDragging = false;           // Right-click dragging (panning)
-	bool mOffsetInitialized = false;    // Track if initial offset has been set
 	wxPoint mLastMouse;                 // Last mouse position for drag operations
 
 	// ========== Note Selection State ==========
@@ -76,7 +75,6 @@ private:
 	ubyte mOriginalPitch = 0;
 	wxPoint mDragStartPos;       // Mouse position when drag started
 	std::vector<NoteLocation> mOriginalSelectedNotes;  // Original positions for multi-note move
-	uint64_t mPreviewStartTick = 0;  // Note creation preview (UI state for visual feedback during drag)
 
 	// ========== Debug MIDI Events State ==========
 	struct MidiEventDebugInfo 
@@ -135,6 +133,7 @@ private:
 	void DrawPlayhead(wxGraphicsContext* gc);
 	void DrawMidiEventsDebug(wxGraphicsContext* gc);
 	void DrawMidiEventTooltip(wxGraphicsContext* gc, const MidiEventDebugInfo& event);
+	void DrawPianoKeyboard(wxGraphicsContext* gc);
 
 	// ========================================================================
 	// EVENT HANDLERS - Implemented in MidiCanvasEventHandlers.cpp

@@ -82,6 +82,9 @@ public:
 	uint64_t GetTicksPerBeat() const;
 	uint64_t GetTicksPerMeasure() const;
 
+	// Check if playback should loop back to loop start
+	bool ShouldLoopBack(uint64_t currentTick) const;
+
 	// Callback for loop settings changes
 	using LoopChangedCallback = std::function<void()>;
 	void SetLoopChangedCallback(LoopChangedCallback callback) { mLoopChangedCallback = callback; }

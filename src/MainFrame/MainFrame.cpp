@@ -41,7 +41,7 @@ void MainFrame::CreateDockablePanes()
 	RegisterPanel({"Sound Bank", mSoundBankPanel, PanePosition::Left, wxSize(247, 636)});
 
 	mMidiSettingsPanel = new MidiSettingsPanel(this, mAppModel, *wxLIGHT_GREY, "Midi Settings");
-	RegisterPanel({"Midi Settings", mMidiSettingsPanel, PanePosition::Left, wxSize(247, 253)});
+	RegisterPanel({"Midi Settings", mMidiSettingsPanel, PanePosition::Left, wxSize(247, 253), false});
 
 	mTransportPanel = new TransportPanel(this, mAppModel, *wxLIGHT_GREY, "Transport");
 	RegisterPanel({"Transport", mTransportPanel, PanePosition::Top, wxSize(-1, -1), true, false, false});

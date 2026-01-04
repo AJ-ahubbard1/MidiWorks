@@ -2,6 +2,7 @@
 #include "ProjectManager.h"
 #include "AppModel/Transport/Transport.h"
 #include "AppModel/SoundBank/SoundBank.h"
+#include "AppModel/SoundBank/ChannelColors.h"
 #include "AppModel/TrackSet/TrackSet.h"
 #include "AppModel/RecordingSession/RecordingSession.h"
 #include "MidiConstants.h"
@@ -54,7 +55,14 @@ bool ProjectManager::SaveProject(const std::string& filepath)
 				{"volume", ch.volume},
 				{"mute", ch.mute},
 				{"solo", ch.solo},
-				{"record", ch.record}
+				{"record", ch.record},
+				{"minimized", ch.minimized},
+				{"customName", ch.customName},
+				{"customColor", {
+					{"r", ch.customColor.Red()},
+					{"g", ch.customColor.Green()},
+					{"b", ch.customColor.Blue()}
+				}}
 			});
 		}
 
@@ -140,6 +148,20 @@ bool ProjectManager::LoadProject(const std::string& filepath)
 			ch.mute = chJson["mute"];
 			ch.solo = chJson["solo"];
 			ch.record = chJson["record"];
+
+			// Load optional fields (for backwards compatibility)
+			if (chJson.contains("minimized")) {
+				ch.minimized = chJson["minimized"];
+			}
+			if (chJson.contains("customName")) {
+				ch.customName = chJson["customName"];
+			}
+			if (chJson.contains("customColor")) {
+				unsigned char r = chJson["customColor"]["r"];
+				unsigned char g = chJson["customColor"]["g"];
+				unsigned char b = chJson["customColor"]["b"];
+				ch.customColor = wxColour(r, g, b);
+			}
 		}
 
 		// IMPORTANT: Apply channel settings to MIDI device
@@ -216,6 +238,9 @@ void ProjectManager::ClearProject()
 		ch.mute = false;
 		ch.solo = false;
 		ch.record = false;
+		ch.minimized = false;
+		ch.customName = "";
+		ch.customColor = TRACK_COLORS[i];
 	}
 	mSoundBank.ApplyChannelSettings();
 

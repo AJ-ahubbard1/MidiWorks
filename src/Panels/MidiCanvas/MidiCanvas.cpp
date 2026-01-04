@@ -98,7 +98,8 @@ void MidiCanvasPanel::Update()
 	int targetPlayheadX = canvasWidth * AUTOSCROLL_TARGET_POSITION;
 
 	// Track tick changes to detect Reset button clicks while stopped
-	static uint64_t lastTick = 0;
+	// Initialize to UINT64_MAX to force offset update on first call
+	static uint64_t lastTick = UINT64_MAX;
 	bool tickChanged = (currentTick != lastTick);
 	lastTick = currentTick;
 
@@ -145,6 +146,7 @@ void MidiCanvasPanel::Draw(wxPaintEvent&)
 	DrawHoverBorder(gc);
 	DrawSelectionRectangle(gc);
 	DrawPlayhead(gc);
+	DrawPianoKeyboard(gc);  // Draw last so it appears on top of scrolling notes
 
 	delete gc;
 }
@@ -239,7 +241,11 @@ std::vector<NoteLocation> MidiCanvasPanel::FindNotesInRectangle(wxPoint start, w
 	uint64_t maxTick = ScreenXToTick(maxX);
 	ubyte minPitch = ScreenYToPitch(maxY);  // Y is flipped
 	ubyte maxPitch = ScreenYToPitch(minY);  // Y is flipped
-
+	
+	if (minTick == maxTick)
+	{
+		return std::vector<NoteLocation>{};
+	}
 	// Search through all tracks 
 	return mTrackSet.FindNotesInRegion(minTick, maxTick, minPitch, maxPitch);
 }
@@ -426,7 +432,8 @@ void MidiCanvasPanel::DrawTrackNotes(wxGraphicsContext* gc)
 			}
 		}
 		// Set color for this track
-		gc->SetBrush(wxBrush(TRACK_COLORS[note.trackIndex]));
+		auto trackColor = mAppModel->GetSoundBank().GetChannelColor(note.trackIndex);
+		gc->SetBrush(wxBrush(trackColor));
 		DrawNote(gc, note);
 	}
 }
@@ -445,17 +452,18 @@ void MidiCanvasPanel::DrawRecordingBuffer(wxGraphicsContext* gc)
 
 void MidiCanvasPanel::DrawNoteAddPreview(wxGraphicsContext* gc)
 {
-	if (!mAppModel->GetSoundBank().IsPreviewingNote() || mMouseMode != MouseMode::Adding)
+	if (!mAppModel->HasNoteAddPreview() || mMouseMode != MouseMode::Adding)
 		return;
 
 	gc->SetBrush(wxBrush(NOTE_ADD_PREVIEW));
 
-	// Calculate preview note position with grid snap applied
-	uint64_t snappedTick = ApplyGridSnap(mPreviewStartTick);
+	// Get preview state from model
+	const auto& preview = mAppModel->GetNoteAddPreview();
+	uint64_t snappedTick = ApplyGridSnap(preview.tick);
 	uint64_t duration = GetSelectedDuration();
 
 	int x = TickToScreenX(snappedTick);
-	int y = PitchToScreenY(mAppModel->GetSoundBank().GetPreviewPitch());
+	int y = PitchToScreenY(preview.pitch);
 	int w = TicksToWidth(duration);
 	gc->DrawRectangle(x, y, w, mNoteHeight);
 }
@@ -662,4 +670,107 @@ void MidiCanvasPanel::DrawMidiEventTooltip(wxGraphicsContext* gc, const MidiEven
 
 	// Draw text
 	gc->DrawText(text, rectX + padding, rectY + padding);
+}
+
+void MidiCanvasPanel::DrawPianoKeyboard(wxGraphicsContext* gc)
+{
+	int canvasWidth = GetSize().GetWidth();
+	int canvasHeight = GetSize().GetHeight();
+	int keyboardWidth = static_cast<int>(canvasWidth * 0.15);  // 15% of canvas width (leaves 5% gap to playhead at 20%)
+
+	// Draw background for entire keyboard area (light gray)
+	gc->SetBrush(wxBrush(wxColour(240, 240, 240)));
+	gc->SetPen(*wxTRANSPARENT_PEN);
+	gc->DrawRectangle(0, CONTROL_BAR_HEIGHT, keyboardWidth, canvasHeight - CONTROL_BAR_HEIGHT);
+
+	// First pass: Draw white keys
+	for (int pitch = 0; pitch <= MidiConstants::MAX_MIDI_NOTE; pitch++)
+	{
+		int y = PitchToScreenY(pitch);
+
+		// Skip if outside visible area
+		if (y < CONTROL_BAR_HEIGHT || y >= canvasHeight) continue;
+
+		// Determine if this is a white or black key
+		int noteInOctave = pitch % MidiConstants::NOTES_PER_OCTAVE;  // 0=C, 1=C#, 2=D, etc.
+		bool isBlackKey = (noteInOctave == 1 || noteInOctave == 3 ||
+		                  noteInOctave == 6 || noteInOctave == 8 || noteInOctave == 10);
+
+		if (!isBlackKey)
+		{
+			// White key
+			gc->SetBrush(wxBrush(*wxWHITE));
+			gc->SetPen(wxPen(wxColour(180, 180, 180), 1));
+			gc->DrawRectangle(0, y, keyboardWidth, mNoteHeight);
+
+			// Add octave labels on C notes
+			if (noteInOctave == 0)
+			{
+				int octave = pitch / MidiConstants::NOTES_PER_OCTAVE;
+				std::string label = "C" + std::to_string(octave);
+				gc->SetFont(wxFont(8, wxFONTFAMILY_DEFAULT, wxFONTSTYLE_NORMAL, wxFONTWEIGHT_NORMAL), *wxBLACK);
+				gc->DrawText(label, 2, y + 2);
+			}
+		}
+	}
+
+	// Second pass: Draw black keys (on top of white keys)
+	for (int pitch = 0; pitch <= MidiConstants::MAX_MIDI_NOTE; pitch++)
+	{
+		int y = PitchToScreenY(pitch);
+
+		// Skip if outside visible area
+		if (y < CONTROL_BAR_HEIGHT || y >= canvasHeight) continue;
+
+		int noteInOctave = pitch % MidiConstants::NOTES_PER_OCTAVE;
+		bool isBlackKey = (noteInOctave == 1 || noteInOctave == 3 ||
+		                  noteInOctave == 6 || noteInOctave == 8 || noteInOctave == 10);
+
+		if (isBlackKey)
+		{
+			// Black key: smaller width (60% of keyboard width)
+			int blackKeyWidth = static_cast<int>(keyboardWidth * 0.6);
+			gc->SetBrush(wxBrush(*wxBLACK));
+			gc->SetPen(wxPen(wxColour(50, 50, 50), 1));
+			gc->DrawRectangle(0, y, blackKeyWidth, mNoteHeight);
+		}
+	}
+
+	// Third pass: Highlight active notes (drawn on top)
+	// Check for preview note (during note add)
+	if (mAppModel->HasNoteAddPreview())
+	{
+		const auto& preview = mAppModel->GetNoteAddPreview();
+		int y = PitchToScreenY(preview.pitch);
+
+		if (y >= CONTROL_BAR_HEIGHT && y < canvasHeight)
+		{
+			// Green highlight for preview note
+			gc->SetBrush(wxBrush(wxColour(100, 255, 100, 180)));
+			gc->SetPen(*wxTRANSPARENT_PEN);
+			gc->DrawRectangle(0, y, keyboardWidth, mNoteHeight);
+		}
+	}
+
+	// Check for active recording notes
+	if (mTransport.IsRecording())
+	{
+		const auto& activeNotes = mAppModel->GetRecordingSession().GetActiveNotes();
+		for (const auto& activeNote : activeNotes)
+		{
+			int y = PitchToScreenY(activeNote.mm.getPitch());
+
+			if (y >= CONTROL_BAR_HEIGHT && y < canvasHeight)
+			{
+				// Red-orange highlight for recording notes
+				gc->SetBrush(wxBrush(wxColour(255, 150, 100, 180)));
+				gc->SetPen(*wxTRANSPARENT_PEN);
+				gc->DrawRectangle(0, y, keyboardWidth, mNoteHeight);
+			}
+		}
+	}
+
+	// Draw separator line at keyboard edge
+	gc->SetPen(wxPen(*wxBLACK, 2));
+	gc->StrokeLine(keyboardWidth, CONTROL_BAR_HEIGHT, keyboardWidth, canvasHeight);
 }

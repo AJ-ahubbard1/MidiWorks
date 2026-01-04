@@ -68,9 +68,23 @@ public:
 	bool HasNoteEditPreview() const;
 	bool HasMultiNoteEditPreview() const;
 
+	// Note add preview (for mouse-based note creation)
+	struct NoteAddPreview
+	{
+		bool isActive = false;
+		ubyte pitch = 0;
+		uint64_t tick = 0;  // Unsnapped tick for visual display
+	};
+
+	void SetNoteAddPreview(ubyte pitch, uint64_t tick, uint64_t snappedTick, uint64_t duration);
+	void ClearNoteAddPreview();
+	const NoteAddPreview& GetNoteAddPreview() const;
+	bool HasNoteAddPreview() const;
+
 private:
 	TrackSet& mTrackSet;
 	SoundBank& mSoundBank;
 	NoteEditPreview mNoteEditPreview;
 	MultiNoteEditPreview mMultiNoteEditPreview;
+	NoteAddPreview mNoteAddPreview;
 };

@@ -23,20 +23,15 @@ std::unique_ptr<Command> NoteEditor::CreateAddNoteToRecordChannels(
 	// @TODO velocity should be based on recording settings, separate from preview settings
 	ubyte velocity = mSoundBank.GetPreviewVelocity();
 
-	// For now, we'll add to the first record-enabled channel
-	// TODO: Create a compound command to handle multiple channels
-	const MidiChannel* channel = channels[0];
+	// Get all record-enabled channels and convert to track indices
+	std::vector<int> targetTracks;
+	for (const MidiChannel* channel : channels)
+	{
+		targetTracks.push_back(static_cast<int>(channel->channelNumber));
+	}
 
-	// Create note-on and note-off events
-	MidiMessage noteOn = MidiMessage::NoteOn(pitch, velocity, channel->channelNumber);
-	MidiMessage noteOff = MidiMessage::NoteOff(pitch, channel->channelNumber);
-
-	TimedMidiEvent timedNoteOn{noteOn, startTick};
-	TimedMidiEvent timedNoteOff{noteOff, startTick + duration - MidiConstants::NOTE_SEPARATION_TICKS};
-
-	// Get the track and create the command
-	Track& track = mTrackSet.GetTrack(channel->channelNumber);
-	return std::make_unique<AddNoteCommand>(track, timedNoteOn, timedNoteOff);
+	// Create command to add note to all record-enabled tracks
+	return std::make_unique<AddNoteCommand>(mTrackSet, targetTracks, pitch, velocity, startTick, duration);
 }
 
 std::unique_ptr<Command> NoteEditor::CreateDeleteNote(const NoteLocation& note)
@@ -221,4 +216,57 @@ const NoteEditor::MultiNoteEditPreview& NoteEditor::GetMultiNoteEditPreview() co
 bool NoteEditor::HasMultiNoteEditPreview() const
 {
 	return mMultiNoteEditPreview.isActive;
+}
+
+void NoteEditor::SetNoteAddPreview(ubyte pitch, uint64_t tick, uint64_t snappedTick, uint64_t duration)
+{
+	uint64_t endTick = snappedTick + duration - MidiConstants::NOTE_SEPARATION_TICKS;
+
+	// Collision check: Check for conflicts in ALL record-enabled channels
+	// (since note will be added to all of them)
+	auto channels = mSoundBank.GetRecordEnabledChannels();
+	for (const MidiChannel* channel : channels)
+	{
+		int trackIndex = static_cast<int>(channel->channelNumber);
+		auto conflicts = mTrackSet.FindNotesInRegion(snappedTick, endTick, pitch, pitch, trackIndex);
+		if (!conflicts.empty())
+		{
+			return;  // Collision detected in this channel, don't update preview
+		}
+	}
+
+	// Handle audio preview - switch pitch if changed
+	bool pitchChanged = !mNoteAddPreview.isActive || (pitch != mNoteAddPreview.pitch);
+	if (pitchChanged)
+	{
+		if (mNoteAddPreview.isActive)
+		{
+			mSoundBank.StopPreviewNote();
+		}
+		mSoundBank.PlayPreviewNote(pitch);
+	}
+
+	// Store preview state (using unsnapped tick for visual display)
+	mNoteAddPreview.isActive = true;
+	mNoteAddPreview.pitch = pitch;
+	mNoteAddPreview.tick = tick;
+}
+
+void NoteEditor::ClearNoteAddPreview()
+{
+	if (mNoteAddPreview.isActive)
+	{
+		mSoundBank.StopPreviewNote();
+		mNoteAddPreview.isActive = false;
+	}
+}
+
+const NoteEditor::NoteAddPreview& NoteEditor::GetNoteAddPreview() const
+{
+	return mNoteAddPreview;
+}
+
+bool NoteEditor::HasNoteAddPreview() const
+{
+	return mNoteAddPreview.isActive;
 }

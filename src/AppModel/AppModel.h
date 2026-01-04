@@ -5,6 +5,7 @@
 #include <chrono>
 #include <vector>
 #include <functional>
+#include <optional>
 #include "SoundBank/SoundBank.h"
 #include "Transport/Transport.h"
 #include "TrackSet/TrackSet.h"
@@ -62,18 +63,31 @@ public:
 	bool HasNoteEditPreview() const;
 	bool HasMultiNoteEditPreview() const;
 
+	// Note Add Preview (for mouse-based note creation)
+	void SetNoteAddPreview(ubyte pitch, uint64_t tick, uint64_t snappedTick, uint64_t duration);
+	void ClearNoteAddPreview();
+	const NoteEditor::NoteAddPreview& GetNoteAddPreview() const;
+	bool HasNoteAddPreview() const;
+
 	// Callbacks
 	using DirtyStateCallback = std::function<void(bool isDirty)>;
 	void SetDirtyStateCallback(DirtyStateCallback callback);
 
 	// Clipboard for copy/paste
 	void CopyNotesToClipboard(const std::vector<NoteLocation>& notes);
-	void PasteNotes(uint64_t pasteTick = UINT64_MAX);
+	void PasteNotes(std::optional<uint64_t> pasteTick = std::nullopt);
+	void PasteNotesToRecordTracks(std::optional<uint64_t> pasteTick = std::nullopt);
 
 	// Drum Machine
 	void RecordDrumPatternToTrack();
 	int TriggerDrumPad(int rowIndex);  // Trigger drum pad via keyboard (returns column index if pad enabled, -1 otherwise)
 	void ReleaseDrumPad(int rowIndex);
+	
+	// Collision detection helpers
+	bool IsRegionCollisionFree(uint64_t startTick, uint64_t endTick, ubyte pitch, int channel,
+	                           const NoteLocation* excludeNote = nullptr) const;
+	bool IsRegionCollisionFree(uint64_t startTick, uint64_t endTick, ubyte pitch, int channel,
+	                           const std::vector<NoteLocation>& excludeNotes) const;
 
 
 private:
@@ -97,12 +111,6 @@ private:
 	void RouteAndPlayMessage(const MidiMessage& mm, uint64_t currentTick);
 	void HandleIncomingMidi();
 	std::vector<MidiMessage> PlayDrumMachinePattern(uint64_t lastTick, uint64_t currentTick);
-
-	// Collision detection helpers
-	bool IsRegionCollisionFree(uint64_t startTick, uint64_t endTick, ubyte pitch,
-	                           const NoteLocation* excludeNote = nullptr) const;
-	bool IsRegionCollisionFree(uint64_t startTick, uint64_t endTick, ubyte pitch,
-	                           const std::vector<NoteLocation>& excludeNotes) const;
 
 	// Transport state handlers
 	void HandleStopRecording();

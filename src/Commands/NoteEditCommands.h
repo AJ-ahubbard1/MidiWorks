@@ -6,14 +6,21 @@
 using namespace MidiInterface;
 
 /// <summary>
-/// Command to add a note to a track.
-/// Stores the note data and track reference to enable undo.
+/// Command to add a note to one or more tracks.
+/// Stores note indices per track to enable efficient undo.
+/// When multiple tracks are provided, adds the same note to all tracks (useful for layering).
 /// </summary>
 class AddNoteCommand : public Command
 {
 public:
-	AddNoteCommand(Track& track, TimedMidiEvent noteOn, TimedMidiEvent noteOff)
-		: mTrack(track), mNoteOn(noteOn), mNoteOff(noteOff)
+	AddNoteCommand(TrackSet& trackSet, const std::vector<int>& targetTracks,
+	               ubyte pitch, ubyte velocity, uint64_t startTick, uint64_t duration)
+		: mTrackSet(trackSet)
+		, mTargetTracks(targetTracks)
+		, mPitch(pitch)
+		, mVelocity(velocity)
+		, mStartTick(startTick)
+		, mDuration(duration)
 	{
 	}
 
@@ -22,13 +29,19 @@ public:
 	std::string GetDescription() const override;
 
 private:
-	Track& mTrack;
-	TimedMidiEvent mNoteOn;
-	TimedMidiEvent mNoteOff;
-	size_t mNoteOnIndex = 0;
-	size_t mNoteOffIndex = 0;
+	struct NoteIndices {
+		int trackIndex = 0;
+		size_t noteOnIndex = 0;
+		size_t noteOffIndex = 0;
+	};
 
-	void FindNoteIndices();
+	TrackSet& mTrackSet;
+	std::vector<int> mTargetTracks;
+	ubyte mPitch;
+	ubyte mVelocity;
+	uint64_t mStartTick;
+	uint64_t mDuration;
+	std::vector<NoteIndices> mAddedNotes;  // Indices of notes added to each track
 };
 
 /// <summary>

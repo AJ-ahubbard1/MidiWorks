@@ -92,9 +92,6 @@
     <ClInclude Include="src\Panels\Log.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="src\Panels\Dummy.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
     <ClInclude Include="src\AppModel\AppModel.h">
       <Filter>Header Files</Filter>
     </ClInclude>
@@ -222,6 +219,12 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="src\Commands\DeleteMultipleNotesCommand.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="src\Commands\PasteToTracksCommand.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="src\AppModel\SoundBank\ChannelColors.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>

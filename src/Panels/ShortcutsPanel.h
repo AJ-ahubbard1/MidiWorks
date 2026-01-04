@@ -55,6 +55,7 @@ private:
 		AddShortcut("Q", "Quantize notes to grid");
 		AddShortcut("Ctrl+C", "Copy selected notes");
 		AddShortcut("Ctrl+V", "Paste notes at playhead");
+		AddShortcut("Ctrl+Shift+V", "Paste notes to record-enabled tracks");
 		AddShortcut("Ctrl+X", "Cut selected notes");
 
 		mMainSizer->AddSpacer(10);

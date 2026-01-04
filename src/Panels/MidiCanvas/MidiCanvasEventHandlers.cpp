@@ -130,11 +130,10 @@ void MidiCanvasPanel::OnLeftDown(wxMouseEvent& event)
 		}
 		else
 		{
-			// Start preview playback on record-enabled channels
-			mAppModel->GetSoundBank().PlayPreviewNote(pitch);
-
-			// Store the starting tick for note creation
-			mPreviewStartTick = tick;
+			// Start note add preview
+			uint64_t snappedTick = ApplyGridSnap(tick);
+			uint64_t duration = GetSelectedDuration();
+			mAppModel->SetNoteAddPreview(pitch, tick, snappedTick, duration);
 			mMouseMode = MouseMode::Adding;
 		}
 	}
@@ -151,17 +150,16 @@ void MidiCanvasPanel::OnLeftUp(wxMouseEvent& event)
 		return;
 	}
 
-	if (mMouseMode == MouseMode::Adding && mAppModel->GetSoundBank().IsPreviewingNote())
+	if (mMouseMode == MouseMode::Adding && mAppModel->HasNoteAddPreview())
 	{
-		// Stop the preview playback
-		mAppModel->GetSoundBank().StopPreviewNote();
-
-		// Apply grid snap to starting tick
-		uint64_t snappedTick = ApplyGridSnap(mPreviewStartTick);
+		// Finalize note addition using preview state
+		const auto& preview = mAppModel->GetNoteAddPreview();
+		uint64_t snappedTick = ApplyGridSnap(preview.tick);
 		uint64_t duration = GetSelectedDuration();
 
 		// Add note to all record-enabled channels
-		mAppModel->AddNoteToRecordChannels(mAppModel->GetSoundBank().GetPreviewPitch(), snappedTick, duration);
+		mAppModel->AddNoteToRecordChannels(preview.pitch, snappedTick, duration);
+		mAppModel->ClearNoteAddPreview();
 	}
 	else if (mMouseMode == MouseMode::MovingNote && mSelectedNote.found)
 	{
@@ -276,6 +274,15 @@ void MidiCanvasPanel::OnMouseMove(wxMouseEvent& event)
 {
 	wxPoint pos = event.GetPosition();
 
+	// Update debug message with mouse position
+	uint64_t tick = ScreenXToTick(pos.x);
+	ubyte pitch = ScreenYToPitch(pos.y);
+	wxString msg = wxString::Format("Mouse: (%d, %d) | Tick: %llu, Pitch: %d",
+	                                 pos.x, pos.y, tick, pitch);
+	mDebugMessage->SetLabelText(msg);
+
+	bool outOfBounds = (pos.x < GetSize().GetWidth() * AUTOSCROLL_TARGET_POSITION);
+
 	// Handle rectangle selection dragging
 	if (mIsSelecting)
 	{
@@ -293,6 +300,8 @@ void MidiCanvasPanel::OnMouseMove(wxMouseEvent& event)
 		mOriginOffset += delta;
 		ClampOffset(); // Apply boundaries after panning
 		mLastMouse = pos;
+		wxString msg = wxString::Format("Offset (%d, %d)", mOriginOffset.x, mOriginOffset.y);
+		mDebugMessage->SetLabelText(msg);
 		Refresh();
 		return;
 	}
@@ -317,27 +326,16 @@ void MidiCanvasPanel::OnMouseMove(wxMouseEvent& event)
 	}
 
 	// Handle note preview while adding (left button held)
-	if (mMouseMode == MouseMode::Adding && mAppModel->GetSoundBank().IsPreviewingNote())
+	if (mMouseMode == MouseMode::Adding && mAppModel->HasNoteAddPreview())
 	{
 		ubyte newPitch = ScreenYToPitch(pos.y);
 		uint64_t newTick = ScreenXToTick(pos.x);
+		uint64_t snappedTick = ApplyGridSnap(newTick);
+		uint64_t duration = GetSelectedDuration();
 
-		bool pitchChanged = (newPitch != mAppModel->GetSoundBank().GetPreviewPitch());
-		bool timingChanged = (newTick != mPreviewStartTick);
-
-		// If pitch changed, switch the preview note audio
-		if (pitchChanged)
-		{
-			mAppModel->GetSoundBank().StopPreviewNote();
-			mAppModel->GetSoundBank().PlayPreviewNote(newPitch);
-		}
-
-		// If pitch or timing changed, update the visual preview
-		if (pitchChanged || timingChanged)
-		{
-			mPreviewStartTick = newTick;  // Update current position
-			Refresh();  // Redraw to show updated preview note
-		}
+		// Update preview (handles collision detection and audio automatically)
+		mAppModel->SetNoteAddPreview(newPitch, newTick, snappedTick, duration);
+		Refresh();
 		return;
 	}
 
@@ -392,7 +390,7 @@ void MidiCanvasPanel::OnMouseMove(wxMouseEvent& event)
 	}
 
 	// Update hover state when idle
-	if (mMouseMode == MouseMode::Idle)
+	if (mMouseMode == MouseMode::Idle && !outOfBounds)
 	{
 		NoteLocation newHover = FindNoteAtPosition(pos.x, pos.y);
 		if (newHover.found != mHoveredNote.found ||
@@ -404,6 +402,11 @@ void MidiCanvasPanel::OnMouseMove(wxMouseEvent& event)
 		}
 	}
 
+	if (outOfBounds)
+	{
+		mHoveredNote = NoteLocation{};
+	}
+	
 	// Update MIDI event hover detection
 	if (mShowMidiEventsCheckbox->GetValue())
 	{
@@ -421,20 +424,13 @@ void MidiCanvasPanel::OnMouseMove(wxMouseEvent& event)
 			}
 		}
 	}
-
-	// Update debug message with mouse position
-	uint64_t tick = ScreenXToTick(pos.x);
-	ubyte pitch = ScreenYToPitch(pos.y);
-	wxString msg = wxString::Format("Mouse: (%d, %d) | Tick: %llu, Pitch: %d",
-	                                 pos.x, pos.y, tick, pitch);
-	mDebugMessage->SetLabelText(msg);
 }
 
 
 // ============================================================================
 // WINDOW EVENTS
 // ============================================================================
-
+// Event triggers when window size changes
 void MidiCanvasPanel::OnSize(wxSizeEvent& event)
 {
 	int canvasWidth = GetSize().GetWidth();
@@ -443,31 +439,27 @@ void MidiCanvasPanel::OnSize(wxSizeEvent& event)
 	// Calculate minimum note height (fully zoomed out = all notes visible)
 	mMinNoteHeight = std::max(MIN_NOTE_HEIGHT_PIXELS, canvasHeight / MidiConstants::MIDI_NOTE_COUNT);
 
-	// Initialize to minimum zoom (fully zoomed out)
-	mNoteHeight = mMinNoteHeight;
+	// Initialize to 3 times minimum zoom
+	mNoteHeight = mMinNoteHeight * 3;
 
-	// At minimum zoom, all notes fit exactly, so no vertical offset needed
-	mOriginOffset.y = 0;
+	// Force ClampOffset() to reset horizontal position to show tick 0 at playhead
+	// (handles timing issues where OnSize fires before canvas width is initialized)
+	mOriginOffset.x = INT32_MAX;
 
-	// Initialize horizontal offset on first size event (fixed playhead position)
-	if (!mOffsetInitialized && canvasWidth > 0)
-	{
-		int targetPlayheadX = canvasWidth * AUTOSCROLL_TARGET_POSITION;
-		mOriginOffset.x = targetPlayheadX;
-		mOffsetInitialized = true;
-	}
+	// Center viewport vertically on middle octaves
+	mOriginOffset.y = (MidiConstants::MAX_MIDI_NOTE * mNoteHeight - canvasHeight) * 0.5;
 
-	ClampOffset(); // Ensure we're within valid bounds
-	event.Skip(); // Allow default handling
+	ClampOffset(); // Apply offset bounds and finalize positioning
+	event.Skip();
 }
 
 void MidiCanvasPanel::OnMouseLeave(wxMouseEvent& event)
 {
 	// If we're previewing a note and the mouse leaves the window, stop the preview
 	// This prevents stuck notes if the mouse leaves while left button is held
-	if (mAppModel->GetSoundBank().IsPreviewingNote() && mMouseMode == MouseMode::Adding)
+	if (mAppModel->HasNoteAddPreview() && mMouseMode == MouseMode::Adding)
 	{
-		mAppModel->GetSoundBank().StopPreviewNote();
+		mAppModel->ClearNoteAddPreview();
 		mMouseMode = MouseMode::Idle;
 	}
 }
@@ -517,10 +509,22 @@ void MidiCanvasPanel::OnKeyDown(wxKeyEvent& event)
 	// Ctrl+V - Paste clipboard notes at the playhead tick
 	if (event.ControlDown() && keyCode == 'V')
 	{
-		mAppModel->PasteNotes();
-		ClearSelection();
-		Refresh();
-		return;
+		// Ctrl+Shift+V - Paste to record-enabled tracks
+		if (event.ShiftDown())
+		{
+			mAppModel->PasteNotesToRecordTracks();
+			ClearSelection();
+			Refresh();
+			return;
+		}
+		// Ctrl+V - Regular paste
+		else
+		{
+			mAppModel->PasteNotes();
+			ClearSelection();
+			Refresh();
+			return;
+		}
 	}
 
 	// Ctrl+X - Cut selected notes (copy + delete)

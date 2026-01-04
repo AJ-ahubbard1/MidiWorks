@@ -25,6 +25,7 @@ public:
 	void WrapActiveNotesAtLoop(uint64_t endTick, uint64_t loopStartTick);
 	void CloseAllActiveNotes(uint64_t endTick);  // Close held notes without reopening (for stop recording)
 	bool HasActiveNotes() const;
+	const std::vector<TimedMidiEvent>& GetActiveNotes() const { return mActiveNotes; }
 
 	// Loop recording playback (plays back previously recorded material during loop recording)
 	void ResetLoopPlayback(uint64_t loopStartTick);

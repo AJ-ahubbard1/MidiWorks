@@ -14,185 +14,6 @@ Track bugs and issues discovered during testing of MidiWorks.
 
 ---
 
-
----
-
-### #10 - Add ability to hide/show soundbank channels
-**Status:** Open
-**Priority:** Low
-**Found:** 2025-12-17
-
-**Description:**
-The SoundBankPanel currently displays all 15 channels at once, taking up significant vertical space. Users often only work with a few channels at a time and would benefit from being able to hide unused channels.
-
-**Proposed Feature:**
-- Add collapse/expand button or checkbox for each channel
-- Option to "hide empty channels" (channels with no recorded notes)
-- Save visibility state with project file
-- Keyboard shortcut to toggle all channels visibility
-
-**Benefits:**
-- Cleaner, less cluttered interface
-- Easier to focus on active channels
-- Better use of screen real estate
-- Faster scrolling through mixer
-
-**Implementation Notes:**
-- Could use wxCollapsiblePane for each ChannelControlsPanel
-- Or simple Show()/Hide() with layout refresh
-- Store visibility state in channel data structure or separate UI state
-
-**Notes:**
-See SoundBankPanel.h for current implementation. Consider how this interacts with solo/mute workflow.
-
----
-
-### #11 - Add custom colors and titles to channels
-**Status:** Open
-**Priority:** Low
-**Found:** 2025-12-17
-
-**Description:**
-Channels are currently identified only by number (0-14) and program name. Users working with multiple channels would benefit from custom colors and descriptive names for better organization.
-
-**Proposed Feature:**
-- **Custom channel titles** - User-editable text field (e.g., "Bass", "Piano", "Drums")
-- **Custom channel colors** - Color picker for each channel
-  - Apply color to channel strip in mixer
-  - Apply color to notes in piano roll (MidiCanvas)
-  - Apply color to track headers/labels
-
-**Benefits:**
-- Better visual organization in complex projects
-- Easier to identify channels at a glance
-- Standard DAW feature (Ableton, FL Studio, Reaper all have this)
-- Improves workflow for multi-instrument compositions
-
-**UI Mockup Ideas:**
-- Double-click channel number to edit title
-- Right-click channel strip → "Set Color"
-- Color swatch button on each ChannelControlsPanel
-
-**Implementation Notes:**
-- Add `std::string customName` and `wxColour customColor` to MidiChannel struct (SoundBank.h)
-- Update ChannelControlsPanel to display custom name if set
-- Update MidiCanvas note rendering to use channel color
-- Store in project file (SaveProject/LoadProject in AppModel.cpp)
-- Default colors: use color wheel (HSV with evenly spaced hues)
-
-**Notes:**
-Color-coding notes in piano roll significantly improves readability in dense arrangements. This is a quality-of-life feature that distinguishes professional DAWs.
-
----
-
-### #12 - Add virtual piano keyboard with visual feedback
-**Status:** Open
-**Priority:** Medium
-**Found:** 2025-12-17
-
-**Description:**
-Add an on-screen piano keyboard that shows which notes are currently playing and allows mouse-based note triggering. This provides visual feedback during playback/recording and enables note input without a MIDI keyboard.
-
-**Proposed Features:**
-1. **Visual feedback** - Highlight keys that are currently playing
-   - Show notes from `mActiveNotes` vector (during recording)
-   - Show preview notes from `mIsPreviewingNote`/`mPreviewPitch`
-   - Show notes during playback
-   - Color-code by channel (integrate with bug #11)
-
-2. **Mouse interaction** - Click keys to trigger sounds
-   - Left-click to play note on record-enabled channels
-   - Release to stop note
-   - Use same velocity as preview notes (`mPreviewVelocity`)
-
-3. **Keyboard shortcuts** - Computer keyboard as piano
-   - Map QWERTY keys to piano keys (e.g., A-K = white keys, W-I = black keys)
-   - Adjustable octave range
-
-**UI Placement:**
-- Vertical piano strip on left side of MidiCanvas (standard DAW layout)
-- Or dockable panel for flexibility
-- Piano keys should align with piano roll note rows
-
-**Benefits:**
-- Visual confirmation of what's playing (especially useful during recording)
-- Note input without MIDI keyboard
-- Standard DAW feature (FL Studio, Ableton, Reaper all have this)
-- Helps beginners understand note layout
-- Useful for testing/debugging stuck notes
-
-**Implementation Notes:**
-- New panel or widget: `VirtualPianoPanel` or `PianoKeyboard`
-- Poll `AppModel::mActiveNotes` to determine which keys to highlight
-- Poll `AppModel::mIsPreviewingNote` and `mPreviewPitch` for preview state
-- Mouse down → `AppModel::PlayPreviewNote(pitch)`
-- Mouse up → `AppModel::StopPreviewNote()`
-- Render piano keys (88 keys or configurable range, e.g., C1-C7)
-- Update in sync with timer (10ms refresh)
-
-**Technical Considerations:**
-- `mActiveNotes` is currently used only during recording - may need to track active notes during playback too
-- Need to handle multiple simultaneous notes (polyphony)
-- Key highlighting should be channel-aware (different colors per channel)
-- Consider performance impact of rendering 88 keys at 100fps
-
-**Notes:**
-This is a highly visible, user-facing feature that significantly improves usability. Medium priority because it enhances both input and feedback. See AppModel.h for `mActiveNotes`, `mIsPreviewingNote`, and preview note methods.
-
----
-
-### #13 - Add ability to copy notes between channels
-**Status:** Open
-**Priority:** Medium
-**Found:** 2025-12-17
-
-**Description:**
-Currently, copy-paste operations only work within the same channel. Users need the ability to copy notes from one channel/instrument to another for doubling lines, layering instruments, or rearranging parts.
-
-**Use Cases:**
-- Double a bass line on electric bass + synth bass
-- Copy a melody to multiple instruments for layering
-- Move a part from one instrument to another
-- Create harmony by copying and transposing to different channel
-
-**Proposed Solutions:**
-
-**Option 1: Paste to Active Channel**
-- Select notes from any channel(s) → Copy
-- Select/activate destination channel (click channel in mixer?)
-- Paste → notes appear in active channel at paste position
-- Pro: Simple, standard DAW behavior
-- Con: Need UI concept of "active/selected channel"
-
-**Option 2: "Copy to Channel..." Context Menu**
-- Select notes → Right-click → "Copy to Channel..." → Choose from dropdown
-- Creates copy in destination channel immediately
-- Pro: Explicit, clear to user
-- Con: Extra menu interaction
-
-**Option 3: Paste with Channel Override**
-- Select notes → Copy
-- Paste (Ctrl+V) → pastes to original channels
-- "Paste to Channel..." (Ctrl+Shift+V) → dialog to choose destination
-- Pro: Preserves current behavior, adds option
-- Con: Extra keyboard shortcut to learn
-
-**Implementation Notes:**
-- Current clipboard: `std::vector<ClipboardNote>` includes `trackIndex`
-- `PasteCommand` currently respects original `trackIndex` from clipboard
-- Need to modify `PasteCommand` to accept optional channel override parameter
-- Or add new `PasteToChannelCommand`
-- Consider multi-channel selection: if selecting notes from channels 0, 1, 2 and pasting to channel 5, should it paste all to 5, or to 5, 6, 7?
-
-**Recommended Approach:**
-Option 1 (paste to active channel) + ability to paste to multiple record-enabled channels:
-- Add "active channel" concept to UI (highlight active channel in mixer)
-- Paste to all record-enabled channels (existing pattern in `AddNoteToRecordChannels()`)
-- Matches existing mental model in app
-
-**Notes:**
-This is a fundamental DAW workflow feature. See `AppModel::CopyNotesToClipboard()` and `PasteCommand` for current implementation. Consider interaction with bug #5 (multi-note move).
-
 ---
 
 ### #25 - DrumMachine plays even when panel is hidden
@@ -226,43 +47,6 @@ Use the **mute button** (implemented in bug #24 Option 5) to control drum machin
 ---
 
 ---
-
----
-
-### #16 - Magic number sentinel value in PasteNotes
-**Status:** Open
-**Priority:** Low
-**Found:** 2025-12-22
-
-**Description:**
-`PasteNotes()` uses UINT64_MAX as a sentinel value to indicate "use current tick", which is unclear and error-prone.
-
-**Problematic Code:**
-- AppModel.cpp:223: `void AppModel::PasteNotes(uint64_t pasteTick = UINT64_MAX)`
-- AppModel.cpp:227: `if (pasteTick == UINT64_MAX)`
-
-**Issues:**
-1. **Unclear intent** - Magic number doesn't convey meaning
-2. **Error-prone** - Easy to accidentally pass UINT64_MAX thinking it's a valid tick
-3. **Not idiomatic C++** - C++17 provides std::optional for exactly this use case
-
-**Expected Behavior:**
-Use std::optional to clearly express "optional parameter with default behavior".
-
-**Proposed Solution:**
-```cpp
-void AppModel::PasteNotes(std::optional<uint64_t> pasteTick = std::nullopt)
-{
-    if (!mClipboard.HasData()) return;
-
-    uint64_t tick = pasteTick.value_or(mTransport.GetCurrentTick());
-    auto cmd = std::make_unique<PasteCommand>(mTrackSet, mClipboard.GetNotes(), tick);
-    mUndoRedoManager.ExecuteCommand(std::move(cmd));
-}
-```
-
-**Notes:**
-This is a minor refactoring but improves code clarity and type safety. Low priority because current implementation works, but should be addressed during next refactoring pass.
 
 ---
 
@@ -376,140 +160,488 @@ int maxOffsetX = targetPlayheadX;  // Was: 0
 
 ---
 
-### #20 - Loop boundary check uses magic number -1
-**Status:** Open
+## Fixed Bugs
+
+### #10 - Add ability to hide/show soundbank channels
+**Status:** Fixed
 **Priority:** Low
-**Found:** 2025-12-22
+**Found:** 2025-12-17
+**Fixed:** 2026-01-04
 
 **Description:**
-Loop boundary checks in HandlePlaying and HandleRecording use `mTransport.mLoopEndTick - 1` without explaining why the `-1` is necessary.
+The SoundBankPanel displayed all 15 channels at once, taking up significant vertical space. Users often only work with a few channels at a time and would benefit from being able to minimize unused channels.
 
-**Problematic Code:**
-- AppModel.cpp:320: `if (mTransport.mLoopEnabled && currentTick >= mTransport.mLoopEndTick - 1)`
-- AppModel.cpp:365: `if (mTransport.mLoopEnabled && currentTick >= mTransport.mLoopEndTick - 1)`
+**Solution:**
+Implemented minimize/expand functionality for each channel control panel:
 
-**Issues:**
-1. **Unclear intent** - Why subtract 1? Off-by-one correction? Timing compensation?
-2. **Duplicated logic** - Same magic number appears twice
-3. **Fragile** - If the reason for `-1` is forgotten, future refactoring might break it
+**1. Added Minimize Button** (ChannelControls.h:37, 51)
+- Toggle button ("-" when expanded, "+" when minimized)
+- Positioned in top row next to channel label
 
-**Expected Behavior:**
-Either add a clear comment explaining the `-1`, or extract to a named method/constant that expresses intent.
+**2. Minimize State Tracking** (SoundBank.h - MidiChannel struct)
+- Added `minimized` boolean field to persist state per channel
+- Allows state to be saved/loaded with project files
 
-**Proposed Solution:**
+**3. Show/Hide Controls Logic** (ChannelControls.h:107-146)
+- OnMinimizeButton event handler:
+  - Hides/shows: patch selector, volume slider, mute/solo/record checkboxes
+  - Updates button label
+  - Maintains panel width while shrinking height
+  - Triggers proper layout recalculation
 
-**Option 1: Add explanatory comment**
+**4. Layout Recalculation** (ChannelControls.h:133-145)
 ```cpp
-// Check slightly before loop end to avoid timing edge cases
-// where the loop boundary is crossed between timer ticks
-if (mTransport.mLoopEnabled && currentTick >= mTransport.mLoopEndTick - 1)
-```
+// Set minimum width to prevent horizontal shrinking
+SetMinSize(wxSize(currentWidth, -1));
 
-**Option 2: Extract to named method (better)**
-```cpp
-bool Transport::ShouldLoopBack(uint64_t currentTick) const
-{
-    // Check one tick before loop end to ensure smooth loop transition
-    return mLoopEnabled && currentTick >= mLoopEndTick - 1;
-}
+// Trigger layout recalculation
+GetSizer()->Layout();
+Fit();
 
-// In AppModel:
-if (mTransport.ShouldLoopBack(currentTick))
+// Update parent layout (SoundBankPanel is wxScrolledWindow)
+if (GetParent())
 {
-    // loop-back logic
+    GetParent()->Layout();
+    GetParent()->FitInside();  // Recalculates virtual size
 }
 ```
 
-**Notes:**
-Low priority style/clarity issue. Option 2 is preferred as it encapsulates the loop logic in Transport where it belongs and makes the intent self-documenting.
+**Key Implementation Details:**
+- Used `SetMinSize(wxSize(currentWidth, -1))` to constrain width while allowing height to vary
+- Called `FitInside()` on parent to properly update scrolled window's virtual size
+- Minimized state persists across app sessions when saved in project file
 
----
-**Priority:** Medium
-**Found:** 2025-12-24
-
-**Description:**
-The `QuantizeCommand` quantizes all MIDI events independently by snapping them to the nearest grid point. This can cause note-on and note-off events to snap to the same tick (creating zero-length notes) or cause consecutive notes to overlap (note-off and next note-on at same tick).
-
-**Problematic Code:**
-QuantizeCommand.h:46-62 - Quantizes all events without considering note pairing or overlap
-
-**Example Problem:**
-```
-Before quantize (grid = 960 ticks, quarter note):
-  NoteOn  C4 at tick 950   (near grid point 960)
-  NoteOff C4 at tick 1400  (near grid point 1440)
-  NoteOn  C4 at tick 1410  (near grid point 1440)
-
-After quantize:
-  NoteOn  C4 at tick 960   ✓ Snapped to grid
-  NoteOff C4 at tick 1440  ✓ Snapped to grid
-  NoteOn  C4 at tick 1440  ✗ SAME TICK! Creates overlap/stuck note
-```
-
-**Additional Issues:**
-- Zero-duration notes when note-on and note-off snap to same grid point
-- No respect for `NOTE_SEPARATION_TICKS` constant after quantizing
-- Can violate the note separation guarantees established elsewhere in the codebase
-
-**Expected Behavior:**
-After quantizing, notes should maintain proper separation using `NOTE_SEPARATION_TICKS` to prevent overlaps and ensure minimum note duration.
-
-**Proposed Solutions:**
-
-**Option A: Post-process with SeparateOverlappingNotes** (Quick fix)
-- After quantizing, call `TrackSet::SeparateOverlappingNotes(track)`
-- Reuses existing overlap prevention logic
-- Ensures `NOTE_SEPARATION_TICKS` gap is maintained
-
-**Option B: Duration-aware quantization** (Recommended) ⭐
-Use `TrackSet::GetNotesFromTrack()` to work with note pairs and handle short vs long notes intelligently:
-
-```cpp
-std::vector<NoteLocation> notes = TrackSet::GetNotesFromTrack(track);
-
-for (const auto& note : notes)
-{
-    uint64_t duration = note.endTick - note.startTick;
-
-    if (duration < gridSize)
-    {
-        // Short note: Quantize start, extend to minimum one grid snap
-        uint64_t quantizedStart = RoundToNearestGrid(note.startTick);
-        track[note.noteOnIndex].tick = quantizedStart;
-        track[note.noteOffIndex].tick = quantizedStart + gridSize - NOTE_SEPARATION_TICKS;
-    }
-    else
-    {
-        // Long note: Quantize both start and end independently
-        track[note.noteOnIndex].tick = RoundToNearestGrid(note.startTick);
-        track[note.noteOffIndex].tick = RoundToNearestGrid(note.endTick);
-    }
-}
-
-// Post-process to fix any remaining overlaps
-TrackSet::SeparateOverlappingNotes(track);
-```
+**Files Modified:**
+- `src/Panels/ChannelControls.h` - Added minimize button and collapse logic
+- `src/AppModel/SoundBank/SoundBank.h` - Added minimized field to MidiChannel
 
 **Benefits:**
-- Short notes (< grid size) won't disappear - they're extended to one grid snap minimum
-- Long notes preserve their relative duration while snapping to grid
-- Musically intelligent - respects performance intent
-- Uses existing helper methods (`GetNotesFromTrack`, `SeparateOverlappingNotes`)
+- Cleaner, less cluttered interface
+- Easier to focus on active channels
+- Better use of screen real estate
+- Faster scrolling through mixer
+- State persists with project files
 
-**Option C: Preserve duration exactly** (Alternative)
-- Quantize note-on only
-- Keep original duration: `quantized_start + original_duration - NOTE_SEPARATION_TICKS`
-- Preserves phrasing completely, only fixes note timing
-
-**Recommended Approach:**
-Option B - Duration-aware quantization. It handles the common case of "grace notes" or quick ornaments (which should become one grid snap minimum) while still properly quantizing longer sustained notes. The combination of intelligent duration handling + post-process overlap fix ensures musical and technically correct results.
-
-**Notes:**
-This is related to the overall note separation refactoring using `NOTE_SEPARATION_TICKS` constant (MidiConstants.h:9). Any quantize fix should respect this constant to maintain consistency with loop recording, mouse note creation, and overlap prevention.
+**Not Implemented:**
+- "Hide empty channels" feature - may be added later
+- Keyboard shortcut to toggle all - may be added later
 
 ---
 
-## Fixed Bugs
+### #11 - Add custom colors and titles to channels
+**Status:** Fixed
+**Priority:** Low
+**Found:** 2025-12-17
+**Fixed:** 2026-01-04
+
+**Description:**
+Channels were identified only by number (0-14) and program name. Users working with multiple channels needed custom colors and descriptive names for better organization and visual identification.
+
+**Solution:**
+Implemented comprehensive custom color and name system for all channels:
+
+**1. Data Model Updates** (SoundBank.h)
+- Added `std::string customName` - Custom channel name (empty = use default "Channel N")
+- Added `wxColour customColor` - Custom channel color
+- Created `ChannelColors.h` - Defines default colors (15 unique colors from existing TRACK_COLORS)
+- Initialized all channels with default colors in `SoundBank` constructor
+
+**2. Color Swatch UI** (ChannelControls.h)
+- Added 15x15 pixel color swatch panel next to channel label
+- Click color swatch to open `wxColourDialog` for color selection
+- Color updates immediately upon selection
+- Layout: `[■] Channel Name [+/-]`
+
+**3. Channel Name Editing** (ChannelControls.h)
+- Double-click channel label to rename
+- Opens `wxTextEntryDialog` with current name
+- Updates `mChannel.customName` and refreshes label display
+- Empty name restores default "Channel N" format
+
+**4. Display Logic**
+- Label displays custom name if set, otherwise "Channel N"
+- Color swatch always displays current channel color
+- `UpdateFromModel()` refreshes both color and name when loading projects
+
+**5. Project Serialization** (ProjectManager.cpp)
+- **SaveProject**: Saves customName, customColor (as RGB), and minimized state
+- **LoadProject**: Restores values with backwards compatibility
+- **ClearProject**: Resets to defaults (empty name, TRACK_COLORS[i])
+
+**6. MidiCanvas Integration**
+- Updated note rendering to use channel custom colors (user reported already implemented)
+- Notes in piano roll now display with channel's custom color
+- Improves visual identification in multi-track compositions
+
+**Code Implementation:**
+```cpp
+// MidiChannel struct (SoundBank.h)
+struct MidiChannel
+{
+    // ... existing fields ...
+    std::string customName = "";       // Empty = use default "Channel N"
+    wxColour customColor;              // Initialized in constructor
+};
+
+// Color swatch click handler (ChannelControls.h)
+void OnColorSwatchClicked(wxMouseEvent& event)
+{
+    wxColourDialog dialog(this, &colorData);
+    if (dialog.ShowModal() == wxID_OK)
+    {
+        mChannel.customColor = dialog.GetColourData().GetColour();
+        mColorSwatch->SetBackgroundColour(mChannel.customColor);
+        mColorSwatch->Refresh();
+    }
+}
+
+// Label double-click handler (ChannelControls.h)
+void OnLabelDoubleClicked(wxMouseEvent& event)
+{
+    wxTextEntryDialog dialog(this, "Enter channel name:", "Rename Channel", currentName);
+    if (dialog.ShowModal() == wxID_OK)
+    {
+        mChannel.customName = dialog.GetValue().ToStdString();
+        mLabel->SetLabel(displayName);
+    }
+}
+
+// Project serialization (ProjectManager.cpp)
+project["channels"].push_back({
+    // ... other fields ...
+    {"customName", ch.customName},
+    {"customColor", {
+        {"r", ch.customColor.Red()},
+        {"g", ch.customColor.Green()},
+        {"b", ch.customColor.Blue()}
+    }}
+});
+```
+
+**Files Modified:**
+- `src/AppModel/SoundBank/SoundBank.h` - Added customName and customColor fields
+- `src/AppModel/SoundBank/SoundBank.cpp` - Initialize colors with TRACK_COLORS
+- `src/AppModel/SoundBank/ChannelColors.h` (new) - Default color definitions
+- `src/Panels/ChannelControls.h` - Color swatch UI and rename dialog
+- `src/AppModel/ProjectManager/ProjectManager.cpp` - Serialization support
+
+**Benefits:**
+- Better visual organization in complex projects
+- Easier to identify channels at a glance (both in mixer and piano roll)
+- Standard DAW feature now available (matches Ableton, FL Studio, Reaper)
+- Improves workflow for multi-instrument compositions
+- Custom settings persist across sessions
+- Backwards compatible with old project files
+
+**User Experience:**
+- **Click color swatch** → Opens color picker → Updates immediately
+- **Double-click channel name** → Rename dialog → Updates label
+- **Custom colors applied** to both mixer strip and piano roll notes
+- **Settings saved** automatically with project files
+
+---
+
+### #30 - Collision detection doesn't account for separate channels
+**Status:** Fixed
+**Priority:** High
+**Found:** 2026-01-03
+**Fixed:** 2026-01-04
+
+**Description:**
+The collision detection system prevented notes from being added or moved if they overlapped with existing notes in time and pitch, regardless of channel/track. This blocked valid multi-track operations where different instruments should be allowed to play the same pitch simultaneously.
+
+**Problem:**
+- `IsRegionCollisionFree()` searched ALL tracks for collisions
+- Prevented adding/moving notes even when collision was on a different channel
+- Example: Couldn't add C4 on channel 1 if C4 already existed on channel 0
+- Affected note add, move, multi-move, and resize previews
+
+**Solution:**
+Implemented channel-aware collision detection throughout the system:
+
+**1. Updated TrackSet::FindNotesInRegion** (TrackSet.h/cpp)
+- Added optional `trackIndex` parameter (default = -1 for "all tracks")
+- When trackIndex specified, only searches that specific track
+- Backwards compatible - existing calls without parameter still work
+
+```cpp
+std::vector<NoteLocation> FindNotesInRegion(
+    uint64_t minTick, uint64_t maxTick,
+    ubyte minPitch, ubyte maxPitch,
+    int trackIndex = -1) const;  // -1 = search all tracks
+```
+
+**2. Updated AppModel::IsRegionCollisionFree** (AppModel.h/cpp)
+- Added `int channel` parameter to both overloads
+- Passes channel to `FindNotesInRegion` for channel-specific search
+- Both single-note and multi-note exclusion variants updated
+
+```cpp
+bool IsRegionCollisionFree(uint64_t startTick, uint64_t endTick, ubyte pitch,
+                           int channel, const NoteLocation* excludeNote = nullptr) const;
+bool IsRegionCollisionFree(uint64_t startTick, uint64_t endTick, ubyte pitch,
+                           int channel, const std::vector<NoteLocation>& excludeNotes) const;
+```
+
+**3. Updated All Call Sites** (AppModel.cpp)
+- **SetNoteMovePreview**: Uses `note.trackIndex` for channel
+- **SetMultipleNotesMovePreview**: Uses `note.trackIndex` for each note being moved
+- **SetNoteResizePreview**: Uses `note.trackIndex` for channel
+
+**4. Fixed Note Add Preview** (NoteEditor.cpp)
+- Checks collision in ALL record-enabled channels
+- Since notes are added to all record-enabled tracks, must verify all are collision-free
+- Iterates through `GetRecordEnabledChannels()` and checks each
+
+```cpp
+auto channels = mSoundBank.GetRecordEnabledChannels();
+for (const MidiChannel* channel : channels)
+{
+    int trackIndex = static_cast<int>(channel->channelNumber);
+    auto conflicts = mTrackSet.FindNotesInRegion(snappedTick, endTick, pitch, pitch, trackIndex);
+    if (!conflicts.empty())
+        return;  // Collision in this channel, reject preview
+}
+```
+
+**Files Modified:**
+- `src/AppModel/TrackSet/TrackSet.h` - Added trackIndex parameter to FindNotesInRegion
+- `src/AppModel/TrackSet/TrackSet.cpp` - Implemented channel-specific search
+- `src/AppModel/AppModel.h` - Added channel parameter to IsRegionCollisionFree methods
+- `src/AppModel/AppModel.cpp` - Updated implementations and all 3 call sites
+- `src/AppModel/NoteEditor/NoteEditor.cpp` - Fixed SetNoteAddPreview to check all record channels
+
+**Benefits:**
+- ✓ Users can now layer instruments at same pitch/time on different channels
+- ✓ Multi-track compositions work as expected (professional DAW behavior)
+- ✓ No more false collision rejections from other channels
+- ✓ Collision detection still prevents overlaps WITHIN each channel
+- ✓ All note operations (add, move, multi-move, resize) now channel-aware
+
+**Impact:**
+Removes a major workflow limitation in multi-track editing. Users can now:
+- Layer bass + piano at same pitch
+- Create harmonies with multiple instruments
+- Work with complex multi-instrument arrangements
+- Follow standard DAW editing patterns
+
+**Related:**
+- Bug #4 (Collision prevention strategy) - Original implementation that didn't consider multi-channel scenario
+
+---
+
+### #27 - App initializes with tick 0 and playhead off left screen edge
+**Status:** Fixed
+**Priority:** Medium
+**Found:** 2026-01-03
+**Fixed:** 2026-01-03
+
+**Description:**
+When the application first launches, the MidiCanvas initializes with the playhead positioned off the left edge of the screen, making tick 0 invisible to the user.
+
+**Root Cause:**
+The MidiCanvas `OnSize` event is called before the canvas's width is properly set. This timing issue causes the initial offset calculation to be incorrect, resulting in the playhead and starting tick (0) being positioned off-screen.
+
+**Solution:**
+Set `mOriginOffset.x = INT32_MAX` in `OnSize()` to force `ClampOffset()` to recalculate and snap the offset to the proper maximum value. This ensures tick 0 is positioned at the playhead location (20% from left edge) regardless of when `OnSize` fires during initialization.
+
+**Code Implementation:**
+```cpp
+// MidiCanvasEventHandlers.cpp - OnSize()
+// Force ClampOffset() to reset horizontal position to show tick 0 at playhead
+// (handles timing issues where OnSize fires before canvas width is initialized)
+mOriginOffset.x = INT32_MAX;
+
+// Center viewport vertically on middle octaves
+mOriginOffset.y = (MidiConstants::MAX_MIDI_NOTE * mNoteHeight - canvasHeight) * 0.5;
+
+ClampOffset(); // Apply offset bounds and finalize positioning
+```
+
+**Files Modified:**
+- `src/Panels/MidiCanvas/MidiCanvasEventHandlers.cpp` - Added INT32_MAX reset in OnSize()
+
+**Benefits:**
+- Application now starts with tick 0 and playhead properly visible
+- Robust solution that handles timing issues during initialization
+- Minimal code change with clear intent
+
+---
+
+### #13 - Add ability to copy notes between channels
+**Status:** Fixed
+**Priority:** Medium
+**Found:** 2025-12-17
+**Fixed:** 2026-01-03
+
+**Description:**
+Users needed the ability to copy notes from one channel/instrument to another for doubling lines, layering instruments, or rearranging parts. The original copy-paste operations only worked within the same channel.
+
+**Use Cases:**
+- Double a bass line on electric bass + synth bass
+- Copy a melody to multiple instruments for layering
+- Move a part from one instrument to another
+- Create harmony by copying and transposing to different channel
+
+**Solution:**
+Implemented cross-track pasting using **Ctrl+Shift+V** with the `PasteToTracksCommand`:
+- Pastes clipboard notes to **all record-enabled channels** (instead of original channels)
+- Each clipboard note is pasted to ALL target tracks for easy layering/doubling
+- Uses `SeparateOverlappingNotes` to handle collisions (like loop recording overdub)
+- Full undo support with track snapshots
+
+**Workflow:**
+1. Select notes from any channel(s) → Copy (Ctrl+C)
+2. Enable record on target channel(s) in mixer
+3. Paste to record tracks (Ctrl+Shift+V)
+4. Notes appear in all record-enabled channels at paste position
+
+**Code Implementation:**
+```cpp
+// PasteToTracksCommand.h - Cross-track paste command
+void Execute() override
+{
+    // Paste each clipboard note to ALL target tracks
+    for (int targetTrack : mTargetTracks)
+    {
+        for (const auto& clipNote : mClipboardNotes)
+        {
+            // Create note events using target track's channel
+            noteOn.mm = MidiMessage::NoteOn(clipNote.pitch, clipNote.velocity, targetTrack);
+            noteOff.mm = MidiMessage::NoteOff(clipNote.pitch, targetTrack);
+            track.push_back(noteOn);
+            track.push_back(noteOff);
+        }
+    }
+
+    // Handle overlaps with overdub behavior
+    TrackSet::SeparateOverlappingNotes(track);
+}
+```
+
+**Files Modified:**
+- `src/Commands/PasteToTracksCommand.h` (new) - Cross-track paste command
+- `src/AppModel/AppModel.h/cpp` - Added `PasteNotesToRecordTracks()` method
+- `src/Panels/MidiCanvas/MidiCanvasEventHandlers.cpp` - Added Ctrl+Shift+V handler
+
+**Benefits:**
+- Fundamental DAW workflow now available
+- Easy instrument doubling and layering
+- Consistent with existing record-enabled channel pattern
+- Single keyboard shortcut (Ctrl+Shift+V)
+- Full undo/redo support
+
+---
+
+### #12 - Add virtual piano keyboard with visual feedback
+**Status:** Fixed
+**Priority:** Medium
+**Found:** 2025-12-17
+**Fixed:** 2026-01-03
+
+**Description:**
+Added an on-screen piano keyboard that shows which notes are currently active during recording and note editing. This provides visual feedback and helps users understand note layout without requiring external reference.
+
+**Implemented Features:**
+1. **Visual piano keyboard** - 15% of canvas width on left side
+   - White and black keys with proper rendering
+   - Octave labels on C notes (C0, C1, C2, etc.)
+   - Keys align with piano roll note rows
+
+2. **Active note highlighting:**
+   - **Green** - Preview notes during mouse-add operations
+   - **Red-orange** - Recording notes (currently held during recording)
+
+**Code Implementation:**
+```cpp
+// MidiCanvas.cpp - DrawPianoKeyboard()
+void MidiCanvasPanel::DrawPianoKeyboard(wxGraphicsContext* gc)
+{
+    // First pass: Draw white keys
+    for (int pitch = 0; pitch <= MAX_MIDI_NOTE; pitch++)
+    {
+        if (!isBlackKey)
+        {
+            gc->DrawRectangle(0, y, keyboardWidth, mNoteHeight);
+            // Add octave labels on C notes
+            if (noteInOctave == 0)
+                gc->DrawText("C" + std::to_string(octave), 2, y + 2);
+        }
+    }
+
+    // Second pass: Draw black keys (on top)
+    // Third pass: Highlight active notes
+    if (mAppModel->HasNoteAddPreview())
+    {
+        // Green highlight for preview note
+        gc->SetBrush(wxBrush(wxColour(100, 255, 100, 180)));
+        gc->DrawRectangle(0, y, keyboardWidth, mNoteHeight);
+    }
+}
+```
+
+**Files Modified:**
+- `src/Panels/MidiCanvas/MidiCanvas.h` - Added `DrawPianoKeyboard()` declaration
+- `src/Panels/MidiCanvas/MidiCanvas.cpp` - Implemented piano keyboard rendering
+
+**Benefits:**
+- Visual confirmation of what's being played/recorded
+- Helps beginners understand note layout
+- Standard DAW feature (FL Studio, Ableton, Reaper all have this)
+- No performance impact (rendered once per frame with existing notes)
+- Useful for debugging stuck notes
+
+**Notes:**
+Current implementation provides visual feedback for preview and recording notes. Future enhancements could include:
+- Playback note highlighting
+- Mouse interaction (click keys to trigger sounds)
+- Computer keyboard as piano (QWERTY mapping)
+
+---
+
+### #29 - Mouse-added notes only go to first record-enabled channel
+**Status:** Fixed
+**Priority:** High
+**Found:** 2026-01-03
+**Fixed:** 2026-01-03
+
+**Description:**
+When adding notes to the piano roll by clicking with the mouse, notes are only added to the first record-enabled channel, even when multiple channels have record enabled. This is inconsistent with the MIDI keyboard recording behavior, which correctly records to all record-enabled channels.
+
+**Root Cause:**
+The `CreateAddNoteToRecordChannels()` method in NoteEditor.cpp:15-39 contained a @TODO comment acknowledging this limitation. The method retrieved all record-enabled channels but only used `channels[0]`:
+
+```cpp
+// For now, we'll add to the first record-enabled channel
+// @TODO: Create a compound command to handle multiple channels
+const MidiChannel* channel = channels[0];
+```
+
+**Solution:**
+Modified the existing `AddNoteCommand` to handle multiple tracks instead of creating a new command. The updated implementation:
+- Changed constructor to accept `TrackSet&` and `std::vector<int> targetTracks` instead of single `Track&`
+- Stores note indices per track (not entire track snapshots) for memory-efficient undo
+- Uses `TrackSet::FindNoteAt()` to locate added notes for undo
+- Loops through all target tracks in Execute() to add the same note to each
+- Handles undo by removing notes from each track in reverse order
+
+This approach is more memory-efficient than track snapshots and reuses existing TrackSet API methods.
+
+**Files Modified:**
+- `src/Commands/NoteEditCommands.h` - Updated AddNoteCommand interface
+- `src/Commands/NoteEditCommands.cpp` - Implemented multi-track add logic
+- `src/AppModel/NoteEditor/NoteEditor.cpp` - Updated CreateAddNoteToRecordChannels to pass all record-enabled tracks
+
+**Benefits:**
+- Mouse-added notes now correctly go to all record-enabled channels
+- Consistent with MIDI keyboard recording behavior
+- Memory-efficient undo using note indices instead of track snapshots
+- Single undoable action for adding note to multiple tracks
+
+**Related:**
+This bug was discovered after implementing cross-track pasting (Ctrl+Shift+V), which uses the same pattern of adding notes to multiple record-enabled tracks.
+
+---
 
 ### #4 - Collision prevention strategy for all note operations
 **Status:** Fixed
@@ -1420,6 +1552,152 @@ This ensures drum pattern events are offset by the loop's starting tick, so they
 - Drum machine now works correctly at any loop position
 - Pattern playback properly adapts to loop start tick
 - No change to pattern generation - just corrects playback timing
+
+---
+
+### #16 - Magic number sentinel value in PasteNotes
+**Status:** Fixed
+**Priority:** Low
+**Found:** 2025-12-22
+**Fixed:** 2026-01-03
+
+**Description:**
+`PasteNotes()` used UINT64_MAX as a sentinel value to indicate "use current tick", which was unclear and error-prone. This violated modern C++ idioms and made the code harder to understand.
+
+**Problematic Code:**
+```cpp
+void AppModel::PasteNotes(uint64_t pasteTick = UINT64_MAX)
+{
+    if (!mClipboard.HasData()) return;
+    if (pasteTick == UINT64_MAX)
+        pasteTick = mTransport.GetCurrentTick();
+    // ...
+}
+```
+
+**Solution:**
+Replaced magic number with C++17 `std::optional` for clear, type-safe optional parameters:
+
+```cpp
+void AppModel::PasteNotes(std::optional<uint64_t> pasteTick = std::nullopt)
+{
+    if (!mClipboard.HasData()) return;
+    uint64_t tick = pasteTick.value_or(mTransport.GetCurrentTick());
+    auto cmd = std::make_unique<PasteCommand>(mTrackSet, mClipboard.GetNotes(), tick);
+    mUndoRedoManager.ExecuteCommand(std::move(cmd));
+}
+```
+
+**Files Modified:**
+- `src/AppModel/AppModel.h` - Added `#include <optional>`, updated method signature
+- `src/AppModel/AppModel.cpp` - Updated implementation to use `value_or()`
+
+**Benefits:**
+- Self-documenting code - `std::nullopt` clearly indicates "use default"
+- Type-safe - Impossible to accidentally pass UINT64_MAX as valid tick
+- Idiomatic C++17 - Uses standard library feature designed for this use case
+- Cleaner logic - Single line using `value_or()` instead of conditional
+
+---
+
+### #20 - Loop boundary check uses magic number
+**Status:** Fixed
+**Priority:** Low
+**Found:** 2025-12-22
+**Fixed:** 2026-01-03
+
+**Description:**
+Loop boundary check in `HandlePlaybackCore()` used inline logic `loopSettings.enabled && currentTick >= loopSettings.endTick` which duplicated loop detection logic and wasn't properly encapsulated in the Transport class.
+
+**Problematic Code:**
+```cpp
+// AppModel.cpp:521
+if (loopSettings.enabled && currentTick >= loopSettings.endTick)
+{
+    // loop-back logic
+}
+```
+
+**Issues:**
+1. **Poor encapsulation** - Loop boundary logic exposed outside Transport class
+2. **Unclear intent** - Inline condition doesn't express "should we loop back?"
+3. **Fragile** - Changes to loop logic require updating all call sites
+
+**Solution:**
+Extracted loop boundary check to named method in Transport class:
+
+```cpp
+// Transport.h
+bool ShouldLoopBack(uint64_t currentTick) const;
+
+// Transport.cpp
+bool Transport::ShouldLoopBack(uint64_t currentTick) const
+{
+    return mLoopSettings.enabled && currentTick >= mLoopSettings.endTick;
+}
+
+// AppModel.cpp - Usage
+if (mTransport.ShouldLoopBack(currentTick))
+{
+    // loop-back logic
+}
+```
+
+**Files Modified:**
+- `src/AppModel/Transport/Transport.h` - Added `ShouldLoopBack()` declaration
+- `src/AppModel/Transport/Transport.cpp` - Implemented method
+- `src/AppModel/AppModel.cpp` - Replaced inline check with method call
+
+**Benefits:**
+- Better encapsulation - Loop logic owned by Transport class
+- Self-documenting - Method name clearly expresses intent
+- Easier to maintain - Changes to loop logic centralized in one place
+- Testable - Loop boundary logic can be unit tested in isolation
+
+---
+
+### #28 - Note add preview collision detection broken due to type overflow
+**Status:** Fixed
+**Priority:** Medium
+**Found:** 2026-01-03
+**Fixed:** 2026-01-03
+
+**Description:**
+The collision detection for note add preview in the MidiCanvas was not working, allowing users to see preview notes hovering over existing notes. The collision check was implemented but always failed due to a critical type mismatch.
+
+**Root Cause:**
+In MidiCanvasEventHandlers.cpp:335, the `endTick` variable was declared as `ubyte` (unsigned byte, range 0-255) instead of `uint64_t`:
+```cpp
+ubyte endTick = newTick + GetGridSize();  // WRONG - overflow!
+```
+
+Since `newTick` is a `uint64_t` that can be much larger than 255, this caused severe overflow/truncation. For example, if `newTick` was 960, the calculation would wrap around to a small value, causing `IsRegionCollisionFree()` to check the wrong region entirely.
+
+**Solution:**
+Fixed the type declaration and improved the collision check implementation (MidiCanvasEventHandlers.cpp:335-338):
+
+```cpp
+// Check if new note has any collisions on trackset
+uint64_t snappedTick = ApplyGridSnap(newTick);
+uint64_t endTick = snappedTick + GetGridSize() - MidiConstants::NOTE_SEPARATION_TICKS;
+bool noCollisions = mAppModel->IsRegionCollisionFree(snappedTick, endTick, newPitch);
+if (!noCollisions) return;
+```
+
+**Key Changes:**
+1. Fixed type from `ubyte` to `uint64_t` to prevent overflow
+2. Added grid snapping to check collision at the actual placement position (matches OnLeftUp behavior)
+3. Subtracted `NOTE_SEPARATION_TICKS` to match the actual note duration that will be created
+4. Removed outdated @TODO comment
+
+**Files Modified:**
+- `src/Panels/MidiCanvas/MidiCanvasEventHandlers.cpp` - Fixed collision check in OnMouseMove
+
+**Benefits:**
+- Preview note now correctly prevents hovering over existing notes
+- Collision detection matches the actual note that will be created
+- Consistent with grid snap settings
+- Proper separation padding enforcement
 
 ---
 

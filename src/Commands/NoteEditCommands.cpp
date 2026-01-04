@@ -3,55 +3,77 @@
 // AddNoteCommand implementations
 void AddNoteCommand::Execute()
 {
-	// Add both note-on and note-off events to the track
-	mTrack.push_back(mNoteOn);
-	mTrack.push_back(mNoteOff);
+	// Clear any previous execution data (for redo)
+	mAddedNotes.clear();
 
-	// Sort track by tick to maintain chronological order
-	TrackSet::SortTrack(mTrack);
+	// Add note to ALL target tracks
+	uint64_t noteOffTick = mStartTick + mDuration - MidiConstants::NOTE_SEPARATION_TICKS;
 
-	// Store indices after sorting for undo
-	FindNoteIndices();
+	for (int targetTrack : mTargetTracks)
+	{
+		Track& track = mTrackSet.GetTrack(targetTrack);
+
+		// Create note on event (use target track's channel)
+		TimedMidiEvent noteOn;
+		noteOn.tick = mStartTick;
+		noteOn.mm = MidiMessage::NoteOn(mPitch, mVelocity, targetTrack);
+
+		// Create note off event (use target track's channel)
+		TimedMidiEvent noteOff;
+		noteOff.tick = noteOffTick;
+		noteOff.mm = MidiMessage::NoteOff(mPitch, targetTrack);
+
+		// Add to track
+		track.push_back(noteOn);
+		track.push_back(noteOff);
+
+		// Sort track to maintain chronological order
+		TrackSet::SortTrack(track);
+
+		// Find and store indices for undo using TrackSet::FindNoteInTrack
+		uint64_t noteOffTick = mStartTick + mDuration - MidiConstants::NOTE_SEPARATION_TICKS;
+		NoteLocation found = mTrackSet.FindNoteInTrack(targetTrack, mStartTick, noteOffTick, mPitch);
+		if (found.found)
+		{
+			NoteIndices indices;
+			indices.trackIndex = targetTrack;
+			indices.noteOnIndex = found.noteOnIndex;
+			indices.noteOffIndex = found.noteOffIndex;
+			mAddedNotes.push_back(indices);
+		}
+	}
 }
 
 void AddNoteCommand::Undo()
 {
-	// Remove note-off first (higher index) to avoid invalidating note-on index
-	if (mNoteOffIndex < mTrack.size() && mTrack[mNoteOffIndex].tick == mNoteOff.tick)
+	// Remove notes from each track (reverse order to handle indices correctly)
+	for (auto it = mAddedNotes.rbegin(); it != mAddedNotes.rend(); ++it)
 	{
-		mTrack.erase(mTrack.begin() + mNoteOffIndex);
-	}
+		Track& track = mTrackSet.GetTrack(it->trackIndex);
 
-	// Remove note-on
-	if (mNoteOnIndex < mTrack.size() && mTrack[mNoteOnIndex].tick == mNoteOn.tick)
-	{
-		mTrack.erase(mTrack.begin() + mNoteOnIndex);
+		// Remove note-off first (higher index) to avoid invalidating note-on index
+		if (it->noteOffIndex < track.size())
+		{
+			track.erase(track.begin() + it->noteOffIndex);
+		}
+
+		// Remove note-on
+		if (it->noteOnIndex < track.size())
+		{
+			track.erase(track.begin() + it->noteOnIndex);
+		}
 	}
 }
 
 std::string AddNoteCommand::GetDescription() const
 {
-	return "Add Note (Pitch: " + std::to_string(mNoteOn.mm.mData[1]) +
-	       ", Tick: " + std::to_string(mNoteOn.tick) + ")";
-}
-
-void AddNoteCommand::FindNoteIndices()
-{
-	for (size_t i = 0; i < mTrack.size(); i++)
+	int trackCount = static_cast<int>(mTargetTracks.size());
+	std::string desc = "Add note";
+	if (trackCount > 1)
 	{
-		if (mTrack[i].tick == mNoteOn.tick &&
-			mTrack[i].mm.mData[1] == mNoteOn.mm.mData[1] &&
-			mTrack[i].mm.getEventType() == MidiEvent::NOTE_ON)
-		{
-			mNoteOnIndex = i;
-		}
-		if (mTrack[i].tick == mNoteOff.tick &&
-			mTrack[i].mm.mData[1] == mNoteOff.mm.mData[1] &&
-			mTrack[i].mm.getEventType() == MidiEvent::NOTE_OFF)
-		{
-			mNoteOffIndex = i;
-		}
+		desc += " to " + std::to_string(trackCount) + " tracks";
 	}
+	return desc;
 }
 
 // DeleteNoteCommand implementations

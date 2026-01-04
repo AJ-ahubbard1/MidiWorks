@@ -1,4 +1,5 @@
 #include "SoundBank.h"
+#include "ChannelColors.h"
 
 SoundBank::SoundBank()
 {
@@ -6,6 +7,7 @@ SoundBank::SoundBank()
 	{
 		mChannels[c].channelNumber = c;
 		mChannels[c].programNumber = c * 8;
+		mChannels[c].customColor = TRACK_COLORS[c];  // Initialize with default color
 	}
 	mMidiOut = std::make_shared<MidiOut>();
 	ApplyChannelSettings();
@@ -48,6 +50,11 @@ MidiChannel& SoundBank::GetChannel(ubyte c)
 std::span<MidiChannel> SoundBank::GetAllChannels()
 {
 	return std::span<MidiChannel>(mChannels);
+}
+
+wxColour SoundBank::GetChannelColor(ubyte channelNumber) const
+{
+	return mChannels[channelNumber].customColor;
 }
 
 bool SoundBank::SolosFound() const
