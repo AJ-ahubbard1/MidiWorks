@@ -152,6 +152,12 @@
     <ClCompile Include="src\AppModel\TrackSet\TrackSet.cpp" />
     <ClCompile Include="src\AppModel\Transport\Transport.cpp" />
     <ClCompile Include="src\Commands\NoteEditCommands.cpp" />
+    <ClCompile Include="src\External\midifile\Binasc.cpp" />
+    <ClCompile Include="src\External\midifile\MidiEvent.cpp" />
+    <ClCompile Include="src\External\midifile\MidiEventList.cpp" />
+    <ClCompile Include="src\External\midifile\MidiFile.cpp" />
+    <ClCompile Include="src\External\midifile\MidiMessage.cpp" />
+    <ClCompile Include="src\External\midifile\Options.cpp" />
     <ClCompile Include="src\MainFrame\KeyboardHandler.cpp" />
     <ClCompile Include="src\MainFrame\MainFrame.cpp" />
     <ClCompile Include="src\MainFrame\MainFrameEventHandlers.cpp" />
@@ -180,6 +186,12 @@
     <ClInclude Include="src\Commands\QuantizeCommand.h" />
     <ClInclude Include="src\Commands\RecordCommand.h" />
     <ClInclude Include="src\External\json.hpp" />
+    <ClInclude Include="src\External\midifile\Binasc.h" />
+    <ClInclude Include="src\External\midifile\MidiEvent.h" />
+    <ClInclude Include="src\External\midifile\MidiEventList.h" />
+    <ClInclude Include="src\External\midifile\MidiFile.h" />
+    <ClInclude Include="src\External\midifile\MidiMessage.h" />
+    <ClInclude Include="src\External\midifile\Options.h" />
     <ClInclude Include="src\MainFrame\KeyboardHandler.h" />
     <ClInclude Include="src\MainFrame\MainFrameIDs.h" />
     <ClInclude Include="src\MainFrame\PaneInfo.h" />

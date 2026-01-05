@@ -69,6 +69,8 @@ private:
     void OnOpen(wxCommandEvent& event);
     void OnSave(wxCommandEvent& event);
     void OnSaveAs(wxCommandEvent& event);
+    void OnImportMidiFile(wxCommandEvent& event);
+    void OnExportMidiFile(wxCommandEvent& event);
 
     // Application Lifecycle Events
     void OnExit(wxCommandEvent& event);

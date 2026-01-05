@@ -12,6 +12,63 @@ Track bugs and issues discovered during testing of MidiWorks.
 
 ## Bugs
 
+### #31 - Turn off playhead autoscroll when loop is enabled
+**Status:** Open
+**Priority:** Medium
+**Found:** 2026-01-05
+
+**Description:**
+During loop playback, the playhead autoscroll causes the view to constantly jump back to the loop start position. This creates a distracting visual experience as the content repeatedly scrolls forward then jumps back.
+
+**Expected Behavior:**
+When loop is enabled, the canvas should remain stationary (no autoscroll) and let the playhead move across the visible loop region. This would provide a stable, predictable view during loop playback.
+
+**Notes:**
+The current fixed playhead autoscroll (implemented in bug #1) works well for linear playback but becomes problematic during looping. Consider adding a setting or automatically disabling autoscroll when loop mode is active.
+
+---
+
+### #32 - Need faster way to scroll/move loop region
+**Status:** Open
+**Priority:** Medium
+**Found:** 2026-01-05
+
+**Description:**
+Currently, adjusting the loop region over long distances requires dragging the start and end boundaries individually, which is tedious for large compositions. Users need a faster workflow to reposition the entire loop region.
+
+**Proposed Solutions:**
+1. **Drag entire loop region** - Click and drag the middle of the loop overlay to move both start and end together
+2. **Keyboard shortcuts** - Shift+Arrow keys to move loop region by measures
+3. **Numeric input** - Dialog to type exact tick/measure values for loop boundaries
+4. **Selection to loop** - Right-click on selection → "Set as loop region"
+
+**Notes:**
+Option 1 (drag entire region) would be the most intuitive and matches DAW standards. Options could be combined for best workflow.
+
+---
+
+### #33 - Show record-enabled status when channel is minimized
+**Status:** Open
+**Priority:** Low
+**Found:** 2026-01-05
+
+**Description:**
+When a channel is minimized in the mixer (using the +/- button from bug #10), there's no visual indication of whether the channel is record-enabled. Users must expand the channel to check the record checkbox state.
+
+**Expected Behavior:**
+Minimized channels should show a visual indicator (red dot, icon, background color change, etc.) when record is enabled, allowing users to see recording routing at a glance without expanding all channels.
+
+**Proposed Solutions:**
+1. **Red border/outline** around minimized channel when record enabled
+2. **Record icon (●)** next to the +/- button when record enabled
+3. **Background color tint** (subtle red) for record-enabled minimized channels
+4. **Status text** - Show "[R]" or "REC" next to channel name when minimized
+
+**Notes:**
+This complements the minimize feature (bug #10) by maintaining full functionality when channels are collapsed. Low priority but improves workflow efficiency.
+
+---
+
 ---
 
 ---

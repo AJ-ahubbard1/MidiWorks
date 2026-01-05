@@ -258,6 +258,70 @@ void MainFrame::OnSaveAs(wxCommandEvent& event)
 	}
 }
 
+void MainFrame::OnImportMidiFile(wxCommandEvent& event)
+{
+	// Warn user that importing will clear the current project
+	int response = wxMessageBox(
+		"Importing a MIDI file will clear the current project.\n\nDo you want to continue?",
+		"Warning",
+		wxYES_NO | wxICON_WARNING,
+		this
+	);
+
+	if (response != wxYES)
+	{
+		return;
+	}
+
+	wxFileDialog openDialog(this,
+		"Import MIDI File",
+		wxEmptyString,
+		wxEmptyString,
+		"MIDI Files (*.mid;*.midi)|*.mid;*.midi",
+		wxFD_OPEN | wxFD_FILE_MUST_EXIST);
+
+	if (openDialog.ShowModal() == wxID_CANCEL)
+	{
+		return;
+	}
+
+	std::string path = openDialog.GetPath().ToStdString();
+	if (mAppModel->GetProjectManager().ImportMIDI(path))
+	{
+		wxMessageBox("MIDI file imported successfully", "Import Complete", wxOK | wxICON_INFORMATION);
+		UpdateTitle();  // Update title to reflect dirty state
+	}
+	else
+	{
+		wxMessageBox("Failed to import MIDI file", "Error", wxOK | wxICON_ERROR);
+	}
+}
+
+void MainFrame::OnExportMidiFile(wxCommandEvent& event)
+{
+	wxFileDialog saveDialog(this,
+		"Export MIDI File",
+		wxEmptyString,
+		wxEmptyString,
+		"MIDI Files (*.mid)|*.mid",
+		wxFD_SAVE | wxFD_OVERWRITE_PROMPT);
+
+	if (saveDialog.ShowModal() == wxID_CANCEL)
+	{
+		return;
+	}
+
+	std::string path = saveDialog.GetPath().ToStdString();
+	if (mAppModel->GetProjectManager().ExportMIDI(path))
+	{
+		wxMessageBox("MIDI file exported successfully", "Export Complete", wxOK | wxICON_INFORMATION);
+	}
+	else
+	{
+		wxMessageBox("Failed to export MIDI file", "Error", wxOK | wxICON_ERROR);
+	}
+}
+
 
 // APPLICATION LIFECYCLE EVENTS
 

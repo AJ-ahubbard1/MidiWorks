@@ -23,6 +23,10 @@ enum MainFrameIDs
 	ID_KEYBOARD_DRUM_PAD_9,
 	ID_KEYBOARD_DRUM_PAD_0,
 
+	// Midi file Import/Export
+	ID_MENU_IMPORT_MIDIFILE, 
+	ID_MENU_EXPORT_MIDIFILE,
+	
 	// Panel menu IDs (dynamically assigned starting here)
 	ID_PANELS_BEGIN
 };

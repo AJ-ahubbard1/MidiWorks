@@ -144,6 +144,9 @@ void MainFrame::CreateMenuBar()
 	fileMenu->Append(wxID_SAVE, "&Save\tCtrl+S", "Save the current project");
 	fileMenu->Append(wxID_SAVEAS, "Save &As...\tCtrl+Shift+S", "Save project with a new name");
 	fileMenu->AppendSeparator();
+	fileMenu->Append(ID_MENU_IMPORT_MIDIFILE, "Import Midi File...", "Import MIDI file into project");
+	fileMenu->Append(ID_MENU_EXPORT_MIDIFILE, "Export Midi File...", "Export project as a midi file");
+	fileMenu->AppendSeparator();
 	fileMenu->Append(wxID_EXIT, "E&xit\tAlt+F4", "Exit MidiWorks");
 
 	// Use event ids and bind them to event handlers
@@ -151,6 +154,8 @@ void MainFrame::CreateMenuBar()
 	Bind(wxEVT_MENU, &MainFrame::OnOpen, this, wxID_OPEN);
 	Bind(wxEVT_MENU, &MainFrame::OnSave, this, wxID_SAVE);
 	Bind(wxEVT_MENU, &MainFrame::OnSaveAs, this, wxID_SAVEAS);
+	Bind(wxEVT_MENU, &MainFrame::OnImportMidiFile, this, ID_MENU_IMPORT_MIDIFILE);
+	Bind(wxEVT_MENU, &MainFrame::OnExportMidiFile, this, ID_MENU_EXPORT_MIDIFILE);
 	Bind(wxEVT_MENU, &MainFrame::OnExit, this, wxID_EXIT);
 	menuBar->Append(fileMenu, "&File");
 

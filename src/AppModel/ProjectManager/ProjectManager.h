@@ -156,6 +156,20 @@ public:
 	 */
 	void SetClearUndoHistoryCallback(ClearUndoHistoryCallback callback);
 
+	/**
+     * Export Project Midi data to a midifile
+	 * @param filepath is the output midifile
+	 * @return true if export successful, false on error
+	*/
+	bool ExportMIDI(const std::string& filepath);
+
+	/**
+	 * Import MIDI data from a midifile into the project
+	 * @param filepath is the input midifile
+	 * @return true if import successful, false on error
+	 */
+	bool ImportMIDI(const std::string& filepath);
+
 private:
 	// References to app model components
 	Transport& mTransport;

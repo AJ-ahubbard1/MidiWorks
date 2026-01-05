@@ -8,6 +8,7 @@
 #include "MidiConstants.h"
 #include "External/json.hpp"
 #include <fstream>
+#include "External/midifile/MidiFile.h"
 
 using json = nlohmann::json;
 
@@ -299,4 +300,163 @@ void ProjectManager::SetDirtyStateCallback(DirtyStateCallback callback)
 void ProjectManager::SetClearUndoHistoryCallback(ClearUndoHistoryCallback callback)
 {
 	mClearUndoHistoryCallback = callback;
+}
+
+bool ProjectManager::ExportMIDI(const std::string& filepath)
+{
+	try 
+	{
+		smf::MidiFile midifile;
+		std::vector<ubyte> midievent;
+		midievent.resize(3);
+
+		auto beatSettings = mTransport.GetBeatSettings();
+
+		midifile.setTPQ(960);	// Ticks Per Quarter
+
+		// Add tempo and time signature to track 0
+		midifile.addTempo(0, 0, beatSettings.tempo);
+		midifile.addTimeSignature(0, 0, beatSettings.timeSignatureNumerator, beatSettings.timeSignatureDenominator);
+
+		// Export each track
+		for (int i = 0; i < MidiConstants::CHANNEL_COUNT; i++)
+		{
+			Track& track = mTrackSet.GetTrack(i);
+			if (track.empty()) continue;
+
+			int tracknum = midifile.addTrack();
+
+			// Add program change
+			midifile.addPatchChange(tracknum, 0, i, mSoundBank.GetChannel(i).programNumber);
+
+			// Add all events
+			for (const auto& event : track)
+			{
+				midievent[0] = event.mm.mData[0];
+				midievent[1] = event.mm.mData[1];
+				midievent[2] = event.mm.mData[2];
+				midifile.addEvent(tracknum, event.tick, midievent);
+			}
+		}
+
+		midifile.write(filepath);
+		return true;
+	}
+	catch (const std::exception& e)
+	{
+		// Log error or show dialog
+		return false;
+	}
+}
+
+bool ProjectManager::ImportMIDI(const std::string& filepath)
+{
+	try
+	{
+		smf::MidiFile midifile;
+		if (!midifile.read(filepath))
+		{
+			return false;
+		}
+
+		// Clear existing tracks before importing
+		for (int i = 0; i < MidiConstants::CHANNEL_COUNT; i++)
+		{
+			mTrackSet.GetTrack(i).clear();
+		}
+
+		// Extract tempo from first tempo event (if present)
+		double tempo = 120.0;  // Default tempo
+		for (int track = 0; track < midifile.getTrackCount(); track++)
+		{
+			for (int event = 0; event < midifile[track].size(); event++)
+			{
+				if (midifile[track][event].isTempo())
+				{
+					tempo = midifile[track][event].getTempoBPM();
+					break;
+				}
+			}
+			if (tempo != 120.0) break;
+		}
+
+		// Extract time signature from first time signature event (if present)
+		int timeSignatureNumerator = 4;    // Default 4/4
+		int timeSignatureDenominator = 4;
+		for (int track = 0; track < midifile.getTrackCount(); track++)
+		{
+			for (int event = 0; event < midifile[track].size(); event++)
+			{
+				if (midifile[track][event].isTimeSignature())
+				{
+					timeSignatureNumerator = midifile[track][event][3];
+					timeSignatureDenominator = (int)pow(2, midifile[track][event][4]);
+					break;
+				}
+			}
+			if (timeSignatureNumerator != 4) break;
+		}
+
+		// Update Transport settings
+		Transport::BeatSettings beatSettings;
+		beatSettings.tempo = tempo;
+		beatSettings.timeSignatureNumerator = timeSignatureNumerator;
+		beatSettings.timeSignatureDenominator = timeSignatureDenominator;
+		mTransport.SetBeatSettings(beatSettings);
+
+		// Import each track's events
+		for (int trackNum = 0; trackNum < midifile.getTrackCount(); trackNum++)
+		{
+			for (int eventNum = 0; eventNum < midifile[trackNum].size(); eventNum++)
+			{
+				auto& midiEvent = midifile[trackNum][eventNum];
+
+				// Skip meta events (tempo, time signature, etc.)
+				if (midiEvent.isMetaMessage())
+				{
+					continue;
+				}
+
+				// Get the MIDI channel from the event (0-15)
+				int channel = midiEvent.getChannelNibble();
+				if (channel >= MidiConstants::CHANNEL_COUNT)
+				{
+					continue;  // Skip invalid channels
+				}
+
+				// Handle program change events
+				if (midiEvent.isTimbre())
+				{
+					int programNumber = midiEvent[1];
+					mSoundBank.GetChannel(channel).programNumber = programNumber;
+					continue;
+				}
+
+				// Import note events (note on/off)
+				if (midiEvent.isNoteOn() || midiEvent.isNoteOff())
+				{
+					TimedMidiEvent timedEvent;
+					timedEvent.tick = midiEvent.tick;
+					timedEvent.mm.mData[0] = midiEvent[0];
+					timedEvent.mm.mData[1] = midiEvent[1];
+					timedEvent.mm.mData[2] = midiEvent[2];
+
+					mTrackSet.GetTrack(channel).push_back(timedEvent);
+				}
+			}
+		}
+
+		// Apply the imported program changes to MIDI device
+		mSoundBank.ApplyChannelSettings();
+
+		// Mark project as dirty (imported data is unsaved)
+		MarkDirty();
+
+		return true;
+	}
+	catch (const std::exception& e)
+	{
+		// Log error or show dialog
+		return false;
+	}
 }
