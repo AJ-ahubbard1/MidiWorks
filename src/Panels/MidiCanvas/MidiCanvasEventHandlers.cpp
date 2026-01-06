@@ -494,7 +494,10 @@ void MidiCanvasPanel::OnKeyDown(wxKeyEvent& event)
 	if (event.ControlDown() && keyCode == 'A')
 	{
 		ClearSelection();
-		mSelectedNotes = mTrackSet.GetAllNotes();
+		mSelectedNotes = FindNotesInRegionWithSoloFilter(
+			0, MidiConstants::MAX_TICK_VALUE,
+			0, MidiConstants::MAX_MIDI_NOTE
+		);
 		Refresh();
 		return;
 	}

@@ -69,6 +69,115 @@ This complements the minimize feature (bug #10) by maintaining full functionalit
 
 ---
 
+### #36 - UI doesn't refresh after MIDI import
+**Status:** Closed
+**Priority:** Medium
+**Found:** 2026-01-05
+**Fixed:** 2026-01-05
+
+**Description:**
+After importing a MIDI file, the UI panels don't update to reflect the imported data. The data is correctly loaded into the model (program changes, tempo, time signature), but the visual displays remain unchanged until the user manually interacts with them.
+
+**Affected UI Elements:**
+1. **SoundBank channel controls** - Don't update to show imported instrument/patch names
+   - Program numbers are set correctly in the model
+   - Patch selector dropdowns still show previous selection
+   - User must manually refresh or switch patches to see correct instrument
+
+2. **Transport panel** - Doesn't update to show imported tempo and time signature
+   - Tempo is set correctly in Transport model
+   - Display still shows previous tempo value (e.g., 120 BPM instead of imported 140 BPM)
+   - Time signature display may also be stale
+
+**Root Cause:**
+The `ImportMIDI()` method updates the model data but doesn't notify the UI panels to refresh their displays:
+
+```cpp
+// ProjectManager.cpp:497-498 - Sets model, no UI refresh
+int programNumber = midiEvent[1];
+mSoundBank.GetChannel(channel).programNumber = programNumber;
+
+// ProjectManager.cpp:468-471 - Sets model, no UI refresh
+Transport::BeatSettings beatSettings;
+beatSettings.tempo = tempo;
+beatSettings.timeSignatureNumerator = timeSignatureNumerator;
+beatSettings.timeSignatureDenominator = timeSignatureDenominator;
+mTransport.SetBeatSettings(beatSettings);
+```
+
+**Expected Behavior:**
+After importing a MIDI file, all UI panels should immediately update to reflect the imported settings:
+- Channel controls should show the imported patch/instrument names
+- Transport display should show the imported tempo and time signature
+- User sees the correct state without manual intervention
+
+**Proposed Solution:**
+
+**Option 1: Update panels at end of import** (Simple)
+```cpp
+// At end of ImportMIDI() in ProjectManager.cpp
+// Notify panels to refresh from model
+if (mUpdateUICallback) {
+    mUpdateUICallback();  // Trigger MainFrame to update all panels
+}
+```
+
+**Option 2: Add update callbacks to ProjectManager** (More targeted)
+```cpp
+// Add callback setters to ProjectManager
+void SetSoundBankUpdateCallback(std::function<void()> callback);
+void SetTransportUpdateCallback(std::function<void()> callback);
+
+// Call after import
+if (mSoundBankUpdateCallback) mSoundBankUpdateCallback();
+if (mTransportUpdateCallback) mTransportUpdateCallback();
+```
+
+**Option 3: Panels poll model in Update()** (Automatic, but wasteful)
+- Have panels check for model changes every frame
+- Inefficient but requires no callback infrastructure
+
+**Recommendation:**
+Option 1 is simplest - add a single callback that triggers MainFrame to call `Update()` on all panels. This reuses existing infrastructure and ensures all panels stay in sync.
+
+**Solution Implemented:**
+No callback was needed. The fix was implemented directly in `MainFrameEventHandlers.cpp:295-304` in the `OnImportMidiFile()` event handler. After `ImportMIDI()` succeeds, the UI panels are updated directly:
+
+```cpp
+if (mAppModel->GetProjectManager().ImportMIDI(path))
+{
+    wxMessageBox("MIDI file imported successfully", "Import Complete", wxOK | wxICON_INFORMATION);
+
+    UpdateTitle();  // Update title to reflect dirty state
+
+    // Show new tempo from midifile
+    if (mTransportPanel)
+    {
+        mTransportPanel->UpdateTempoDisplay();
+    }
+
+    // Show patch changes from midifile
+    if (mSoundBankPanel)
+    {
+        mSoundBankPanel->UpdateFromModel();
+    }
+}
+```
+
+This approach is simpler than using callbacks because:
+- MainFrame calls `ImportMIDI()` and knows when it succeeds
+- MainFrame can directly update its own panels
+- No indirection or callback registration needed
+- Matches existing pattern used in `OnOpen()` and `OnNew()` handlers
+
+**Files Modified:**
+- `src/MainFrame/MainFrameEventHandlers.cpp` - Added panel updates in OnImportMidiFile()
+
+**Related:**
+- Bug #34, #35 - MIDI import functionality (data import works, just UI refresh missing)
+
+---
+
 ---
 
 ---
@@ -1758,17 +1867,126 @@ if (!noCollisions) return;
 
 ---
 
-### #X - [Fixed Bug Title]
+### #34 - MIDI import doesn't recognize NOTE_ON velocity 0 as NOTE_OFF
 **Status:** Fixed
-**Priority:** High/Medium/Low
-**Found:** YYYY-MM-DD
-**Fixed:** YYYY-MM-DD
+**Priority:** High
+**Found:** 2026-01-05
+**Fixed:** 2026-01-05
 
 **Description:**
-What the bug was.
+When importing MIDI files, notes that used NOTE_ON messages with velocity 0 (a common MIDI convention for note-offs) were not being properly recognized as note-off events. This caused imported notes to not display correctly in the piano roll because the note pairing logic couldn't match them.
+
+**Root Cause:**
+MIDI has two representations for Note Off:
+1. **Explicit Note Off** - Status byte 0x80 (what MidiWorks uses internally)
+2. **Implicit Note Off** - NOTE_ON (0x90) with velocity 0 (common in MIDI files for running status optimization)
+
+The `isNoteOff()` method only checked for explicit NOTE_OFF (0x80), missing the velocity 0 case.
 
 **Solution:**
-How it was fixed.
+Implemented two-part fix:
+
+**1. Enhanced `isNoteOff()` API** (MidiMessage.h:97-104)
+```cpp
+bool isNoteOff() const
+{
+    // Note Off can be either:
+    // 1. Explicit NOTE_OFF message (0x80)
+    // 2. NOTE_ON message with velocity 0 (common MIDI convention)
+    return getEventType() == MidiEvent::NOTE_OFF || (isNoteOn() && getVelocity() == 0);
+}
+```
+
+**2. Normalized on import** (ProjectManager.cpp:444-449)
+```cpp
+// Normalize NOTE_ON velocity 0 to explicit NOTE_OFF (0x80)
+// This ensures our internal format is consistent (we always use NOTE_OFF)
+if (timedEvent.mm.isNoteOn() && timedEvent.mm.getVelocity() == 0)
+{
+    timedEvent.mm = MidiMessage::NoteOff(timedEvent.mm.getPitch(), channel);
+}
+```
+
+**Files Modified:**
+- `src/RtMidiWrapper/MidiMessage/MidiMessage.h` - Enhanced `isNoteOff()` to handle both cases
+- `src/AppModel/ProjectManager/ProjectManager.cpp` - Convert NOTE_ON velocity 0 to NOTE_OFF during import
+
+**Benefits:**
+- ✓ Imported MIDI files from all sources now display correctly
+- ✓ Internal format is consistent (always explicit NOTE_OFF)
+- ✓ Handles both MIDI conventions automatically
+- ✓ `isNoteOff()` acts as safety check throughout codebase
+
+**Design Decision:**
+Chose to normalize at import boundary rather than handling both formats throughout the codebase. This keeps internal representation simple and canonical.
+
+---
+
+### #35 - MIDI import timing incorrect due to missing PPQN conversion
+**Status:** Fixed
+**Priority:** High
+**Found:** 2026-01-05
+**Fixed:** 2026-01-05
+
+**Description:**
+Imported MIDI files played back at incorrect tempos. Files with different PPQN (Pulses Per Quarter Note) values than MidiWorks' internal 960 PPQN had all their note timings wrong, causing them to play too fast or too slow.
+
+**Problem Examples:**
+- **480 PPQN file**: Quarter note = 480 ticks → Imported as 480 ticks → Plays at **half speed** (should be 960)
+- **192 PPQN file**: Quarter note = 192 ticks → Imported as 192 ticks → Plays at **1/5 speed** (should be 960)
+- **960 PPQN file**: Works correctly by accident (matches internal PPQN)
+
+**Root Cause:**
+The import code directly copied tick values from the MIDI file without converting them to MidiWorks' internal 960 PPQN resolution:
+
+```cpp
+timedEvent.tick = midiEvent.tick;  // ❌ No conversion!
+```
+
+Initially assumed the midifile library's `setTicksPerQuarterNote()` would automatically scale tick values, but it only sets metadata - it doesn't rescale existing event ticks.
+
+**Solution:**
+Implemented manual tick conversion with comprehensive logging:
+
+**1. Calculate conversion ratio** (ProjectManager.cpp:364-367)
+```cpp
+// Calculate tick conversion ratio (needed for event import)
+// Formula: newTick = oldTick * (targetPPQN / sourcePPQN)
+int sourcePPQN = midifile.getTicksPerQuarterNote();
+double tickConversion = (double)MidiConstants::TICKS_PER_QUARTER / (double)sourcePPQN;
+```
+
+**2. Apply conversion during import** (ProjectManager.cpp:506-507)
+```cpp
+// Convert tick from source PPQN to MidiWorks PPQN (960)
+timedEvent.tick = (uint64_t)(midiEvent.tick * tickConversion);
+```
+
+**3. Added comprehensive import logging** (ProjectManager.cpp:362-429)
+Created `import-midi.log` that records:
+- Original PPQN from file
+- Track count and duration
+- All tempo events with timestamps and BPM
+- All time signature events
+- **Tick conversion ratio** (e.g., "2.0x" for 480→960)
+
+**Example Conversions:**
+- **480 PPQN file**: Ratio = 960/480 = 2.0x (tick 480 → 960) ✓
+- **192 PPQN file**: Ratio = 960/192 = 5.0x (tick 192 → 960) ✓
+- **960 PPQN file**: Ratio = 960/960 = 1.0x (no change) ✓
+
+**Files Modified:**
+- `src/AppModel/ProjectManager/ProjectManager.cpp` - Added tick conversion, import logging
+
+**Benefits:**
+- ✓ MIDI files from all sources now play at correct tempo
+- ✓ Manual conversion is explicit and predictable
+- ✓ Import log shows exactly what conversion happened
+- ✓ Handles any PPQN value (480, 192, 96, 960, etc.)
+- ✓ Works with all DAW exports (FL Studio, Ableton, Logic, Cubase, etc.)
+
+**Testing:**
+User confirmed fix by importing MIDI file that previously played at wrong tempo - now plays correctly at proper speed.
 
 ---
 

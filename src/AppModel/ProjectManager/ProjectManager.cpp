@@ -8,6 +8,8 @@
 #include "MidiConstants.h"
 #include "External/json.hpp"
 #include <fstream>
+#include <chrono>
+#include <ctime>
 #include "External/midifile/MidiFile.h"
 
 using json = nlohmann::json;
@@ -359,6 +361,73 @@ bool ProjectManager::ImportMIDI(const std::string& filepath)
 			return false;
 		}
 
+		// Calculate tick conversion ratio (needed for event import)
+		// Formula: newTick = oldTick * (targetPPQN / sourcePPQN)
+		int sourcePPQN = midifile.getTicksPerQuarterNote();
+		double tickConversion = (double)MidiConstants::TICKS_PER_QUARTER / (double)sourcePPQN;
+
+		// Log import metadata for debugging
+		std::ofstream logFile("import-midi.log", std::ios::app);
+		if (logFile.is_open())
+		{
+			auto now = std::chrono::system_clock::now();
+			auto time_t_val = std::chrono::system_clock::to_time_t(now);
+
+			// Use safe time formatting
+			char timeBuffer[26];
+			struct tm timeInfo;
+			localtime_s(&timeInfo, &time_t_val);
+			asctime_s(timeBuffer, sizeof(timeBuffer), &timeInfo);
+
+			logFile << "\n========================================\n";
+			logFile << "Import: " << filepath << "\n";
+			logFile << "Time: " << timeBuffer;
+			logFile << "========================================\n";
+
+			// Log original PPQN before conversion
+			logFile << "Original PPQN: " << sourcePPQN << "\n";
+			logFile << "Track Count: " << midifile.getTrackCount() << "\n";
+			logFile << "File Duration (ticks): " << midifile.getFileDurationInTicks() << "\n";
+			logFile << "File Duration (quarters): " << midifile.getFileDurationInQuarters() << "\n";
+
+			// Log all tempo events
+			logFile << "\nTempo Events:\n";
+			for (int track = 0; track < midifile.getTrackCount(); track++)
+			{
+				for (int event = 0; event < midifile[track].size(); event++)
+				{
+					if (midifile[track][event].isTempo())
+					{
+						logFile << "  Track " << track
+						        << ", Tick " << midifile[track][event].tick
+						        << ": " << midifile[track][event].getTempoBPM() << " BPM\n";
+					}
+				}
+			}
+
+			// Log all time signature events
+			logFile << "\nTime Signature Events:\n";
+			for (int track = 0; track < midifile.getTrackCount(); track++)
+			{
+				for (int event = 0; event < midifile[track].size(); event++)
+				{
+					if (midifile[track][event].isTimeSignature())
+					{
+						int numerator = midifile[track][event][3];
+						int denominator = (int)pow(2, midifile[track][event][4]);
+						logFile << "  Track " << track
+						        << ", Tick " << midifile[track][event].tick
+						        << ": " << numerator << "/" << denominator << "\n";
+					}
+				}
+			}
+
+			// Log conversion info
+			logFile << "\nConverting to PPQN: " << MidiConstants::TICKS_PER_QUARTER << "\n";
+			logFile << "Tick Conversion Ratio: " << tickConversion << "x\n";
+			logFile.close();
+		}
+
 		// Clear existing tracks before importing
 		for (int i = 0; i < MidiConstants::CHANNEL_COUNT; i++)
 		{
@@ -436,10 +505,18 @@ bool ProjectManager::ImportMIDI(const std::string& filepath)
 				if (midiEvent.isNoteOn() || midiEvent.isNoteOff())
 				{
 					TimedMidiEvent timedEvent;
-					timedEvent.tick = midiEvent.tick;
+					// Convert tick from source PPQN to MidiWorks PPQN (960)
+					timedEvent.tick = (uint64_t)(midiEvent.tick * tickConversion);
 					timedEvent.mm.mData[0] = midiEvent[0];
 					timedEvent.mm.mData[1] = midiEvent[1];
 					timedEvent.mm.mData[2] = midiEvent[2];
+
+					// Normalize NOTE_ON velocity 0 to explicit NOTE_OFF (0x80)
+					// This ensures our internal format is consistent (we always use NOTE_OFF)
+					if (timedEvent.mm.isNoteOn() && timedEvent.mm.getVelocity() == 0)
+					{
+						timedEvent.mm = MidiMessage::NoteOff(timedEvent.mm.getPitch(), channel);
+					}
 
 					mTrackSet.GetTrack(channel).push_back(timedEvent);
 				}

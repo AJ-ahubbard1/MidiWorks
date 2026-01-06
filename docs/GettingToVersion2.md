@@ -21,7 +21,7 @@ and integrate with my existing audio production workflow - all with professional
   - Error handling, stability, track management, MIDI export
 
 - **v1.2 - "Professional Editing"** (3-4 weeks)
-  - Velocity editing, transpose, timeline improvements, MIDI import
+  - Velocity editing, transpose, timeline improvements, MIDI import, solo visual filtering
 
 - **v1.3 - "Musical Intelligence"** (2-3 weeks)
   - Humanize, scale tools, chord helpers, advanced editing
@@ -107,15 +107,47 @@ This unlocks collaboration, visual organization, and integration with the broade
   - [ ] Log errors to file (MidiWorks.log)
   - [ ] Include timestamp, error type, context
 
-**Implementation Notes:**
+**Implementation Strategy:**
+
+Break this down into manageable phases. Phase 1 covers 80% of real-world crashes.
+
+---
+
+**PHASE 1: Foundation (3 hours) - DO THIS FIRST**
+
+**Step 1: Add Error Callback System (30 min - 1 hour)**
+
+This is the foundation everything else builds on.
+
 ```cpp
 // AppModel.h
+enum class ErrorLevel { Info, Warning, Error };
 using ErrorCallback = std::function<void(const std::string& title,
                                           const std::string& message,
                                           ErrorLevel level)>;
 void SetErrorCallback(ErrorCallback callback);
 
-// In SaveProject/LoadProject
+private:
+    ErrorCallback mErrorCallback;
+```
+
+Wire it up in MainFrame:
+```cpp
+// MainFrame.cpp - In constructor
+mAppModel->SetErrorCallback([this](const std::string& title,
+                                     const std::string& msg,
+                                     ErrorLevel level) {
+    wxMessageBox(msg, title, wxOK | wxICON_ERROR);
+});
+```
+
+**Step 2: Protect File Operations (1-2 hours)**
+
+Focus on `ProjectManager::SaveProject()` and `ProjectManager::LoadProject()`:
+
+```cpp
+// In SaveProject
+std::ofstream file(filepath);
 if (!file.is_open()) {
     if (mErrorCallback) {
         mErrorCallback("Save Failed",
@@ -124,16 +156,186 @@ if (!file.is_open()) {
     }
     return false;
 }
+
+// Wrap JSON serialization in try-catch
+try {
+    nlohmann::json j = /* your serialization */;
+    file << j.dump(4);
+    return true;
+} catch (const std::exception& e) {
+    if (mErrorCallback) {
+        mErrorCallback("Save Failed",
+                      std::string("Error writing file: ") + e.what(),
+                      ErrorLevel::Error);
+    }
+    return false;
+}
 ```
 
-**Testing:**
-- [ ] Disconnect MIDI device during playback
-- [ ] Try to save to read-only directory
-- [ ] Try to load corrupt JSON file
-- [ ] Try to load file with missing fields
-- [ ] Run with no MIDI devices connected
+Protection for LoadProject:
+```cpp
+try {
+    nlohmann::json j = nlohmann::json::parse(file);
+    // ... load data from j
+} catch (const nlohmann::json::parse_error& e) {
+    if (mErrorCallback) {
+        mErrorCallback("Load Failed",
+                      "Corrupt project file: " + std::string(e.what()),
+                      ErrorLevel::Error);
+    }
+    return false;
+} catch (const std::exception& e) {
+    if (mErrorCallback) {
+        mErrorCallback("Load Failed",
+                      std::string("Error loading file: ") + e.what(),
+                      ErrorLevel::Error);
+    }
+    return false;
+}
+```
 
-**Estimated Effort:** 1-2 days
+**Phase 1 Testing:**
+- [ ] Try to save to `C:\Windows\test.mwp` (permission denied)
+- [ ] Create a corrupt JSON file and try to load it
+- [ ] Try to load a non-existent file
+- [ ] Verify error dialogs show user-friendly messages
+
+**STOP HERE and test thoroughly. This covers 80% of crashes.**
+
+---
+
+**PHASE 2: MIDI Device Handling (2 hours) - DO THIS NEXT**
+
+**Step 3: MIDI Device Disconnect Detection (1-2 hours)**
+
+This is the #1 cause of crashes during actual use.
+
+**Option A - Simple (Start Here):**
+Wrap all `MidiOut` calls in try-catch or null checks:
+
+```cpp
+// In SoundBank::PlayNote (or wherever you send MIDI)
+void SoundBank::PlayNote(ubyte pitch, ubyte velocity, ubyte channel)
+{
+    if (!mMidiOut || !mMidiOut->isPortOpen()) {
+        // Device disconnected - silently fail or show warning once
+        return;
+    }
+
+    try {
+        mMidiOut->sendMessage(/* ... */);
+    } catch (const RtMidiError& e) {
+        if (mErrorCallback) {
+            mErrorCallback("MIDI Device Error",
+                          "Device may have been disconnected",
+                          ErrorLevel::Warning);
+        }
+        // Optionally: clear mMidiOut so we don't keep trying
+    }
+}
+```
+
+**Option B - Proactive (Later):**
+Add periodic device polling in `AppModel::Update()` to detect disconnects early.
+
+**Step 4: Startup with No MIDI Devices (30 min)**
+
+Handle the case where user has no MIDI devices at all.
+
+```cpp
+// In MidiSettingsPanel or wherever you initialize MIDI
+if (mMidiOut->getPortCount() == 0) {
+    wxMessageBox("No MIDI devices found. You can still use MidiWorks, "
+                 "but you won't hear audio output.",
+                 "No MIDI Devices",
+                 wxOK | wxICON_INFORMATION);
+    // Continue anyway - app works fine without MIDI output
+}
+```
+
+**Phase 2 Testing:**
+- [ ] Start playback, then unplug MIDI device (or close device in another app)
+- [ ] Verify warning appears instead of crash
+- [ ] Disable all MIDI devices in Device Manager
+- [ ] Launch MidiWorks - should show friendly message, not crash
+- [ ] Verify app continues to work (save/load, editing, etc.)
+
+---
+
+**PHASE 3: Optional Enhancements (1 hour)**
+
+**Step 5: Basic Logging System**
+
+Helps debug issues users report.
+
+```cpp
+// Logger.h - Simple approach
+class Logger {
+public:
+    static void Log(const std::string& message) {
+        std::ofstream log("MidiWorks.log", std::ios::app);
+        auto now = std::chrono::system_clock::now();
+        auto time_t = std::chrono::system_clock::to_time_t(now);
+        log << std::ctime(&time_t) << ": " << message << "\n";
+    }
+
+    static void Error(const std::string& message) {
+        Log("[ERROR] " + message);
+    }
+
+    static void Warning(const std::string& message) {
+        Log("[WARNING] " + message);
+    }
+};
+
+// Usage in error callback
+mAppModel->SetErrorCallback([this](const std::string& title,
+                                     const std::string& msg,
+                                     ErrorLevel level) {
+    Logger::Error(title + ": " + msg);
+    wxMessageBox(msg, title, wxOK | wxICON_ERROR);
+});
+```
+
+**Step 6: Track Index Bounds Checking**
+
+Add validation in critical TrackSet methods:
+
+```cpp
+// In TrackSet.cpp
+Track& TrackSet::GetTrack(int index) {
+    if (index < 0 || index >= USER_TRACK_COUNT) {
+        if (mErrorCallback) {
+            mErrorCallback("Internal Error",
+                          "Invalid track index: " + std::to_string(index),
+                          ErrorLevel::Error);
+        }
+        // Return a safe default or throw
+        return mTracks.at(0);  // Or use exception
+    }
+    return mTracks[index];
+}
+```
+
+---
+
+**Testing Checklist - "Break It" Tests:**
+- [ ] Save to read-only folder
+- [ ] Load corrupted JSON file (manually edit and break syntax)
+- [ ] Load non-existent file
+- [ ] Unplug MIDI device during playback
+- [ ] Launch with no MIDI devices
+- [ ] Load project from older version (if format changed)
+- [ ] Try to load empty file
+- [ ] Try to load text file as .mwp
+- [ ] Disconnect MIDI input during recording
+
+**Estimated Effort:**
+- Phase 1: 3 hours (CRITICAL - do this first)
+- Phase 2: 2 hours (HIGH PRIORITY)
+- Phase 3: 1 hour (NICE TO HAVE)
+- **Total: 6 hours / ~1 day**
+
 **Status:** ❌ TODO
 
 ---
@@ -536,10 +738,175 @@ void DrawTimeline(wxDC& dc)
 
 ---
 
+#### 1.2.5 Solo Visual Filtering ⭐⭐⭐ HIGH PRIORITY
+**Why:** Overlapping notes from different tracks make rectangular selection grab wrong notes. Need visual isolation to edit individual tracks precisely.
+
+**Problem Statement:**
+When multiple tracks have notes at the same pitch and time, selecting a range of notes from one track accidentally grabs notes from other tracks. This makes editing individual tracks in dense multi-track projects frustrating and error-prone.
+
+**Tasks:**
+- [ ] Add visual filtering mode setting
+  - [ ] Add option to control solo visual behavior: "Normal" / "Dimmed" / "Hidden"
+  - [ ] Store preference in project settings or app preferences
+  - [ ] Add UI control (dropdown in canvas toolbar or settings panel)
+- [ ] Implement solo-based visual filtering
+  - [ ] When solo is active, check visual filtering mode
+  - [ ] **Dimmed mode:** Draw non-soloed notes at 20-30% opacity
+  - [ ] **Hidden mode:** Don't draw non-soloed notes at all
+  - [ ] **Normal mode:** Current behavior (all visible regardless of solo)
+- [ ] Filter note interaction based on solo state
+  - [ ] `FindNoteAtPosition()` - only return notes from soloed tracks
+  - [ ] `FindNotesInRectangle()` - only return notes from soloed tracks
+  - [ ] Mouse hover - only highlight notes from soloed tracks
+- [ ] Update selection logic
+  - [ ] Rectangular selection only grabs soloed track notes
+  - [ ] Single-click selection only selects soloed track notes
+  - [ ] Prevent editing non-soloed tracks when solo is active
+- [ ] Handle edge cases
+  - [ ] Multiple solos - show all soloed tracks (existing solo logic)
+  - [ ] No solo active - all tracks visible and editable (current behavior)
+  - [ ] Existing note selections when enabling solo - clear or filter?
+
+**Implementation Notes:**
+```cpp
+// MidiCanvas.h
+enum class SoloVisualMode
+{
+    Normal,    // Solo only affects playback (current behavior)
+    Dimmed,    // Non-solo tracks drawn at low opacity, not selectable
+    Hidden     // Non-solo tracks invisible and not selectable
+};
+
+// AppModel.h or MidiCanvas.h
+SoloVisualMode mSoloVisualMode = SoloVisualMode::Normal;
+
+// MidiCanvas.cpp - DrawTrackNotes()
+void MidiCanvasPanel::DrawTrackNotes(wxGraphicsContext* gc)
+{
+    bool solosActive = mAppModel->GetSoundBank().SolosFound();
+    std::vector<NoteLocation> allNotes = mTrackSet.GetAllNotes();
+
+    for (const auto& note : allNotes)
+    {
+        if (note.trackIndex >= USER_TRACK_COUNT) continue;
+
+        // Check if track should be drawn based on solo state
+        bool isSoloed = mAppModel->GetSoundBank().GetChannel(note.trackIndex).solo;
+
+        if (solosActive && !isSoloed)
+        {
+            // Non-soloed track when solo is active
+            if (mSoloVisualMode == SoloVisualMode::Hidden)
+            {
+                continue;  // Skip drawing completely
+            }
+            else if (mSoloVisualMode == SoloVisualMode::Dimmed)
+            {
+                // Draw with low opacity
+                auto trackColor = mAppModel->GetSoundBank().GetChannelColor(note.trackIndex);
+                trackColor.Set(trackColor.Red(), trackColor.Green(), trackColor.Blue(), 50);  // ~20% opacity
+                gc->SetBrush(wxBrush(trackColor));
+                DrawNote(gc, note);
+                continue;
+            }
+        }
+
+        // Normal drawing (soloed track or no solo active or Normal mode)
+        auto trackColor = mAppModel->GetSoundBank().GetChannelColor(note.trackIndex);
+        gc->SetBrush(wxBrush(trackColor));
+        DrawNote(gc, note);
+    }
+}
+
+// MidiCanvas.cpp - FindNoteAtPosition()
+NoteLocation MidiCanvasPanel::FindNoteAtPosition(int screenX, int screenY)
+{
+    uint64_t clickTick = ScreenXToTick(screenX);
+    ubyte clickPitch = ScreenYToPitch(screenY);
+    NoteLocation found = mTrackSet.FindNoteAt(clickTick, clickPitch);
+
+    // Filter by solo if filtering is active
+    if (mSoloVisualMode != SoloVisualMode::Normal &&
+        mAppModel->GetSoundBank().SolosFound())
+    {
+        if (!found.IsEmpty())
+        {
+            bool isSoloed = mAppModel->GetSoundBank().GetChannel(found.trackIndex).solo;
+            if (!isSoloed)
+            {
+                return NoteLocation{};  // Return empty - note not selectable
+            }
+        }
+    }
+
+    return found;
+}
+
+// Similar filtering for FindNotesInRectangle()
+std::vector<NoteLocation> MidiCanvasPanel::FindNotesInRectangle(wxPoint start, wxPoint end)
+{
+    // ... existing conversion code ...
+    std::vector<NoteLocation> found = mTrackSet.FindNotesInRegion(minTick, maxTick, minPitch, maxPitch);
+
+    // Filter by solo if filtering is active
+    if (mSoloVisualMode != SoloVisualMode::Normal &&
+        mAppModel->GetSoundBank().SolosFound())
+    {
+        found.erase(
+            std::remove_if(found.begin(), found.end(), [&](const NoteLocation& note) {
+                return !mAppModel->GetSoundBank().GetChannel(note.trackIndex).solo;
+            }),
+            found.end()
+        );
+    }
+
+    return found;
+}
+```
+
+**UI Options:**
+
+**Option A: Dropdown in Canvas Toolbar**
+```
+[Piano Roll] | Solo Visual: [Dimmed ▼] | Grid Snap: [✓] | ...
+```
+
+**Option B: Toggle Button Cycle**
+- Click button to cycle: Normal → Dimmed → Hidden → Normal
+- Icon changes to indicate current mode
+- Tooltip shows current mode
+
+**Option C: Settings Panel**
+- Add to app preferences
+- Set once and forget
+
+**Recommendation:** Start with **Option C** (settings preference) for simplicity, add **Option A** later if users want quick toggling.
+
+**Benefits:**
+- ✅ Solves the overlapping notes selection problem
+- ✅ Maintains visual context (Dimmed mode) when needed
+- ✅ Provides maximum focus (Hidden mode) when needed
+- ✅ Doesn't break existing behavior (Normal mode is default)
+- ✅ Leverages existing solo infrastructure
+- ✅ User choice for different workflows
+
+**Testing:**
+- [ ] Create project with overlapping notes (e.g., bass and kick drum on C2)
+- [ ] Solo one track, test each visual mode
+- [ ] Verify rectangular selection only grabs soloed track notes
+- [ ] Test with multiple solos active
+- [ ] Test mode switching during playback
+- [ ] Verify dimmed notes are not selectable
+
+**Estimated Effort:** 1-2 days
+**Status:** ❌ TODO
+
+---
+
 ### Version 1.2 Summary
 
-**Total Tasks:** 4 major features (MIDI import, Velocity editing, Transpose, Timeline)
-**Estimated Effort:** 7-8 days of focused work
+**Total Tasks:** 5 major features (MIDI import, Velocity editing, Transpose, Timeline, Solo visual filtering)
+**Estimated Effort:** 8-10 days of focused work
 **Target:** 3-4 weeks (part-time)
 
 **Success Criteria:**
@@ -547,6 +914,7 @@ void DrawTimeline(wxDC& dc)
 - [ ] Can edit note dynamics (velocity)
 - [ ] Can transpose melodies to different keys
 - [ ] Can navigate projects with measure/beat timeline
+- [ ] Can isolate individual tracks for precise editing (solo visual filtering)
 - [ ] Timeline is clear and intuitive
 
 **Next Milestone:** Once v1.2 is complete, move to v1.3 for musical intelligence features.
@@ -856,38 +1224,167 @@ Chord ParseChord(const std::string& chordName)
 
 ---
 
-#### 2.0.3 Tempo Automation ⭐⭐ MEDIUM PRIORITY
-**Why:** Ritardando, accelerando, tempo changes
+#### 2.0.3 Tempo Track (Tempo & Time Signature Changes) ⭐⭐⭐ HIGH PRIORITY
+**Why:** Support real-world compositions with tempo/meter changes (ritardando, accelerando, complex meters)
 
-**Tasks:**
-- [ ] Add tempo track (separate from MIDI tracks)
-- [ ] Design tempo automation UI
-  - [ ] Tempo lane showing BPM over time
-  - [ ] Breakpoints for tempo changes
-- [ ] Implement tempo ramping
+**Motivation:**
+Testing with imported MIDI files revealed that most professional compositions have tempo and time signature changes throughout the song. Currently, MidiWorks only supports a single global tempo and time signature, which limits both composition flexibility and accurate MIDI import.
+
+**Key Insight:** A tempo track is conceptually similar to MIDI tracks - it's a collection of timed events at specific ticks. The difference is that it stores song structure metadata (tempo, time signature) instead of note on/off messages.
+
+**Architecture Decision:**
+Store tempo track in `Transport` class (not `TrackSet`) because:
+- Transport already owns timing/tempo logic
+- Can reuse existing `Transport::BeatSettings` struct
+- Transport naturally queries tempo during `UpdatePlayBack()`
+- Cleaner separation: TrackSet = note data, Transport = timing data
+
+**Data Structure:**
+```cpp
+// Transport.h
+struct TempoTrackEvent {
+    uint64_t tick;
+    BeatSettings settings;  // Reuse existing struct (tempo, timeSignatureNumerator, timeSignatureDenominator)
+};
+
+class Transport {
+private:
+    std::vector<TempoTrackEvent> mTempoTrack;  // Sorted by tick
+    BeatSettings mCurrentBeatSettings;         // Cached active settings
+
+public:
+    // Query tempo at specific tick
+    BeatSettings GetBeatSettingsAtTick(uint64_t tick) const;
+
+    // Add/remove tempo events
+    void AddTempoEvent(uint64_t tick, const BeatSettings& settings);
+    void RemoveTempoEvent(uint64_t tick);
+
+    // Get all events for UI display
+    const std::vector<TempoTrackEvent>& GetTempoTrack() const;
+};
+```
+
+**Implementation Tasks:**
+
+**Phase 1: Core Data Structure (1 day)**
+- [ ] Add `TempoTrackEvent` struct to Transport.h
+- [ ] Add `mTempoTrack` vector to Transport class
+- [ ] Implement `GetBeatSettingsAtTick()` - binary search to find active tempo
+- [ ] Implement `AddTempoEvent()` and `RemoveTempoEvent()`
+- [ ] Initialize with default tempo event at tick 0 on project creation
+
+**Phase 2: Playback Integration (1 day)**
+- [ ] Update `Transport::UpdatePlayBack()` to query tempo track
+  - [ ] Check if current tick crossed a tempo event
+  - [ ] Update `mCurrentBeatSettings` when tempo changes
+  - [ ] Recalculate tick-to-time conversion with new tempo
+- [ ] Handle tempo changes during playback (don't snap playback position)
+- [ ] Test with gradually changing tempos (ritardando/accelerando)
+
+**Phase 3: MIDI Import/Export (1 day)**
+- [ ] Update `ProjectManager::ImportMIDI()` to populate tempo track
+  - [ ] Currently extracts first tempo event only (line 437-450)
+  - [ ] Change to store ALL tempo events in tempo track
+  - [ ] Extract ALL time signature events
+  - [ ] Store as `TempoTrackEvent` at correct ticks (with PPQN conversion)
+- [ ] Update `ProjectManager::ExportMIDI()` to write tempo track
+  - [ ] Export tempo events as MIDI meta messages (type 0x51)
+  - [ ] Export time signature events as MIDI meta messages (type 0x58)
+  - [ ] Write to track 0 as per MIDI standard
+
+**Phase 4: Project Save/Load (0.5 days)**
+- [ ] Update `ProjectManager::SaveProject()` JSON format
+  - [ ] Add "tempoTrack" array to JSON
+  - [ ] Store tick and BeatSettings for each event
+- [ ] Update `ProjectManager::LoadProject()` to restore tempo track
+- [ ] Handle backwards compatibility (if no tempo track, use single global tempo)
+
+**Phase 5: UI - Canvas Grid Display (1 day)**
+- [ ] Update `MidiCanvas` to query tempo track for grid drawing
+  - [ ] Call `Transport::GetBeatSettingsAtTick()` for visible region
+  - [ ] Draw grid with correct time signature (3/4 shows 3 beats, 4/4 shows 4)
+  - [ ] Update bar lines to match time signature
+  - [ ] Show visual indicator when time signature changes mid-canvas
+- [ ] Update measure calculation to account for variable time signatures
+
+**Phase 6: UI - Tempo Lane Visualization (1-2 days)**
+- [ ] Add tempo lane above piano roll (similar to automation lanes)
+- [ ] Draw tempo curve showing BPM over time
+- [ ] Draw time signature markers at change points
+- [ ] Color-code regions by time signature for visual clarity
+
+**Phase 7: UI - Tempo Editing (1-2 days)**
+- [ ] Add tempo event editing UI
+  - [ ] Right-click timeline → "Add Tempo Change"
+  - [ ] Dialog: Set BPM and time signature
+  - [ ] Click tempo marker to edit or delete
+- [ ] Create `TempoChangeCommand` for undo support
+  - [ ] Store old and new tempo events
+  - [ ] Execute/Undo updates tempo track
+- [ ] Add keyboard shortcuts (Ctrl+T = Add Tempo Change)
+
+**Phase 8: Metronome Integration (0.5 days)**
+- [ ] Update `MetronomeService` to query tempo track
+- [ ] Update beat detection to handle variable time signatures
+- [ ] Ensure downbeat detection works across time signature changes
+
+**Advanced Features (Optional - Phase 9):**
+- [ ] Tempo ramping (gradual tempo changes)
+  - [ ] Add `TempoRampType` enum (None, Linear, Exponential)
   - [ ] Linear interpolation between tempo points
-  - [ ] Update playback engine to handle variable tempo
-- [ ] Create tempo automation commands
-- [ ] Save/load tempo automation
-- [ ] Export tempo changes to MIDI file
+  - [ ] Draw tempo curve instead of stepped changes
+- [ ] Tempo tap (tap keyboard to set tempo)
+- [ ] Common tempo presets (Largo, Andante, Allegro, Presto, etc.)
+- [ ] Visual tempo indicator during playback (flashing on beat)
 
-**Estimated Effort:** 2-3 days
+**Example Usage:**
+```cpp
+// User imports MIDI file with tempo changes
+ProjectManager::ImportMIDI("symphony.mid");
+
+// Tempo track is populated:
+// Tick 0:     120 BPM, 4/4
+// Tick 3840:  140 BPM, 4/4  (accelerando)
+// Tick 7680:  140 BPM, 3/4  (time signature change to waltz)
+// Tick 11520: 100 BPM, 3/4  (ritardando)
+
+// During playback, Transport automatically switches tempos
+// Canvas grid updates to show 3/4 meter starting at tick 7680
+// Metronome plays 3 beats per measure in waltz section
+```
+
+**Files to Modify:**
+- `src/AppModel/Transport/Transport.h` - Add TempoTrackEvent, tempo track vector, query methods
+- `src/AppModel/Transport/Transport.cpp` - Implement tempo track logic and playback integration
+- `src/AppModel/ProjectManager/ProjectManager.cpp` - Update Import/Export/Save/Load
+- `src/Panels/MidiCanvas/MidiCanvas.cpp` - Update grid rendering
+- `src/Commands/TempoChangeCommand.h` - New command for undo support
+- `src/AppModel/MetronomeService/MetronomeService.cpp` - Query tempo track for beat detection
+
+**Testing Checklist:**
+- [ ] Create project with multiple tempo changes, verify playback speed changes
+- [ ] Create project with time signature changes (4/4 → 3/4 → 6/8), verify grid display
+- [ ] Import MIDI file with tempo changes, verify tempo track populated correctly
+- [ ] Export project with tempo track, verify MIDI file has correct tempo meta events
+- [ ] Undo/redo tempo changes, verify tempo track state
+- [ ] Save/load project with tempo track, verify persistence
+- [ ] Test edge cases:
+  - [ ] Tempo change at tick 0 (start of song)
+  - [ ] Multiple tempo changes in rapid succession
+  - [ ] Tempo change during loop playback
+  - [ ] Very fast tempo (200+ BPM) and very slow tempo (40 BPM)
+
+**Estimated Effort:** 6-8 days (full implementation with UI)
+- Core + Playback + Import/Export + Save/Load: 3-4 days
+- UI (visualization + editing): 3-4 days
+
 **Status:** ❌ TODO
 
----
-
-#### 2.0.4 Time Signature Changes ⭐ LOW PRIORITY
-**Why:** Support complex compositions with changing meters
-
-**Tasks:**
-- [ ] Allow multiple time signatures in a project
-- [ ] Add time signature markers
-- [ ] Update grid display to reflect time signature
-- [ ] Update metronome to handle time signature changes
-- [ ] Save/load time signature track
-
-**Estimated Effort:** 2 days
-**Status:** ❌ TODO
+**Related:**
+- MIDI Import already extracts tempo/time signature events (partial support exists)
+- Grid rendering needs to become tempo-aware
+- This unlocks accurate playback of imported classical/film score MIDI files
 
 ---
 
@@ -912,7 +1409,93 @@ Chord ParseChord(const std::string& chordName)
 
 ---
 
-#### 2.0.6 Performance Optimization ⭐⭐ MEDIUM PRIORITY
+#### 2.0.6 MIDI Bank Selection ⭐ LOW PRIORITY
+**Why:** Access hundreds of instrument variations in soundfonts (Timbres of Heaven, etc.)
+
+**Tasks:**
+- [ ] Add bank number to MidiChannel struct
+  - [ ] `ubyte bankMSB = 0;` (CC 0 - Bank Select MSB)
+  - [ ] `ubyte bankLSB = 0;` (CC 32 - Bank Select LSB, usually 0)
+- [ ] Add bank selector UI to ChannelControls
+  - [ ] wxSpinCtrl or wxChoice for bank number (0-127)
+  - [ ] Place above or next to program change dropdown
+  - [ ] Label: "Bank:" with current bank number
+- [ ] Update program change logic
+  - [ ] Send bank select messages BEFORE program change
+  - [ ] Order: CC 0 (MSB) → CC 32 (LSB) → Program Change
+- [ ] Save/load bank numbers in project file
+  - [ ] Add to JSON serialization in ProjectManager
+- [ ] Add bank presets (optional)
+  - [ ] Dropdown with common banks: "GM (0)", "Room Kits (8)", "Power Kits (16)", etc.
+  - [ ] Or just use numeric spinner for flexibility
+
+**MIDI Bank Select Messages:**
+```cpp
+// Example: Select Bank 8, Program 0 (Room Standard Kit)
+void SoundBank::SendBankAndProgram(ubyte channel)
+{
+    MidiChannel& ch = mChannels[channel];
+
+    // 1. Bank Select MSB (CC 0)
+    auto bankMSB = MidiMessage::ControlChange(0, ch.bankMSB, channel);
+    mMidiOut->sendMessage(bankMSB);
+
+    // 2. Bank Select LSB (CC 32) - usually 0
+    auto bankLSB = MidiMessage::ControlChange(32, ch.bankLSB, channel);
+    mMidiOut->sendMessage(bankLSB);
+
+    // 3. Program Change
+    auto pc = MidiMessage::ProgramChange(ch.programNumber, channel);
+    mMidiOut->sendMessage(pc);
+}
+```
+
+**Common Soundfont Banks (Timbres of Heaven):**
+
+**Drums (Channel 10):**
+- Bank 0: Standard Kits
+- Bank 8: Room Kits
+- Bank 16: Power Kits
+- Bank 24: Electronic Kits
+- Bank 25: TR-808 Kits
+- Bank 32: Jazz Kits
+- Bank 40: Brush Kits
+- Bank 48: Orchestra Kits
+- Bank 56: SFX Kits
+- Bank 127: Sound Effects
+
+**Melodic Channels:**
+- Bank 0: GM Standard (128 instruments)
+- Bank 1-127: Variations (different pianos, guitars, synths, etc.)
+
+**UI Mockup:**
+```
+┌─ Channel 1 ──────────────────┐
+│ Bank: [0   ▼]                 │
+│ Program: [Acoustic Grand ▼]   │
+│ Volume: [||||||||||||] 100    │
+│ [M] [S] [R]                   │
+└───────────────────────────────┘
+```
+
+**Implementation Notes:**
+- Bank select only matters if soundfont supports multiple banks
+- Standard GM devices (bank 0) ignore bank select messages - safe to send
+- Some devices use MSB only, some use both MSB+LSB
+- Send bank select every time program changes (some devices reset bank after PC)
+
+**Testing:**
+- [ ] Test with Timbres of Heaven soundfont
+- [ ] Verify bank switching works (different piano sounds, drum kits, etc.)
+- [ ] Test with standard GM synth (should ignore bank select gracefully)
+- [ ] Verify bank numbers persist in save/load
+
+**Estimated Effort:** 1-2 days
+**Status:** ❌ TODO (Low Priority - Nice to Have)
+
+---
+
+#### 2.0.7 Performance Optimization ⭐⭐ MEDIUM PRIORITY
 **Why:** Smooth performance with 1000+ notes
 
 **Tasks:**
@@ -937,7 +1520,7 @@ Chord ParseChord(const std::string& chordName)
 
 ### Version 2.0 Summary
 
-**Total Tasks:** 6 major features (VST, CC automation, Tempo automation, Time sig changes, Markers, Performance)
+**Total Tasks:** 7 major features (VST, CC automation, Tempo automation, Time sig changes, Markers, Bank selection, Performance)
 **Estimated Effort:** 2-4 weeks of focused work (depends on VST scope)
 **Target:** 4-6 weeks (part-time)
 
@@ -955,13 +1538,13 @@ Chord ParseChord(const std::string& chordName)
 
 ## Progress Tracking
 
-### Overall Progress: 25% (Making Great Progress!)
+### Overall Progress: 28% (Making Great Progress!)
 
 | Version | Status | Progress | Completion Date |
 |---------|--------|----------|-----------------|
 | v1.0 | ✅ COMPLETE | 100% | December 2025 |
 | v1.1 | 🔄 IN PROGRESS | 67% (4/6) | Target: January 2026 |
-| v1.2 | 🔄 IN PROGRESS | 25% (1/4) | Target: February 2026 |
+| v1.2 | 🔄 IN PROGRESS | 40% (2/5) | Target: February 2026 |
 | v1.3 | ❌ TODO | 0% | Target: March 2026 |
 | v2.0 | ❌ TODO | 0% | Target: April 2026 |
 
@@ -974,12 +1557,13 @@ Chord ParseChord(const std::string& chordName)
 - [ ] Clear Track
 - [x] MIDI File Export ✅ (January 2026)
 
-### v1.2 Progress: 1/4 Complete (25%)
+### v1.2 Progress: 2/5 Complete (40%)
 
 - [x] MIDI File Import ✅ (January 2026)
 - [ ] Velocity Editing
 - [ ] Transpose
 - [ ] Timeline Improvements
+- [x] Solo Visual Filtering ✅ (January 2026)
 
 ### v1.3 Progress: 0/4 Complete (0%)
 
@@ -988,13 +1572,14 @@ Chord ParseChord(const std::string& chordName)
 - [ ] Scale Constraining
 - [ ] Chord Helper (optional)
 
-### v2.0 Progress: 0/6 Complete (0%)
+### v2.0 Progress: 0/7 Complete (0%)
 
 - [ ] VST Support (optional - defer to v3.0?)
 - [ ] MIDI CC Automation
 - [ ] Tempo Automation
 - [ ] Time Signature Changes
 - [ ] Markers & Sections
+- [ ] Bank Selection (low priority)
 - [ ] Performance Optimization
 
 ---

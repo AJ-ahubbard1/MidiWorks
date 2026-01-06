@@ -17,12 +17,6 @@ AppModel::AppModel()
 	mMetronomeService.Initialize();
 
 	// Setup ProjectManager callbacks
-	mProjectManager.SetDirtyStateCallback([this](bool dirty) {
-		if (mDirtyStateCallback) {
-			mDirtyStateCallback(dirty);
-		}
-	});
-
 	mProjectManager.SetClearUndoHistoryCallback([this]() {
 		mUndoRedoManager.ClearHistory();
 	});
@@ -226,13 +220,6 @@ bool AppModel::HasNoteAddPreview() const
 {
 	return mNoteEditor.HasNoteAddPreview();
 }
-
-// Dirty state notification
-void AppModel::SetDirtyStateCallback(DirtyStateCallback callback)
-{
-	mDirtyStateCallback = callback;
-}
-
 
 // Clipboard operations
 void AppModel::CopyNotesToClipboard(const std::vector<NoteLocation>& notes)

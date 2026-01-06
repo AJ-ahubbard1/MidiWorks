@@ -69,10 +69,6 @@ public:
 	const NoteEditor::NoteAddPreview& GetNoteAddPreview() const;
 	bool HasNoteAddPreview() const;
 
-	// Callbacks
-	using DirtyStateCallback = std::function<void(bool isDirty)>;
-	void SetDirtyStateCallback(DirtyStateCallback callback);
-
 	// Clipboard for copy/paste
 	void CopyNotesToClipboard(const std::vector<NoteLocation>& notes);
 	void PasteNotes(std::optional<uint64_t> pasteTick = std::nullopt);
@@ -103,7 +99,6 @@ private:
 	MidiInputManager						mMidiInputManager;
 	MetronomeService						mMetronomeService;
 	DrumMachine								mDrumMachine;
-	DirtyStateCallback						mDirtyStateCallback;
 
 	uint64_t GetDeltaTimeMs();
 	bool IsMusicalMessage(const MidiMessage& msg);

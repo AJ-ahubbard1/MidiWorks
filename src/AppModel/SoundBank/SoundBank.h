@@ -32,6 +32,7 @@ public:
 	wxColour GetChannelColor(ubyte channelNumber) const;
 	bool SolosFound() const;
 	std::vector<MidiChannel*> GetRecordEnabledChannels();
+	std::vector<MidiChannel*> GetSoloChannels();
 	bool ShouldChannelPlay(const MidiChannel& channel, bool checkRecord = false) const;
 
 	// MIDI Playback helpers

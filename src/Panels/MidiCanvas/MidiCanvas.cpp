@@ -220,12 +220,46 @@ uint64_t MidiCanvasPanel::ApplyGridSnap(uint64_t tick) const
 	return (tick / duration) * duration;  // Round down to nearest multiple
 }
 
+std::vector<NoteLocation> MidiCanvasPanel::FindNotesInRegionWithSoloFilter(
+	uint64_t minTick, uint64_t maxTick,
+	ubyte minPitch, ubyte maxPitch)
+{
+	auto& soundBank = mAppModel->GetSoundBank();
+
+	// If solos are active, only search solo'd channels
+	if (soundBank.SolosFound())
+	{
+		std::vector<NoteLocation> results;
+		auto soloChannels = soundBank.GetSoloChannels();
+		for (MidiChannel* channel : soloChannels)
+		{
+			std::vector<NoteLocation> channelNotes = mTrackSet.FindNotesInRegion(
+				minTick, maxTick,
+				minPitch, maxPitch,
+				channel->channelNumber
+			);
+			results.insert(results.end(), channelNotes.begin(), channelNotes.end());
+		}
+		return results;
+	}
+	else
+	{
+		// Normal behavior - search all tracks
+		return mTrackSet.FindNotesInRegion(minTick, maxTick, minPitch, maxPitch);
+	}
+}
+
 NoteLocation MidiCanvasPanel::FindNoteAtPosition(int screenX, int screenY)
 {
 	uint64_t clickTick = ScreenXToTick(screenX);
 	ubyte clickPitch = ScreenYToPitch(screenY);
 
-	return mTrackSet.FindNoteAt(clickTick, clickPitch);
+	auto notes = FindNotesInRegionWithSoloFilter(
+		clickTick, clickTick + 1,
+		clickPitch, clickPitch
+	);
+
+	return notes.empty() ? NoteLocation{} : notes[0];
 }
 
 std::vector<NoteLocation> MidiCanvasPanel::FindNotesInRectangle(wxPoint start, wxPoint end)
@@ -246,8 +280,8 @@ std::vector<NoteLocation> MidiCanvasPanel::FindNotesInRectangle(wxPoint start, w
 	{
 		return std::vector<NoteLocation>{};
 	}
-	// Search through all tracks 
-	return mTrackSet.FindNotesInRegion(minTick, maxTick, minPitch, maxPitch);
+
+	return FindNotesInRegionWithSoloFilter(minTick, maxTick, minPitch, maxPitch);
 }
 
 void MidiCanvasPanel::ClearSelection()
@@ -414,9 +448,23 @@ void MidiCanvasPanel::DrawLoopRegion(wxGraphicsContext* gc)
 
 void MidiCanvasPanel::DrawTrackNotes(wxGraphicsContext* gc)
 {
-	std::vector<NoteLocation> allNotes = mTrackSet.GetAllNotes();
+	wxSize clientSize = GetClientSize();
 
-	for (const auto& note : allNotes)
+	// Calculate visible viewport bounds for culling
+	uint64_t visibleStartTick = ScreenXToTick(0);
+	uint64_t visibleEndTick = ScreenXToTick(clientSize.GetWidth());
+	ubyte visibleMinPitch = ScreenYToPitch(clientSize.GetHeight());
+	ubyte visibleMaxPitch = ScreenYToPitch(0);
+
+	// Only get notes within visible viewport (viewport culling optimization)
+	std::vector<NoteLocation> visibleNotes = FindNotesInRegionWithSoloFilter(
+		visibleStartTick,
+		visibleEndTick,
+		visibleMinPitch,
+		visibleMaxPitch
+	);
+
+	for (const auto& note : visibleNotes)
 	{
 		// Only draw user tracks (0-14), skip metronome channel (15)
 		if (note.trackIndex >= USER_TRACK_COUNT) continue;

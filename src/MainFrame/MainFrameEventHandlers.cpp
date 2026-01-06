@@ -289,7 +289,19 @@ void MainFrame::OnImportMidiFile(wxCommandEvent& event)
 	if (mAppModel->GetProjectManager().ImportMIDI(path))
 	{
 		wxMessageBox("MIDI file imported successfully", "Import Complete", wxOK | wxICON_INFORMATION);
-		UpdateTitle();  // Update title to reflect dirty state
+		
+		// Update title to reflect dirty state
+		UpdateTitle();  
+		// Show new tempo from midifile
+		if (mTransportPanel) 
+		{
+			mTransportPanel->UpdateTempoDisplay();
+		}
+		// Show patch changes from midifile
+		if (mSoundBankPanel)
+		{
+			mSoundBankPanel->UpdateFromModel();
+		}
 	}
 	else
 	{

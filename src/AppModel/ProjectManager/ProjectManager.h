@@ -164,8 +164,8 @@ public:
 	bool ExportMIDI(const std::string& filepath);
 
 	/**
-	 * Import MIDI data from a midifile into the project
-	 * @param filepath is the input midifile
+	 * Import MIDI data from a midi file into the project
+	 * @param filepath is the input midi file
 	 * @return true if import successful, false on error
 	 */
 	bool ImportMIDI(const std::string& filepath);

@@ -12,6 +12,7 @@ std::vector<MidiMessage> TrackSet::PlayBack(uint64_t currentTick)
 
 	for (int t = 0; t < MidiConstants::CHANNEL_COUNT; t++)
 	{
+		// Track is empty or at the end
 		if (iterators[t] == -1) continue;
 
 		auto& track = GetTrack(t);
@@ -128,8 +129,8 @@ std::vector<NoteLocation> TrackSet::GetNotesFromTrack(const Track& track, int tr
 		for (size_t j = i + 1; j < end; j++)
 		{
 			const TimedMidiEvent& noteOff = track[j];
-			if (noteOff.mm.getEventType() != MidiEvent::NOTE_OFF ||
-				noteOff.mm.mData[1] != noteOn.mm.mData[1]) continue;
+			// Skip if not the corresponding note off
+			if (!noteOff.mm.isNoteOff() || noteOff.mm.getPitch() != noteOn.mm.getPitch()) continue;
 
 			NoteLocation note;
 			note.found = true;

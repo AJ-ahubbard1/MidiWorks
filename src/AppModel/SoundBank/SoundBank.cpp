@@ -9,6 +9,9 @@ SoundBank::SoundBank()
 		mChannels[c].programNumber = c * 8;
 		mChannels[c].customColor = TRACK_COLORS[c];  // Initialize with default color
 	}
+	// Drum Track at index 9 
+	mChannels[9].programNumber = 0; 
+	mChannels[9].customName = "Ch 10 - Percussion";
 	mMidiOut = std::make_shared<MidiOut>();
 	ApplyChannelSettings();
 }
@@ -75,6 +78,19 @@ std::vector<MidiChannel*> SoundBank::GetRecordEnabledChannels()
 	for (auto& channel : mChannels)
 	{
 		if (channel.record)
+		{
+			result.push_back(&channel);
+		}
+	}
+	return result;
+}
+
+std::vector<MidiChannel*> SoundBank::GetSoloChannels()
+{
+	std::vector<MidiChannel*> result;
+	for (auto& channel : mChannels)
+	{
+		if (channel.solo)
 		{
 			result.push_back(&channel);
 		}

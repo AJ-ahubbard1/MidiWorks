@@ -112,6 +112,11 @@ private:
 	void ClearSelection();
 	bool IsNoteSelected(const NoteLocation& note) const;
 
+	// Solo filtering helper
+	std::vector<NoteLocation> FindNotesInRegionWithSoloFilter(
+		uint64_t minTick, uint64_t maxTick,
+		ubyte minPitch, ubyte maxPitch);
+
 	// Loop Edge Detection
 	bool IsNearLoopStart(int screenX);
 	bool IsNearLoopEnd(int screenX);

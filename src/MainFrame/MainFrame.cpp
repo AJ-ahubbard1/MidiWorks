@@ -76,11 +76,12 @@ void MainFrame::CreateCallbackFunctions()
 	});
 
 	// Register dirty state callback for title bar updates
-	mAppModel->SetDirtyStateCallback([this](bool isDirty)
+	auto& projectManager = mAppModel->GetProjectManager();
+	projectManager.SetDirtyStateCallback([this](bool isDirty)
 	{
 		UpdateTitle();
 	});
-
+	
 	// Register loop changed callback for drum machine grid updates
 	mAppModel->GetTransport().SetLoopChangedCallback([this]()
 	{

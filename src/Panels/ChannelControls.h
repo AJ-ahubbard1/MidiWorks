@@ -71,10 +71,23 @@ private:
 		mLabel = new wxStaticText(this, wxID_ANY, strLabel);
 		mMinimizeButton = new wxButton(this, wxID_ANY, "-", wxDefaultPosition, wxSize(20, -1));
 		mPatchChoice = new wxChoice(this, wxID_ANY);
-		for (int i = 0; i < 128; ++i)
+
+		// Channel 10 (index 9) is drums - use drum kit names instead of instrument names
+		if (mChannel.channelNumber == 9)
 		{
-			mPatchChoice->Append(MidiMessage::getSoundName(i));
-			//mPatchChoice->Append(wxString::Format("Patch %d", i));
+			// Populate with drum kit names
+			for (int i = 0; i < 128; ++i)
+			{
+				mPatchChoice->Append(MidiMessage::getDrumKitName(i));
+			}
+		}
+		else
+		{
+			// Populate with normal instrument names
+			for (int i = 0; i < 128; ++i)
+			{
+				mPatchChoice->Append(MidiMessage::getSoundName(i));
+			}
 		}
 		mPatchChoice->SetSelection(mChannel.programNumber);
 

@@ -96,7 +96,11 @@ namespace MidiInterface
 		
 		bool isNoteOff() const
 		{
-			return getEventType() == MidiEvent::NOTE_OFF;
+			// Note Off can be either: 
+			// 1. Explicit NOTE_OFF message (0x80)
+			// 2. NOTE_ON message with velocity 0 (common MIDI convention)
+
+			return getEventType() == MidiEvent::NOTE_OFF || (isNoteOn() && getVelocity() == 0);
 		} 
 		
 		static MidiMessage NoteOff(ubyte keyNumber, ubyte channel = 0)
@@ -132,6 +136,11 @@ namespace MidiInterface
 		static const std::string& getSoundName(ubyte ss)
 		{
 			return SoundNames[ss];
+		}
+
+		static const std::string& getDrumKitName(ubyte dk)
+		{
+			return DrumKitNames[dk];
 		}
 	
 		std::string getString()
