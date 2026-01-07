@@ -7,6 +7,7 @@
 #include "Commands/DeleteMultipleNotesCommand.h"
 #include "Commands/PasteCommand.h"
 #include "Commands/PasteToTracksCommand.h"
+#include "Commands/ClearTrackCommand.h"
 
 AppModel::AppModel()
 	: mNoteEditor(mTrackSet, mSoundBank)
@@ -101,6 +102,15 @@ void AppModel::DeleteNote(const NoteLocation& note)
 void AppModel::DeleteNotes(const std::vector<NoteLocation>& notes)
 {
 	auto cmd = mNoteEditor.CreateDeleteNotes(notes);
+	if (cmd)
+	{
+		mUndoRedoManager.ExecuteCommand(std::move(cmd));
+	}
+}
+
+void AppModel::ClearTrack(ubyte trackNumber)
+{
+	auto cmd = std::make_unique<ClearTrackCommand>(mTrackSet.GetTrack(trackNumber), trackNumber);
 	if (cmd)
 	{
 		mUndoRedoManager.ExecuteCommand(std::move(cmd));

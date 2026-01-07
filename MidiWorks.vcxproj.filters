@@ -251,5 +251,8 @@
     <ClInclude Include="src\External\midifile\Options.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="src\Commands\ClearTrackCommand.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
 </Project>

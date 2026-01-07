@@ -35,10 +35,8 @@ MainFrame::MainFrame()
 // Instantiate panels, define layout metadata, and register each panel (IDs auto-assigned)
 void MainFrame::CreateDockablePanes()
 {
-	auto& soundBank = mAppModel->GetSoundBank();
-
-	mSoundBankPanel = new SoundBankPanel(this, soundBank);
-	RegisterPanel({"Sound Bank", mSoundBankPanel, PanePosition::Left, wxSize(247, 636)});
+	mSoundBankPanel = new SoundBankPanel(this, mAppModel);
+	RegisterPanel({"Sound Bank", mSoundBankPanel, PanePosition::Left, wxSize(313, 636)});
 
 	mMidiSettingsPanel = new MidiSettingsPanel(this, mAppModel, *wxLIGHT_GREY, "Midi Settings");
 	RegisterPanel({"Midi Settings", mMidiSettingsPanel, PanePosition::Left, wxSize(247, 253), false});

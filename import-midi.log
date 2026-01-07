@@ -684,3 +684,78 @@ Time Signature Events:
 
 Converting to PPQN: 960
 Tick Conversion Ratio: 8x
+
+========================================
+Import: C:\Users\16617\Downloads\Deep_Purple_-_Highway_Star.mid
+Time: Wed Jan  7 12:54:43 2026
+========================================
+Original PPQN: 96
+Track Count: 10
+File Duration (ticks): 119823
+File Duration (quarters): 1248.16
+
+Tempo Events:
+  Track 0, Tick 0: 190 BPM
+
+Time Signature Events:
+  Track 0, Tick 0: 4/4
+
+Converting to PPQN: 960
+Tick Conversion Ratio: 10x
+
+========================================
+Import: C:\Users\16617\Downloads\Air_Supply_-_All_Out_Of_Love.mid
+Time: Wed Jan  7 13:18:36 2026
+========================================
+Original PPQN: 384
+Track Count: 10
+File Duration (ticks): 162432
+File Duration (quarters): 423
+
+Tempo Events:
+  Track 0, Tick 0: 109 BPM
+  Track 0, Tick 155136: 93 BPM
+  Track 0, Tick 155904: 73.0001 BPM
+  Track 0, Tick 156672: 98.0001 BPM
+
+Time Signature Events:
+  Track 0, Tick 0: 4/4
+
+Converting to PPQN: 960
+Tick Conversion Ratio: 2.5x
+
+========================================
+Import: C:\Users\16617\Downloads\Aerosmith_-_Dream_On.mid
+Time: Wed Jan  7 13:28:11 2026
+========================================
+Original PPQN: 384
+Track Count: 11
+File Duration (ticks): 107520
+File Duration (quarters): 280
+
+Tempo Events:
+  Track 0, Tick 0: 78.0001 BPM
+
+Time Signature Events:
+  Track 0, Tick 0: 4/4
+
+Converting to PPQN: 960
+Tick Conversion Ratio: 2.5x
+
+========================================
+Import: C:\Users\16617\Downloads\SMASH MOUTH.All star.mid
+Time: Wed Jan  7 14:00:59 2026
+========================================
+Original PPQN: 192
+Track Count: 12
+File Duration (ticks): 64462
+File Duration (quarters): 335.74
+
+Tempo Events:
+  Track 0, Tick 0: 108 BPM
+
+Time Signature Events:
+  Track 0, Tick 0: 4/4
+
+Converting to PPQN: 960
+Tick Conversion Ratio: 5x

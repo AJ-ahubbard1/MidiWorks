@@ -3,15 +3,20 @@
 #include <wx/statline.h>
 #include <wx/colordlg.h>
 #include <wx/textdlg.h>
-#include "AppModel/SoundBank/SoundBank.h"
+#include <wx/slider.h>
+#include "AppModel/AppModel.h"
+#include "Commands/ClearTrackCommand.h"
 
 // Individual Control Panel shown for each channel of the SoundBank
 class ChannelControlsPanel : public wxPanel
 {
 public:
 
-	ChannelControlsPanel(wxWindow* parent, MidiChannel& channel, std::shared_ptr<MidiOut> midiOut)
-		: wxPanel(parent, wxID_ANY, wxDefaultPosition, wxDefaultSize), mChannel(channel), mMidiOut(std::move(midiOut))
+	ChannelControlsPanel(wxWindow* parent, std::shared_ptr<AppModel> model, MidiChannel& channel)
+		: wxPanel(parent, wxID_ANY, wxDefaultPosition, wxDefaultSize)
+		, mAppModel(model)
+		, mChannel(channel)
+		, mMidiOut(mAppModel->GetSoundBank().GetMidiOutDevice())
 	{
 		CreateControls();
 		SetupSizers();
@@ -42,6 +47,7 @@ public:
 	}
 
 private:
+	std::shared_ptr<AppModel> mAppModel;
 	MidiChannel& mChannel;
 	std::shared_ptr<MidiOut> mMidiOut;
 	wxStaticLine* mStaticLine;
@@ -53,6 +59,7 @@ private:
 	wxCheckBox* mMuteCheck;
 	wxCheckBox* mSoloCheck;
 	wxCheckBox* mRecordCheck;
+	wxButton* mClearButton;
 	wxBoxSizer* mMainSizer;
 
 
@@ -98,10 +105,11 @@ private:
 
 		mSoloCheck = new wxCheckBox(this, wxID_ANY, "S");
 		mSoloCheck->SetValue(mChannel.solo);
-		
+
 		mRecordCheck = new wxCheckBox(this, wxID_ANY, "R");
 		mRecordCheck->SetValue(mChannel.record);
 
+		mClearButton = new wxButton(this, wxID_ANY, "CLEAR", wxDefaultPosition, wxDefaultSize);
 	}
 	void BindEvents()
 	{
@@ -113,6 +121,7 @@ private:
 		mMuteCheck->Bind(wxEVT_CHECKBOX, &ChannelControlsPanel::OnMuteToggled, this);
 		mSoloCheck->Bind(wxEVT_CHECKBOX, &ChannelControlsPanel::OnSoloToggled, this);
 		mRecordCheck->Bind(wxEVT_CHECKBOX, &ChannelControlsPanel::OnRecordToggled, this);
+		mClearButton->Bind(wxEVT_BUTTON, &ChannelControlsPanel::OnClearButton, this);
 
 	}
 
@@ -131,6 +140,7 @@ private:
 		mMainSizer->Add(mPatchChoice, wxSizerFlags().Expand().Border(wxALL, 5));
 
 		auto* horizontalSizer = new wxBoxSizer(wxHORIZONTAL);
+		horizontalSizer->Add(mClearButton, wxSizerFlags().CenterVertical());
 		horizontalSizer->Add(mVolumeSlider, wxSizerFlags().Expand().Border(wxALL, 5));
 		horizontalSizer->Add(mMuteCheck, wxSizerFlags().Expand());
 		horizontalSizer->Add(mSoloCheck, wxSizerFlags().Expand());
@@ -195,6 +205,7 @@ private:
 			mMuteCheck->Show();
 			mSoloCheck->Show();
 			mRecordCheck->Show();
+			mClearButton->Show();
 		}
 		else
 		{
@@ -205,6 +216,7 @@ private:
 			mMuteCheck->Hide();
 			mSoloCheck->Hide();
 			mRecordCheck->Hide();
+			mClearButton->Hide();
 		}
 
 		// Set minimum width to prevent horizontal shrinking
@@ -244,10 +256,30 @@ private:
 	{
 		mChannel.solo = mSoloCheck->GetValue();
 	}
-	
+
 	void OnRecordToggled(wxCommandEvent& event)
 	{
 		mChannel.record = mRecordCheck->GetValue();
+	}
+
+	void OnClearButton(wxCommandEvent& event)
+	{
+		bool trackIsEmpty = mAppModel->GetTrackSet().IsTrackEmpty(mChannel.channelNumber);
+		if (trackIsEmpty) return;
+
+		// Warn user that importing will clear the current project
+		wxString prompt = wxString::Format(
+			"This operation will clear all of the notes on channel %d.\n\nDo you want to continue?",
+			mChannel.channelNumber + 1);
+
+		int response = wxMessageBox(prompt, "Warning", wxYES_NO | wxICON_WARNING, this);
+
+		if (response != wxYES)
+		{
+			return;
+		}
+
+		mAppModel->ClearTrack(mChannel.channelNumber);
 	}
 
 	void SendPatch()

@@ -47,6 +47,7 @@ public:
 	// Note Editing - Deletion
 	void DeleteNote(const NoteLocation& note);
 	void DeleteNotes(const std::vector<NoteLocation>& notes);
+	void ClearTrack(ubyte trackNumber);
 
 	// Note Editing - Move and Resize
 	void MoveNote(const NoteLocation& note, uint64_t newStartTick, ubyte newPitch);

@@ -6,6 +6,11 @@ Track& TrackSet::GetTrack(ubyte channelNumber)
 	return mTracks[channelNumber];
 }
 
+bool TrackSet::IsTrackEmpty(ubyte channelNumber)
+{
+	return GetTrack(channelNumber).empty();
+}
+
 std::vector<MidiMessage> TrackSet::PlayBack(uint64_t currentTick)
 {
 	std::vector<MidiMessage> scheduledMessages;

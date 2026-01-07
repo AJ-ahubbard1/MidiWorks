@@ -7,8 +7,10 @@
 class SoundBankPanel : public wxScrolledWindow
 {
 public: 
-	SoundBankPanel(wxWindow* parent, SoundBank& soundBank, wxWindowID id = wxID_ANY)
-		: wxScrolledWindow(parent, id), mSoundBank(soundBank)
+	SoundBankPanel(wxWindow* parent, std::shared_ptr<AppModel> model, wxWindowID id = wxID_ANY)
+		: wxScrolledWindow(parent, id)
+		, mAppModel(model)
+		, mSoundBank(model->GetSoundBank())
 	{
 		SetScrollRate(5, 5);
 		CreateControls();
@@ -30,6 +32,7 @@ public:
 	}
 
 private:
+	std::shared_ptr<AppModel> mAppModel;
 	SoundBank& mSoundBank;
 	wxStaticText* mMidiOutLabel;
 	wxChoice* mMidiOutChoice;
@@ -58,7 +61,7 @@ private:
 		// Only create controls for channels 1-15 (channel 16 reserved for metronome)
 		for (int i = 0; i < 15; i++)
 		{
-			mChannelControls[i] = new ChannelControlsPanel(this, mSoundBank.GetChannel(i), midiOut);
+			mChannelControls[i] = new ChannelControlsPanel(this, mAppModel, mSoundBank.GetChannel(i));
 		}
 	}
 

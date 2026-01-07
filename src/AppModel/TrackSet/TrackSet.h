@@ -42,6 +42,8 @@ public:
 
 	Track& GetTrack(ubyte channelNumber);
 
+	bool IsTrackEmpty(ubyte channelNumber);
+
 	std::vector<MidiMessage> PlayBack(uint64_t currentTick);
 
 	void FindStart(uint64_t startTick);

@@ -8,7 +8,7 @@ class TransportPanel : public wxPanel
 public:
 	TransportPanel(wxWindow* parent, std::shared_ptr<AppModel> model, const wxColour& bgColor, const wxString& label)
 		: wxPanel(parent, wxID_ANY, wxDefaultPosition, wxDefaultSize, 0, label),
-		mModel(model),
+		mAppModel(model),
 		mTransport(model->GetTransport())
 	{
 		SetBackgroundColour(bgColor);
@@ -54,7 +54,7 @@ public:
 	}
 
 private:
-	std::shared_ptr<AppModel> mModel;
+	std::shared_ptr<AppModel> mAppModel;
 	Transport& mTransport;
 	wxStaticText* mTickDisplay;
 	wxStaticText* mTimeDisplay;
@@ -115,7 +115,7 @@ private:
 
 		// Metronome checkbox (renamed to "Click")
 		mMetronomeCheckBox = new wxCheckBox(this, wxID_ANY, "Click");
-		mMetronomeCheckBox->SetValue(mModel->GetMetronomeService().IsEnabled());
+		mMetronomeCheckBox->SetValue(mAppModel->GetMetronomeService().IsEnabled());
 
 		// Loop checkbox
 		mLoopCheckBox = new wxCheckBox(this, wxID_ANY, "Loop");
@@ -234,9 +234,9 @@ private:
 
 	void OnTempoChange(wxSpinDoubleEvent& event)
 	{
-		auto settings = mModel->GetTransport().GetBeatSettings();
+		auto settings = mAppModel->GetTransport().GetBeatSettings();
 		settings.tempo = mTempoControl->GetValue();
-		mModel->GetTransport().SetBeatSettings(settings);
+		mAppModel->GetTransport().SetBeatSettings(settings);
 	}
 
 	void OnNumeratorChange(wxCommandEvent& event)
@@ -257,7 +257,7 @@ private:
 
 	void OnMetronomeToggle(wxCommandEvent& event)
 	{
-		mModel->GetMetronomeService().SetEnabled(mMetronomeCheckBox->GetValue());
+		mAppModel->GetMetronomeService().SetEnabled(mMetronomeCheckBox->GetValue());
 	}
 
 	void OnLoopToggle(wxCommandEvent& event)

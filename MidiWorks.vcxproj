@@ -177,6 +177,7 @@
     <ClInclude Include="src\AppModel\RecordingSession\RecordingSession.h" />
     <ClInclude Include="src\AppModel\SoundBank\ChannelColors.h" />
     <ClInclude Include="src\AppModel\UndoRedoManager\UndoRedoManager.h" />
+    <ClInclude Include="src\Commands\ClearTrackCommand.h" />
     <ClInclude Include="src\Commands\Command.h" />
     <ClInclude Include="src\Commands\DeleteMultipleNotesCommand.h" />
     <ClInclude Include="src\Commands\MoveMultipleNotesCommand.h" />
