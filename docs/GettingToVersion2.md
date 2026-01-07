@@ -66,6 +66,7 @@ This unlocks collaboration, visual organization, and integration with the broade
 - ✅ Save/load projects
 - ✅ Keyboard shortcuts
 - ✅ Visual feedback
+- ✅ **Global time signature control (3/4, 6/8, 7/8, etc.) - January 2026**
 
 **Known Limitations:**
 - ⚠️ No error handling (crashes on device disconnect, file errors)
@@ -75,6 +76,7 @@ This unlocks collaboration, visual organization, and integration with the broade
 - ⚠️ No transpose functionality
 - ⚠️ Timeline is tick-based (hard to navigate)
 - ⚠️ No performance optimization (may lag with 1000+ notes)
+- ⚠️ No tempo changes throughout song (single global tempo/time signature only)
 
 ---
 
@@ -548,7 +550,46 @@ class ClearTrackCommand : public Command {
 
 ---
 
-#### 1.2.2 Velocity Editing ⭐⭐⭐ HIGH PRIORITY
+#### 1.2.2 Multi-Note Resize ⭐⭐ MEDIUM PRIORITY
+**Why:** Quickly adjust duration of multiple notes simultaneously
+
+**Tasks:**
+- [ ] Detect when multiple notes are selected during resize operation
+- [ ] Apply same duration change to all selected notes
+- [ ] Create ResizeMultipleNotesCommand for undo support
+- [ ] Preserve relative timing between notes (all grow/shrink by same amount)
+
+**Implementation Notes:**
+```cpp
+// When user resizes one note in a multi-selection:
+// 1. Calculate delta duration (new duration - old duration)
+// 2. Apply same delta to all selected notes
+// 3. Execute as single undoable command
+
+class ResizeMultipleNotesCommand : public Command {
+    std::vector<NoteResizeInfo> mResizes;
+    int64_t mDurationDelta;
+
+    void Execute() override {
+        for (auto& resize : mResizes) {
+            uint64_t newDuration = resize.oldDuration + mDurationDelta;
+            // Apply new duration to note
+        }
+    }
+};
+```
+
+**Behavior:**
+- Works like multi-note move: user drags one note's edge, all selected notes resize by same amount
+- Maintains musical relationships (if one note is half the length of another, that ratio is preserved)
+- Single undo/redo operation for all resizes
+
+**Estimated Effort:** 0.5 days
+**Status:** ❌ TODO
+
+---
+
+#### 1.2.3 Velocity Editing ⭐⭐⭐ HIGH PRIORITY
 **Why:** Dynamics are essential for expressive, realistic MIDI
 
 **Tasks:**
@@ -612,7 +653,7 @@ class ChangeVelocityCommand : public Command {
 
 ---
 
-#### 1.2.3 Transpose ⭐⭐⭐ HIGH PRIORITY
+#### 1.2.4 Transpose ⭐⭐⭐ HIGH PRIORITY
 **Why:** Essential for trying melodies in different keys
 
 **Tasks:**
@@ -682,7 +723,7 @@ class TransposeCommand : public Command {
 
 ---
 
-#### 1.2.4 Timeline Improvements ⭐⭐ MEDIUM PRIORITY
+#### 1.2.5 Timeline Improvements ⭐⭐ MEDIUM PRIORITY
 **Why:** Tick-based navigation is confusing, need measure/beat display
 
 **Tasks:**
@@ -738,8 +779,42 @@ void DrawTimeline(wxDC& dc)
 
 ---
 
-#### 1.2.5 Solo Visual Filtering ⭐⭐⭐ HIGH PRIORITY
+#### 1.2.6 Global Time Signature Control ⭐⭐ MEDIUM PRIORITY ✅ COMPLETE
+**Why:** Support composing in different meters (3/4 waltz, 6/8 jig, 7/8 odd time, etc.)
+
+**Tasks:**
+- [x] Add time signature controls to TransportPanel
+  - [x] wxChoice for numerator (1-21)
+  - [x] wxChoice for denominator (2, 4, 8, 16, 32)
+- [x] Update Transport::BeatSettings with time signature
+- [x] Calculate ticks per beat and measure from time signature
+- [x] Update canvas grid to respect time signature
+- [x] Update metronome beat detection to respect time signature
+- [x] Persist time signature in project save/load
+- [x] Export/import time signature in MIDI files
+
+**Implementation:**
+- Time signature stored in `Transport::BeatSettings` struct
+- `GetTicksPerBeat()` calculates based on denominator: `TICKS_PER_QUARTER * 4 / denominator`
+- `GetTicksPerMeasure()` calculates: `GetTicksPerBeat() * numerator`
+- Canvas grid automatically updates based on beat settings (MidiCanvas.cpp:386-387)
+- Metronome `CheckForBeat()` respects time signature for downbeat detection
+- Measure navigation (jump to next/previous measure) works correctly
+- MIDI import extracts time signature from imported files (ProjectManager.cpp:461-462)
+- MIDI export writes time signature meta event (ProjectManager.cpp:321)
+- Settings persist in project JSON (save/load)
+
+**Limitation:** This implements a single **global** time signature for the entire project. For multiple time signature changes throughout a song (e.g., 4/4 verse → 3/4 chorus), see section 2.0.3 (Tempo Track).
+
+**Estimated Effort:** 1 day
+**Status:** ✅ COMPLETE (January 2026)
+
+---
+
+#### 1.2.7 Solo Visual Filtering ⭐⭐⭐ HIGH PRIORITY ✅ COMPLETE
 **Why:** Overlapping notes from different tracks make rectangular selection grab wrong notes. Need visual isolation to edit individual tracks precisely.
+
+**Status:** ✅ Core functionality COMPLETE (January 2026) - Hidden mode implemented. Dimmed and Normal modes can be added later as enhancements.
 
 **Problem Statement:**
 When multiple tracks have notes at the same pitch and time, selecting a range of notes from one track accidentally grabs notes from other tracks. This makes editing individual tracks in dense multi-track projects frustrating and error-prone.
@@ -899,22 +974,29 @@ std::vector<NoteLocation> MidiCanvasPanel::FindNotesInRectangle(wxPoint start, w
 - [ ] Verify dimmed notes are not selectable
 
 **Estimated Effort:** 1-2 days
-**Status:** ❌ TODO
+**Status:** ✅ COMPLETE (January 2026) - Core hidden mode implemented
+
+**Future Enhancements (Optional):**
+- [ ] Add Dimmed mode (draw non-soloed notes at low opacity)
+- [ ] Add Normal mode (all tracks visible regardless of solo)
+- [ ] Add UI toggle to switch between modes
 
 ---
 
 ### Version 1.2 Summary
 
-**Total Tasks:** 5 major features (MIDI import, Velocity editing, Transpose, Timeline, Solo visual filtering)
-**Estimated Effort:** 8-10 days of focused work
+**Total Tasks:** 7 major features (MIDI import, Multi-note resize, Velocity editing, Transpose, Timeline, Global time signature, Solo visual filtering)
+**Estimated Effort:** 9.5-11.5 days of focused work
 **Target:** 3-4 weeks (part-time)
 
 **Success Criteria:**
-- [ ] Can import MIDI files from other sources
+- [x] Can import MIDI files from other sources ✅
+- [ ] Can resize multiple selected notes simultaneously
 - [ ] Can edit note dynamics (velocity)
 - [ ] Can transpose melodies to different keys
 - [ ] Can navigate projects with measure/beat timeline
-- [ ] Can isolate individual tracks for precise editing (solo visual filtering)
+- [x] Can compose in different time signatures (3/4, 6/8, 7/8, etc.) ✅
+- [x] Can isolate individual tracks for precise editing (solo visual filtering) ✅
 - [ ] Timeline is clear and intuitive
 
 **Next Milestone:** Once v1.2 is complete, move to v1.3 for musical intelligence features.
@@ -1230,6 +1312,8 @@ Chord ParseChord(const std::string& chordName)
 **Motivation:**
 Testing with imported MIDI files revealed that most professional compositions have tempo and time signature changes throughout the song. Currently, MidiWorks only supports a single global tempo and time signature, which limits both composition flexibility and accurate MIDI import.
 
+**Note:** ✅ Global time signature control is **complete** (see v1.2.5). This section covers adding **multiple** tempo/time signature events at different ticks throughout the song.
+
 **Key Insight:** A tempo track is conceptually similar to MIDI tracks - it's a collection of timed events at specific ticks. The difference is that it stores song structure metadata (tempo, time signature) instead of note on/off messages.
 
 **Architecture Decision:**
@@ -1538,13 +1622,13 @@ void SoundBank::SendBankAndProgram(ubyte channel)
 
 ## Progress Tracking
 
-### Overall Progress: 28% (Making Great Progress!)
+### Overall Progress: 31% (Making Great Progress!)
 
 | Version | Status | Progress | Completion Date |
 |---------|--------|----------|-----------------|
 | v1.0 | ✅ COMPLETE | 100% | December 2025 |
 | v1.1 | 🔄 IN PROGRESS | 67% (4/6) | Target: January 2026 |
-| v1.2 | 🔄 IN PROGRESS | 40% (2/5) | Target: February 2026 |
+| v1.2 | 🔄 IN PROGRESS | 57% (4/7) | Target: February 2026 |
 | v1.3 | ❌ TODO | 0% | Target: March 2026 |
 | v2.0 | ❌ TODO | 0% | Target: April 2026 |
 
@@ -1557,12 +1641,14 @@ void SoundBank::SendBankAndProgram(ubyte channel)
 - [ ] Clear Track
 - [x] MIDI File Export ✅ (January 2026)
 
-### v1.2 Progress: 2/5 Complete (40%)
+### v1.2 Progress: 4/7 Complete (57%)
 
 - [x] MIDI File Import ✅ (January 2026)
+- [ ] Multi-Note Resize
 - [ ] Velocity Editing
 - [ ] Transpose
 - [ ] Timeline Improvements
+- [x] Global Time Signature Control ✅ (January 2026)
 - [x] Solo Visual Filtering ✅ (January 2026)
 
 ### v1.3 Progress: 0/4 Complete (0%)

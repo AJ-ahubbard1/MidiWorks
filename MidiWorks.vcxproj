@@ -201,12 +201,8 @@
     <ClInclude Include="src\MainFrame\MainFrame.h" />
     <ClInclude Include="src\MidiConstants.h" />
     <ClInclude Include="src\Panels\ChannelControls.h" />
-    <ClInclude Include="src\Panels\ChannelTrackRow.h" />
     <ClInclude Include="src\Panels\DrumMachine\DrumMachinePanel.h" />
-    <ClInclude Include="src\Panels\Inspector.h" />
-    <ClInclude Include="src\Panels\Instrument.h" />
     <ClInclude Include="src\Panels\Log.h" />
-    <ClInclude Include="src\Panels\MainSynth.h" />
     <ClInclude Include="src\Panels\MidiCanvas\MidiCanvas.h" />
     <ClInclude Include="src\Panels\MidiCanvas\MidiCanvasConstants.h" />
     <ClInclude Include="src\Panels\MidiSettings.h" />

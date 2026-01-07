@@ -98,15 +98,6 @@
     <ClInclude Include="src\MainFrame\MainFrame.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="src\Panels\Instrument.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="src\Panels\Inspector.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="src\Panels\MainSynth.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
     <ClInclude Include="src\Panels\Log.h">
       <Filter>Header Files</Filter>
     </ClInclude>
@@ -165,9 +156,6 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="src\Panels\MidiCanvas\MidiCanvas.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="src\Panels\ChannelTrackRow.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="src\Commands\Command.h">

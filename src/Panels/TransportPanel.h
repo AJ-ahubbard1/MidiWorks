@@ -31,7 +31,26 @@ public:
 	/// </summary>
 	void UpdateTempoDisplay()
 	{
-		mTempoControl->SetValue(mTransport.GetBeatSettings().tempo);
+		auto beats = mTransport.GetBeatSettings();
+		mTempoControl->SetValue(beats.tempo);
+		UpdateTimeSignatureDisplay(beats);
+	}
+
+	void UpdateTimeSignatureDisplay(const Transport::BeatSettings& beats)
+	{
+		wxString numerator = wxString::Format("%d", beats.timeSignatureNumerator);
+		if (!mNumeratorChoice->SetStringSelection(numerator))
+		{
+			// Fallback if numerator not found
+			mNumeratorChoice->SetSelection(3); // "4"
+		}
+		wxString denominator= wxString::Format("%d", beats.timeSignatureDenominator);
+		if (!mDenominatorChoice->SetStringSelection(denominator))
+		{
+			// Fallback if denominator not found
+			mDenominatorChoice->SetSelection(1); // "4"
+		}
+
 	}
 
 private:
@@ -47,6 +66,8 @@ private:
 	wxButton* mFastForwardButton;
 	wxStaticText* mTempoLabel;
 	wxSpinCtrlDouble* mTempoControl;
+	wxChoice* mNumeratorChoice;
+	wxChoice* mDenominatorChoice;
 	wxCheckBox* mMetronomeCheckBox;
 	wxCheckBox* mLoopCheckBox;
 	Transport::State mPreviousState;
@@ -63,12 +84,34 @@ private:
 		mFastForwardButton = new wxButton(this, wxID_ANY, ">>");
 
 		// Tempo control
+		auto beatSettings = mTransport.GetBeatSettings();
 		mTempoLabel = new wxStaticText(this, wxID_ANY, "Tempo:");
 		mTempoControl = new wxSpinCtrlDouble(this, wxID_ANY, "", wxDefaultPosition, wxSize(80, -1));
 		mTempoControl->SetRange(40.0, 300.0);  // 40-300 BPM range
-		mTempoControl->SetValue(mTransport.GetBeatSettings().tempo);
+		mTempoControl->SetValue(beatSettings.tempo);
 		mTempoControl->SetIncrement(1.0);
 		mTempoControl->SetDigits(1);  // Show 1 decimal place
+
+		// Time Signature
+		mNumeratorChoice = new wxChoice(this, wxID_ANY);
+		mDenominatorChoice = new wxChoice(this, wxID_ANY);
+		std::vector<wxString> nums;
+		nums.reserve(MidiConstants::NUMERATOR_LIST->size());
+		for (auto& numerator : MidiConstants::NUMERATOR_LIST)
+		{
+			nums.emplace_back(numerator);
+		}
+		mNumeratorChoice->Append(nums);
+
+		std::vector<wxString> dens;
+		dens.reserve(MidiConstants::DENOMINATOR_LIST->size());
+		for (auto& denominator: MidiConstants::DENOMINATOR_LIST)
+		{
+			dens.emplace_back(denominator);
+		}
+		mDenominatorChoice->Append(dens);
+		
+		UpdateTimeSignatureDisplay(beatSettings);
 
 		// Metronome checkbox (renamed to "Click")
 		mMetronomeCheckBox = new wxCheckBox(this, wxID_ANY, "Click");
@@ -106,6 +149,10 @@ private:
 		sizer->AddSpacer(5);
 		sizer->Add(mTempoControl, flags);
 		sizer->AddSpacer(buttonSpace);
+		sizer->Add(mNumeratorChoice, flags);
+		sizer->AddSpacer(5);
+		sizer->Add(mDenominatorChoice, flags);
+		sizer->AddSpacer(5);
 		sizer->Add(mMetronomeCheckBox, flags);
 		sizer->AddSpacer(buttonSpace);
 		sizer->Add(mLoopCheckBox, flags);
@@ -124,6 +171,8 @@ private:
 		mResetButton->Bind(wxEVT_BUTTON, &TransportPanel::OnReset, this);
 		mRecordButton->Bind(wxEVT_BUTTON, &TransportPanel::OnRecord, this);
 		mTempoControl->Bind(wxEVT_SPINCTRLDOUBLE, &TransportPanel::OnTempoChange, this);
+		mNumeratorChoice->Bind(wxEVT_CHOICE, &TransportPanel::OnNumeratorChange, this);
+		mDenominatorChoice->Bind(wxEVT_CHOICE, &TransportPanel::OnDenominatorChange, this);
 		mMetronomeCheckBox->Bind(wxEVT_CHECKBOX, &TransportPanel::OnMetronomeToggle, this);
 		mLoopCheckBox->Bind(wxEVT_CHECKBOX, &TransportPanel::OnLoopToggle, this);
 	}
@@ -188,6 +237,22 @@ private:
 		auto settings = mModel->GetTransport().GetBeatSettings();
 		settings.tempo = mTempoControl->GetValue();
 		mModel->GetTransport().SetBeatSettings(settings);
+	}
+
+	void OnNumeratorChange(wxCommandEvent& event)
+	{
+		auto newNumerator = mNumeratorChoice->GetStringSelection();
+		auto beatSettings = mTransport.GetBeatSettings();
+		beatSettings.timeSignatureNumerator = wxAtoi(newNumerator);
+		mTransport.SetBeatSettings(beatSettings);
+	}
+	
+	void OnDenominatorChange(wxCommandEvent& event)
+	{
+		auto newDenominator = mDenominatorChoice->GetStringSelection();
+		auto beatSettings = mTransport.GetBeatSettings();
+		beatSettings.timeSignatureDenominator = wxAtoi(newDenominator);
+		mTransport.SetBeatSettings(beatSettings);
 	}
 
 	void OnMetronomeToggle(wxCommandEvent& event)

@@ -1,6 +1,6 @@
 #pragma once
 #include <cstdint>
-
+#include <string>
 namespace MidiConstants
 {
 	// Timing - True constants
@@ -23,6 +23,13 @@ namespace MidiConstants
 	static constexpr int DEFAULT_TIME_SIGNATURE_DENOMINATOR = 4;
 	static constexpr int DEFAULT_VOLUME = 100;
 	static constexpr int DEFAULT_VELOCITY = 100;
+	static constexpr std::string NUMERATOR_LIST[] = 
+	{
+		"1", "2", "3", "4", "5", "6", "7", 
+		"8", "9", "10", "11", "12", "13", "14", 
+		"15", "16", "17", "18", "19", "20", "21"
+	};
+	static constexpr std::string DENOMINATOR_LIST[] = { "2", "4", "8", "16", "32" };
 
 	// Calculated default (4 bars in 4/4 time)
 	static constexpr uint64_t DEFAULT_LOOP_END = TICKS_PER_QUARTER * 4 * 4;  // = 15360
