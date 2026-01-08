@@ -53,7 +53,21 @@ void MidiCanvasPanel::OnLeftDown(wxMouseEvent& event)
 
 	wxPoint pos = event.GetPosition();
 
-	// Check if we're clicking on loop edges first (priority over notes)
+	// Check if we're clicking on velocity controls first (only if notes are selected)
+	if (!mSelectedNotes.empty())
+	{
+		NoteLocation velocityControl = FindVelocityControlAtPosition(pos.x, pos.y);
+		if (velocityControl.found)
+		{
+			mMouseMode = MouseMode::EditingVelocity;
+			mVelocityEditNote = velocityControl;
+			mOriginalVelocity = velocityControl.velocity;
+			mDragStartPos = pos;
+			return;
+		}
+	}
+
+	// Check if we're clicking on loop edges (priority over notes)
 	if (IsNearLoopStart(pos.x))
 	{
 		mMouseMode = MouseMode::DraggingLoopStart;
@@ -195,6 +209,32 @@ void MidiCanvasPanel::OnLeftUp(wxMouseEvent& event)
 			mAppModel->ClearNoteEditPreview();
 		}
 		mSelectedNote.found = false;
+	}
+	else if (mMouseMode == MouseMode::EditingVelocity && mVelocityEditNote.found)
+	{
+		// Finalize velocity edit
+		ubyte finalVelocity = mVelocityEditNote.velocity;
+
+		// Create note location with original velocity for the command
+		NoteLocation noteWithOriginalVelocity = mVelocityEditNote;
+		noteWithOriginalVelocity.velocity = mOriginalVelocity;
+
+		// Execute command (which will modify track data and enable undo/redo)
+		mAppModel->EditNoteVelocity(noteWithOriginalVelocity, finalVelocity);
+
+		// Update the velocity in mSelectedNotes to reflect the new value
+		for (auto& note : mSelectedNotes)
+		{
+			if (note.trackIndex == mVelocityEditNote.trackIndex &&
+			    note.noteOnIndex == mVelocityEditNote.noteOnIndex)
+			{
+				note.velocity = finalVelocity;
+				break;
+			}
+		}
+
+		// Reset state
+		mVelocityEditNote.found = false;
 	}
 
 	// Reset mode and refresh
@@ -384,6 +424,29 @@ void MidiCanvasPanel::OnMouseMove(wxMouseEvent& event)
 
 		// Store preview state in model (doesn't modify track data)
 		mAppModel->SetNoteResizePreview(mSelectedNote, newEndTick);
+
+		Refresh();
+		return;
+	}
+
+	// Handle editing velocity
+	if (mMouseMode == MouseMode::EditingVelocity && mVelocityEditNote.found)
+	{
+		// Calculate velocity editor region bounds
+		int canvasHeight = GetSize().GetHeight();
+		double velocityEditorTop = 0.75 * canvasHeight;
+		int controlsPadding = 10;
+		int controlsTop = velocityEditorTop + controlsPadding;
+		int controlsHeight = canvasHeight - controlsPadding - controlsTop;
+
+		// Calculate new velocity based on vertical mouse position (inverted: top = 127, bottom = 0)
+		int relativeY = pos.y - controlsTop;
+		int newVelocity = 127 - (relativeY * 127 / controlsHeight);
+		newVelocity = std::clamp(newVelocity, 1, 127);  // Velocity range 1-127 (0 would be note-off)
+
+		// Update only the temporary velocity in mVelocityEditNote for visual feedback
+		// The actual track data will be updated when the command executes on mouse up
+		mVelocityEditNote.velocity = static_cast<ubyte>(newVelocity);
 
 		Refresh();
 		return;

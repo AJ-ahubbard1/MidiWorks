@@ -138,3 +138,31 @@ private:
 
 	size_t FindNoteIndex(uint64_t tick, uint8_t pitch, MidiEvent eventType);
 };
+
+/// <summary>
+/// Command to edit a note's velocity.
+/// Stores both old and new velocities to enable undo/redo.
+/// </summary>
+class EditNoteVelocityCommand : public Command
+{
+public:
+	EditNoteVelocityCommand(Track& track, size_t noteOnIndex, ubyte newVelocity)
+		: mTrack(track), mNoteOnIndex(noteOnIndex), mNewVelocity(newVelocity)
+	{
+		// Store original velocity
+		if (mNoteOnIndex < mTrack.size())
+		{
+			mOldVelocity = mTrack[mNoteOnIndex].mm.getVelocity();
+		}
+	}
+
+	void Execute() override;
+	void Undo() override;
+	std::string GetDescription() const override;
+
+private:
+	Track& mTrack;
+	size_t mNoteOnIndex;
+	ubyte mOldVelocity = 0;
+	ubyte mNewVelocity = 0;
+};

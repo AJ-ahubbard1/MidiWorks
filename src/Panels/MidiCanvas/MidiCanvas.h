@@ -54,7 +54,8 @@ private:
 		MovingMultipleNotes,
 		ResizingNote,
 		DraggingLoopStart,
-		DraggingLoopEnd
+		DraggingLoopEnd,
+		EditingVelocity
 	};
 	MouseMode mMouseMode = MouseMode::Idle;
 	bool mIsDragging = false;           // Right-click dragging (panning)
@@ -73,8 +74,10 @@ private:
 	uint64_t mOriginalStartTick = 0;  // Original values for move/resize operations
 	uint64_t mOriginalEndTick = 0;
 	ubyte mOriginalPitch = 0;
+	ubyte mOriginalVelocity = 0;  // Original velocity for velocity editing
 	wxPoint mDragStartPos;       // Mouse position when drag started
 	std::vector<NoteLocation> mOriginalSelectedNotes;  // Original positions for multi-note move
+	NoteLocation mVelocityEditNote;  // Note whose velocity is being edited
 
 	// ========== Debug MIDI Events State ==========
 	struct MidiEventDebugInfo 
@@ -111,6 +114,7 @@ private:
 	std::vector<NoteLocation> FindNotesInRectangle(wxPoint start, wxPoint end);
 	void ClearSelection();
 	bool IsNoteSelected(const NoteLocation& note) const;
+	NoteLocation FindVelocityControlAtPosition(int screenX, int screenY);
 
 	// Solo filtering helper
 	std::vector<NoteLocation> FindNotesInRegionWithSoloFilter(
@@ -138,6 +142,7 @@ private:
 	void DrawPlayhead(wxGraphicsContext* gc);
 	void DrawMidiEventsDebug(wxGraphicsContext* gc);
 	void DrawMidiEventTooltip(wxGraphicsContext* gc, const MidiEventDebugInfo& event);
+	void DrawVelocityEditor(wxGraphicsContext* gc);
 	void DrawPianoKeyboard(wxGraphicsContext* gc);
 
 	// ========================================================================

@@ -116,6 +116,25 @@ std::unique_ptr<Command> NoteEditor::CreateResizeNote(
 	);
 }
 
+std::unique_ptr<Command> NoteEditor::CreateEditNoteVelocity(
+	const NoteLocation& note,
+	ubyte newVelocity)
+{
+	if (!note.found) return nullptr;
+
+	// Only create command if velocity actually changed
+	if (newVelocity == note.velocity)
+		return nullptr;
+
+	Track& track = mTrackSet.GetTrack(note.trackIndex);
+
+	return std::make_unique<EditNoteVelocityCommand>(
+		track,
+		note.noteOnIndex,
+		newVelocity
+	);
+}
+
 void NoteEditor::SetNoteMovePreview(const NoteLocation& note, uint64_t newStartTick, ubyte newPitch)
 {
 	mNoteEditPreview.isActive = true;

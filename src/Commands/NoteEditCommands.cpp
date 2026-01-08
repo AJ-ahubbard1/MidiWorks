@@ -219,3 +219,26 @@ size_t ResizeNoteCommand::FindNoteIndex(uint64_t tick, uint8_t pitch, MidiEvent 
 	}
 	return mTrack.size();  // Not found
 }
+
+// EditNoteVelocityCommand implementations
+void EditNoteVelocityCommand::Execute()
+{
+	if (mNoteOnIndex < mTrack.size())
+	{
+		mTrack[mNoteOnIndex].mm.mData[2] = mNewVelocity;  // Set velocity
+	}
+}
+
+void EditNoteVelocityCommand::Undo()
+{
+	if (mNoteOnIndex < mTrack.size())
+	{
+		mTrack[mNoteOnIndex].mm.mData[2] = mOldVelocity;  // Restore velocity
+	}
+}
+
+std::string EditNoteVelocityCommand::GetDescription() const
+{
+	return "Edit note velocity (" + std::to_string(mOldVelocity) +
+	       " -> " + std::to_string(mNewVelocity) + ")";
+}

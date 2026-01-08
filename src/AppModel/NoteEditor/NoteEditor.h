@@ -37,6 +37,10 @@ public:
 		const NoteLocation& note,
 		uint64_t newDuration
 	);
+	std::unique_ptr<Command> CreateEditNoteVelocity(
+		const NoteLocation& note,
+		ubyte newVelocity
+	);
 
 	// Quantization
 	std::vector<std::unique_ptr<Command>> CreateQuantizeAllTracks(uint64_t gridSize);

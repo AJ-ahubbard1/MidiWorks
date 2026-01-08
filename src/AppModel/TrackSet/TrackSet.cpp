@@ -144,7 +144,8 @@ std::vector<NoteLocation> TrackSet::GetNotesFromTrack(const Track& track, int tr
 			note.noteOffIndex = j;
 			note.startTick = noteOn.tick;
 			note.endTick = noteOff.tick;
-			note.pitch = noteOn.mm.mData[1];
+			note.pitch = noteOn.mm.getPitch();
+			note.velocity = noteOn.mm.getVelocity();
 			result.push_back(note);
 			break;
 		}

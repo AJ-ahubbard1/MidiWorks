@@ -22,6 +22,7 @@ struct NoteLocation
 	uint64_t	startTick    = 0;
 	uint64_t	endTick      = 0;
 	ubyte		pitch		 = 0;
+	ubyte		velocity     = 0;
 
 	// Equality operator for finding notes in selection
 	bool operator==(const NoteLocation& other) const 

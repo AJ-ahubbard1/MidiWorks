@@ -53,6 +53,7 @@ public:
 	void MoveNote(const NoteLocation& note, uint64_t newStartTick, ubyte newPitch);
 	void MoveMultipleNotes(const std::vector<NoteLocation>& notes, int64_t tickDelta, int pitchDelta);
 	void ResizeNote(const NoteLocation& note, uint64_t newDuration);
+	void EditNoteVelocity(const NoteLocation& note, ubyte newVelocity);
 
 	// Note Edit Preview (for drag operations)
 	void SetNoteMovePreview(const NoteLocation& note, uint64_t newStartTick, ubyte newPitch);

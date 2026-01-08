@@ -1,5 +1,6 @@
 #include "MidiCanvas.h"
 #include <map>
+#include <cmath>
 
 MidiCanvasPanel::MidiCanvasPanel(wxWindow* parent, std::shared_ptr<AppModel> appModel, const wxString& label)
 	: wxPanel(parent, wxID_ANY, wxDefaultPosition, wxDefaultSize, 0, label),
@@ -146,6 +147,7 @@ void MidiCanvasPanel::Draw(wxPaintEvent&)
 	DrawHoverBorder(gc);
 	DrawSelectionRectangle(gc);
 	DrawPlayhead(gc);
+	DrawVelocityEditor(gc);
 	DrawPianoKeyboard(gc);  // Draw last so it appears on top of scrolling notes
 
 	delete gc;
@@ -297,6 +299,40 @@ bool MidiCanvasPanel::IsNoteSelected(const NoteLocation& note) const
 			return true;
 	}
 	return false;
+}
+
+NoteLocation MidiCanvasPanel::FindVelocityControlAtPosition(int screenX, int screenY)
+{
+	// Check if mouse is within the velocity editor region (bottom 25% of canvas)
+	int canvasHeight = GetSize().GetHeight();
+	double velocityEditorTop = 0.75 * canvasHeight;
+
+	if (screenY < velocityEditorTop)
+		return NoteLocation{};  // Not in velocity editor region
+
+	// Check each selected note's velocity control
+	int controlsPadding = 10;
+	int controlsTop = velocityEditorTop + controlsPadding;
+	int controlsHeight = canvasHeight - controlsPadding - controlsTop;
+	int controlsRadius = 8;
+
+	for (const auto& note : mSelectedNotes)
+	{
+		int startNoteX = TickToScreenX(note.startTick);
+		int velocityControlY = controlsTop + (127 - note.velocity) * controlsHeight / 127;
+
+		// Check if click is within radius of this control rectangle
+		int dx = screenX - startNoteX;
+		int dy = screenY - velocityControlY;
+		int distance = std::sqrt(dx * dx + dy * dy);
+
+		if (distance <= controlsRadius + 5)  // Add 5px tolerance for easier clicking
+		{
+			return note;
+		}
+	}
+
+	return NoteLocation{};  // No control found
 }
 
 bool MidiCanvasPanel::IsOnResizeEdge(int screenX, const NoteLocation& note)
@@ -718,6 +754,74 @@ void MidiCanvasPanel::DrawMidiEventTooltip(wxGraphicsContext* gc, const MidiEven
 
 	// Draw text
 	gc->DrawText(text, rectX + padding, rectY + padding);
+}
+
+void MidiCanvasPanel::DrawVelocityEditor(wxGraphicsContext* gc)
+{
+	// Only draw velocity editor if notes are selected
+	if (mSelectedNotes.empty())
+		return;
+
+	int canvasWidth = GetSize().GetWidth();
+	int canvasHeight = GetSize().GetHeight();
+	// editor dimensions
+	double x = 0;
+	double y = 0.75 * canvasHeight;
+	double w = canvasWidth;
+	double h = canvasHeight - y;
+	// Draw background of editor
+	gc->SetBrush(wxBrush(wxColour(45, 45, 48)));  // Dark charcoal gray (similar to Ableton/FL Studio)
+	gc->SetPen(*wxTRANSPARENT_PEN);
+	gc->DrawRectangle(x, y, w, h);
+
+	int controlsPadding = 10;
+	int controlsTop = y + controlsPadding;
+	int controlsHeight = canvasHeight - controlsPadding - controlsTop;
+	int controlsRadius = 8;
+
+	for (const NoteLocation& note : mSelectedNotes)
+	{
+		int startNoteX = TickToScreenX(note.startTick);
+
+		// Check if this is the control being edited
+		bool isBeingEdited = (mMouseMode == MouseMode::EditingVelocity &&
+		                      mVelocityEditNote.found &&
+		                      mVelocityEditNote.trackIndex == note.trackIndex &&
+		                      mVelocityEditNote.noteOnIndex == note.noteOnIndex);
+
+		// Use temporary velocity value if being edited, otherwise use note's velocity
+		ubyte displayVelocity = isBeingEdited ? mVelocityEditNote.velocity : note.velocity;
+		int velocityControlY = controlsTop + (127 - displayVelocity) * controlsHeight / 127;
+
+		// Set colors based on edit state
+		if (isBeingEdited)
+		{
+			gc->SetBrush(wxBrush(wxColour(255, 200, 100)));  // Orange for active editing
+			gc->SetPen(wxPen(wxColour(255, 150, 50), 2));  // Bright orange for vertical line
+		}
+		else
+		{
+			gc->SetBrush(wxBrush(wxColour(120, 180, 255)));  // Light blue for slider handles
+			gc->SetPen(wxPen(wxColour(120, 120, 125), 1));  // Light gray for vertical lines
+		}
+
+		// Draw vertical line
+		gc->StrokeLine(startNoteX, controlsTop, startNoteX, controlsTop + controlsHeight);
+
+		// Draw control rectangle
+		gc->DrawRectangle(startNoteX - controlsRadius,
+		                velocityControlY - controlsRadius,
+		                controlsRadius * 2,
+		                controlsRadius * 2);
+
+		// Draw velocity value text when editing
+		if (isBeingEdited)
+		{
+			std::string velocityText = std::to_string(displayVelocity);
+			gc->SetFont(wxFont(10, wxFONTFAMILY_DEFAULT, wxFONTSTYLE_NORMAL, wxFONTWEIGHT_BOLD), *wxWHITE);
+			gc->DrawText(velocityText, startNoteX + controlsRadius + 5, velocityControlY - 5);
+		}
+	}
 }
 
 void MidiCanvasPanel::DrawPianoKeyboard(wxGraphicsContext* gc)

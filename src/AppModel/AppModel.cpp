@@ -144,6 +144,15 @@ void AppModel::ResizeNote(const NoteLocation& note, uint64_t newDuration)
 	}
 }
 
+void AppModel::EditNoteVelocity(const NoteLocation& note, ubyte newVelocity)
+{
+	auto cmd = mNoteEditor.CreateEditNoteVelocity(note, newVelocity);
+	if (cmd)
+	{
+		mUndoRedoManager.ExecuteCommand(std::move(cmd));
+	}
+}
+
 void AppModel::SetNoteMovePreview(const NoteLocation& note, uint64_t newStartTick, ubyte newPitch)
 {
 	uint64_t newEndTick = newStartTick + note.endTick - note.startTick;

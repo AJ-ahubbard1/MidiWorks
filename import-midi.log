@@ -759,3 +759,38 @@ Time Signature Events:
 
 Converting to PPQN: 960
 Tick Conversion Ratio: 5x
+
+========================================
+Import: C:\Users\16617\Downloads\Tears_For_Fears_-_Head_Over_Heels.mid
+Time: Wed Jan  7 23:45:57 2026
+========================================
+Original PPQN: 48
+Track Count: 11
+File Duration (ticks): 20346
+File Duration (quarters): 423.875
+
+Tempo Events:
+  Track 0, Tick 0: 99.0001 BPM
+  Track 0, Tick 40: 99.0001 BPM
+  Track 0, Tick 192: 99.0001 BPM
+  Track 0, Tick 384: 99.0001 BPM
+  Track 0, Tick 576: 99.0001 BPM
+  Track 0, Tick 768: 99.0001 BPM
+  Track 0, Tick 960: 99.0001 BPM
+  Track 0, Tick 1152: 99.0001 BPM
+  Track 0, Tick 1344: 99.0001 BPM
+  Track 0, Tick 1536: 99.0001 BPM
+  Track 0, Tick 1728: 99.0001 BPM
+  Track 0, Tick 1920: 99.0001 BPM
+  Track 0, Tick 1920: 99.0001 BPM
+  Track 0, Tick 2008: 99.0001 BPM
+  Track 0, Tick 2096: 101 BPM
+  Track 0, Tick 2112: 101 BPM
+  Track 0, Tick 2184: 101 BPM
+  Track 0, Tick 2255: 103 BPM
+
+Time Signature Events:
+  Track 0, Tick 0: 4/4
+
+Converting to PPQN: 960
+Tick Conversion Ratio: 20x
