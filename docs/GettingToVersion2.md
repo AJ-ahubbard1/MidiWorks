@@ -592,64 +592,163 @@ class ResizeMultipleNotesCommand : public Command {
 #### 1.2.3 Velocity Editing ⭐⭐⭐ HIGH PRIORITY
 **Why:** Dynamics are essential for expressive, realistic MIDI
 
-**Tasks:**
-- [ ] Design velocity editing UI
-  - [ ] **Option A:** Velocity lanes below piano roll (like Ableton/FL Studio)
-  - [ ] **Option B:** Velocity editor panel (separate dockable panel)
-  - [ ] **Option C:** Properties panel showing selected note velocity
-  - [ ] **Recommendation:** Start with Option C (simpler), add Option A later
-- [ ] Add velocity display for selected notes
-  - [ ] Show velocity value (0-127) in status bar or properties panel
-  - [ ] wxSpinCtrl or wxSlider to adjust velocity
-  - [ ] Update all selected notes when changed
-- [ ] Create ChangeVelocityCommand for undo support
-- [ ] Add velocity visualization in piano roll
-  - [ ] Color intensity based on velocity (darker = louder)
-  - [ ] Or: Note height/width variation
-- [ ] Add velocity to Quantize panel (optional)
-  - [ ] "Quantize Velocity" - round to nearest 10, 16, etc.
+**Status:** 🔄 PARTIALLY COMPLETE - Single-note editing complete (January 2026), multi-note editing TODO
 
-**UI Mockup (Properties Panel Approach):**
-```
-┌─ Selected Note Properties ──────┐
-│ Count: 5 notes                   │
-│ Velocity: [|||||||||||] 100      │
-│ Duration: Mixed                  │
-│ [Apply]                          │
-└──────────────────────────────────┘
-```
+**Phase 1: Single Note Editing** ✅ COMPLETE (January 2026)
+- [x] Velocity lanes below piano roll (Option A approach)
+  - [x] Velocity editor panel appears when notes selected
+  - [x] Shows in bottom 25% of canvas (dark charcoal background)
+  - [x] Vertical slider controls per selected note
+- [x] Create EditNoteVelocityCommand for undo support
+- [x] Visual feedback during editing
+  - [x] Orange highlight on active control
+  - [x] Real-time velocity value display
+  - [x] Control position updates with mouse drag
+- [x] Integration with piano roll
+  - [x] Click and drag velocity control to edit
+  - [x] Velocity range 1-127 (clamped)
+  - [x] Full undo/redo support
 
-**Implementation Notes:**
+**Implementation (Completed):**
 ```cpp
-// Commands/ChangeVelocityCommand.h
-class ChangeVelocityCommand : public Command {
-    struct NoteVelocityChange {
-        int trackIndex;
-        size_t noteOnIndex;
-        uint8_t oldVelocity;
-        uint8_t newVelocity;
-    };
+// Commands/EditNoteVelocityCommand (in NoteEditCommands.h)
+class EditNoteVelocityCommand : public Command {
+    Track& mTrack;
+    size_t mNoteOnIndex;
+    ubyte mOldVelocity;
+    ubyte mNewVelocity;
 
+    void Execute() override {
+        mTrack[mNoteOnIndex].mm.mData[2] = mNewVelocity;
+    }
+
+    void Undo() override {
+        mTrack[mNoteOnIndex].mm.mData[2] = mOldVelocity;
+    }
+};
+```
+
+**Phase 2: Multi-Note Velocity Editing** (TODO)
+
+When multiple notes are selected, provide intuitive ways to edit velocities together.
+
+**Option 1: Relative Adjustment (Default Behavior)** ⭐ RECOMMENDED
+- Drag any velocity control
+- **All** selected notes adjust by the same delta (+10, -15, etc.)
+- Preserves relative differences between velocities
+- Example: Notes at [100, 80, 60] dragged up +20 → [120, 100, 80]
+
+**Benefits:**
+- ✅ Preserves musical dynamics between notes
+- ✅ Feels natural and intuitive
+- ✅ Most common in professional DAWs (Ableton, FL Studio, Cubase)
+- ✅ No modifiers required
+
+**Implementation:**
+```cpp
+// When dragging a velocity control with multiple notes selected:
+void MidiCanvasPanel::OnMouseMove(wxMouseEvent& event)
+{
+    if (mMouseMode == MouseMode::EditingVelocity &&
+        mVelocityEditNote.found &&
+        mSelectedNotes.size() > 1)  // Multi-note editing
+    {
+        // Calculate delta from original velocity
+        int velocityDelta = mVelocityEditNote.velocity - mOriginalVelocity;
+
+        // Update all selected notes by same delta
+        for (auto& note : mSelectedNotes)
+        {
+            int newVelocity = note.velocity + velocityDelta;
+            newVelocity = std::clamp(newVelocity, 1, 127);
+            // Store in temporary preview state
+        }
+
+        Refresh();
+    }
+}
+
+// On mouse up: Create EditMultipleNoteVelocitiesCommand
+class EditMultipleNoteVelocitiesCommand : public Command {
     std::vector<NoteVelocityChange> mChanges;
+    int mVelocityDelta;
 
     void Execute() override {
         for (auto& change : mChanges) {
             Track& track = mTrackSet.GetTrack(change.trackIndex);
-            track[change.noteOnIndex].mm.mData[2] = change.newVelocity;
-        }
-    }
-
-    void Undo() override {
-        for (auto& change : mChanges) {
-            Track& track = mTrackSet.GetTrack(change.trackIndex);
-            track[change.noteOnIndex].mm.mData[2] = change.oldVelocity;
+            int newVel = std::clamp(
+                static_cast<int>(change.originalVelocity) + mVelocityDelta,
+                1, 127
+            );
+            track[change.noteOnIndex].mm.mData[2] = newVel;
         }
     }
 };
 ```
 
-**Estimated Effort:** 2-3 days
-**Status:** ❌ TODO
+**Option 2: Modifier Key Behavior** (Advanced Flexibility)
+- **Default drag**: Relative adjustment (all notes by delta)
+- **Ctrl+drag**: Set all to same absolute value (normalize dynamics)
+
+**Benefits:**
+- ✅ Flexible: supports both relative and absolute editing
+- ✅ Doesn't break current single-note workflow
+- ✅ Discoverable (tooltip/status bar hint)
+
+**Implementation:**
+```cpp
+void MidiCanvasPanel::OnMouseMove(wxMouseEvent& event)
+{
+    if (mMouseMode == MouseMode::EditingVelocity && mSelectedNotes.size() > 1)
+    {
+        ubyte targetVelocity = CalculateVelocityFromMouseY(event.GetY());
+
+        if (event.ControlDown())
+        {
+            // CTRL: Absolute mode - set all to same value
+            for (auto& note : mSelectedNotes)
+            {
+                // Preview all notes at targetVelocity
+            }
+        }
+        else
+        {
+            // Default: Relative mode - adjust all by delta
+            int velocityDelta = targetVelocity - mOriginalVelocity;
+            for (auto& note : mSelectedNotes)
+            {
+                // Preview note with clamped(original + delta)
+            }
+        }
+    }
+}
+```
+
+**Tasks for Phase 2:**
+- [ ] Add EditMultipleNoteVelocitiesCommand class
+- [ ] Detect multi-note selection in velocity editor
+- [ ] Implement Option 1 (relative adjustment) as default
+- [ ] (Optional) Add Option 2 (Ctrl modifier for absolute mode)
+- [ ] Update visual feedback for all controls during multi-edit
+- [ ] Add status bar hint: "Drag: Relative | Ctrl+Drag: Absolute"
+
+**Future Enhancements (Optional):**
+- [ ] Add velocity visualization to notes in piano roll
+  - [ ] Color intensity based on velocity (darker = louder)
+  - [ ] Or: Note brightness variation
+- [ ] Add velocity to Quantize panel
+  - [ ] "Quantize Velocity" - round to nearest 10, 16, etc.
+- [ ] Velocity curve editing (draw velocity ramps)
+- [ ] Velocity scaling (compress/expand dynamic range)
+
+**Estimated Effort:**
+- Phase 1 (Single-note): ✅ 1 day (COMPLETE)
+- Phase 2 (Multi-note): 1-2 days
+- Total: 2-3 days
+
+**Status:**
+- Phase 1: ✅ COMPLETE (January 2026)
+- Phase 2: ❌ TODO
 
 ---
 
@@ -992,7 +1091,7 @@ std::vector<NoteLocation> MidiCanvasPanel::FindNotesInRectangle(wxPoint start, w
 **Success Criteria:**
 - [x] Can import MIDI files from other sources ✅
 - [ ] Can resize multiple selected notes simultaneously
-- [ ] Can edit note dynamics (velocity)
+- [x] Can edit note dynamics (velocity) 🔄 (Single-note complete, multi-note TODO)
 - [ ] Can transpose melodies to different keys
 - [ ] Can navigate projects with measure/beat timeline
 - [x] Can compose in different time signatures (3/4, 6/8, 7/8, etc.) ✅
@@ -1622,13 +1721,13 @@ void SoundBank::SendBankAndProgram(ubyte channel)
 
 ## Progress Tracking
 
-### Overall Progress: 31% (Making Great Progress!)
+### Overall Progress: 33% (Making Great Progress!)
 
 | Version | Status | Progress | Completion Date |
 |---------|--------|----------|-----------------|
 | v1.0 | ✅ COMPLETE | 100% | December 2025 |
 | v1.1 | 🔄 IN PROGRESS | 67% (4/6) | Target: January 2026 |
-| v1.2 | 🔄 IN PROGRESS | 57% (4/7) | Target: February 2026 |
+| v1.2 | 🔄 IN PROGRESS | 64% (4.5/7) | Target: February 2026 |
 | v1.3 | ❌ TODO | 0% | Target: March 2026 |
 | v2.0 | ❌ TODO | 0% | Target: April 2026 |
 
@@ -1641,11 +1740,11 @@ void SoundBank::SendBankAndProgram(ubyte channel)
 - [ ] Clear Track
 - [x] MIDI File Export ✅ (January 2026)
 
-### v1.2 Progress: 4/7 Complete (57%)
+### v1.2 Progress: 4.5/7 Complete (64%)
 
 - [x] MIDI File Import ✅ (January 2026)
 - [ ] Multi-Note Resize
-- [ ] Velocity Editing
+- [x] Velocity Editing 🔄 (Single-note complete, multi-note TODO - January 2026)
 - [ ] Transpose
 - [ ] Timeline Improvements
 - [x] Global Time Signature Control ✅ (January 2026)

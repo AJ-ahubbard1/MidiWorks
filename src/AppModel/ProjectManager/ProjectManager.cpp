@@ -8,8 +8,6 @@
 #include "MidiConstants.h"
 #include "External/json.hpp"
 #include <fstream>
-#include <chrono>
-#include <ctime>
 #include "External/midifile/MidiFile.h"
 
 using json = nlohmann::json;
@@ -370,18 +368,8 @@ bool ProjectManager::ImportMIDI(const std::string& filepath)
 		std::ofstream logFile("import-midi.log", std::ios::app);
 		if (logFile.is_open())
 		{
-			auto now = std::chrono::system_clock::now();
-			auto time_t_val = std::chrono::system_clock::to_time_t(now);
-
-			// Use safe time formatting
-			char timeBuffer[26];
-			struct tm timeInfo;
-			localtime_s(&timeInfo, &time_t_val);
-			asctime_s(timeBuffer, sizeof(timeBuffer), &timeInfo);
-
 			logFile << "\n========================================\n";
 			logFile << "Import: " << filepath << "\n";
-			logFile << "Time: " << timeBuffer;
 			logFile << "========================================\n";
 
 			// Log original PPQN before conversion

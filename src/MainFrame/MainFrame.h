@@ -48,6 +48,7 @@ private:
     void SyncMenuChecks();
     void UpdateTitle();
     uint64_t GetDeltaTimeMs();
+	void FixLinuxControlSizes(wxWindow* parent);
     
 	// EVENT HANDLERS - Implemented in MainFrameEventHandlers.cpp
     // View / Panel Management Events

@@ -30,6 +30,8 @@ MainFrame::MainFrame()
 
 	CreateStatusBar();
 	SetStatusText("Thanks for using MidiWorks");
+
+	FixLinuxControlSizes(this);
 }
 
 // Instantiate panels, define layout metadata, and register each panel (IDs auto-assigned)
@@ -228,4 +230,25 @@ void MainFrame::UpdateTitle()
 	}
 
 	SetTitle(title);
+}
+
+void MainFrame::FixLinuxControlSizes(wxWindow* parent)
+{
+#ifdef __WXGTK__
+	wxWindowList& children = parent->GetChildren();
+	for (wxWindow* child : children)
+	{
+		if (wxButton* btn = dynamic_cast<wxButton*>(child))
+		{
+			btn->SetMinSize(wxSize(40, -1));
+		}
+		else if (wxSpinCtrl* spin = dynamic_cast<wxSpinCtrl*>(child))
+		{
+			spin->SetMinSize(wxSize(50, -1));
+		}
+		
+		// Recurse into child containers
+		FixLinuxControlSizes(child);
+	}
+#endif
 }

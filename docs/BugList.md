@@ -12,6 +12,65 @@ Track bugs and issues discovered during testing of MidiWorks.
 
 ## Bugs
 
+### #37 - Linux GTK3 widget sizing issues causing missing button/control text
+**Status:** Open
+**Priority:** Medium
+**Found:** 2026-01-10
+
+**Description:**
+When running MidiWorks on Linux (Ubuntu/GTK3), certain UI controls have sizing issues that cause text and content to disappear. The application is functionally working, but the visual issues impact usability.
+
+**Affected Controls:**
+
+1. **Buttons - Negative content width**
+   - Buttons allocated 20px but need 34px (17px padding on each side + content)
+   - Results in -14px for content width, causing button text to disappear
+   - Warning: `Gtk-WARNING **: Negative content width -14 (allocation 20, extents 17x17) while allocating gadget (node button, owner GtkButton)`
+
+2. **SpinButtons - Minimum size violation**
+   - Spin controls need minimum 32px width but only getting 18px
+   - Causes assertion failure: `gtk_box_gadget_distribute: assertion 'size >= 0' failed in GtkSpinButton`
+   - Warning: `Gtk-WARNING **: for_size smaller than min-size (18 < 32) while measuring gadget (node entry, owner GtkSpinButton)`
+
+**Root Cause:**
+GTK3 has stricter widget sizing constraints than Windows. wxWidgets uses GTK3 as its backend on Linux, and the widget sizing constraints need to be explicitly set to accommodate GTK3's requirements. Controls that auto-size correctly on Windows don't meet GTK3's minimum size requirements.
+
+**Expected Behavior:**
+All buttons and spin controls should display their text/content properly on Linux, matching the Windows appearance.
+
+**Proposed Solutions:**
+
+1. **Add explicit minimum sizes to buttons:**
+   ```cpp
+   button->SetMinSize(wxSize(40, -1));  // Ensure buttons have enough width
+   ```
+
+2. **Add explicit minimum sizes to spin controls:**
+   ```cpp
+   spinCtrl->SetMinSize(wxSize(50, -1));  // GTK3 needs minimum 32px + some margin
+   ```
+
+3. **Review parent container sizing:**
+   - Check if toolbar or sizer is constraining child widget sizes
+   - May need to adjust sizer flags or proportions
+
+**Files to Investigate:**
+- Button creation locations across all panels
+- SpinButton/SpinCtrl creation (TransportPanel, DrumMachinePanel, etc.)
+- Toolbar layout code
+- Panel sizer configurations
+
+**Notes:**
+- Application is functionally working on Linux - this is purely a visual/UX issue
+- Similar issues may exist with other wxWidgets controls
+- Need to test fix on both Windows and Linux to ensure cross-platform compatibility
+- May want to create a helper function for setting platform-specific minimum sizes
+
+**Related:**
+- See `linux-errors.log` for full error output
+
+---
+
 ### #31 - Turn off playhead autoscroll when loop is enabled
 **Status:** Open
 **Priority:** Medium
