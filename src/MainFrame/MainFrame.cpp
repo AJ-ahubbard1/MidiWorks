@@ -24,14 +24,15 @@ MainFrame::MainFrame()
 	mKeyboardHandler = std::make_unique<KeyboardHandler>(this, mAppModel);
 	mKeyboardHandler->Initialize();
 
+	// Fix Linux control sizes before AUI layout
+	FixLinuxControlSizes(this);
+
 	mAuiManager.Update();
 	mTimer.Start(1);
 	Bind(wxEVT_AUI_RENDER, &MainFrame::OnAuiRender, this);
 
 	CreateStatusBar();
 	SetStatusText("Thanks for using MidiWorks");
-
-	FixLinuxControlSizes(this);
 }
 
 // Instantiate panels, define layout metadata, and register each panel (IDs auto-assigned)
@@ -238,17 +239,29 @@ void MainFrame::FixLinuxControlSizes(wxWindow* parent)
 	wxWindowList& children = parent->GetChildren();
 	for (wxWindow* child : children)
 	{
+		wxString className = child->GetClassInfo()->GetClassName();
+
 		if (wxButton* btn = dynamic_cast<wxButton*>(child))
 		{
-			btn->SetMinSize(wxSize(40, -1));
+			// GTK3 needs 34px minimum (17px padding each side) + label width
+			// Set to 60px to ensure comfortable fit for most button labels
+			btn->SetMinSize(wxSize(60, 28));
+			wxLogDebug("Fixed button: %s -> MinSize: 60x28", btn->GetLabel());
 		}
 		else if (wxSpinCtrl* spin = dynamic_cast<wxSpinCtrl*>(child))
 		{
-			spin->SetMinSize(wxSize(50, -1));
+			// GTK3 needs 32px minimum for spin controls
+			// Set to 70px to accommodate arrows + text entry
+			spin->SetMinSize(wxSize(70, -1));
+			wxLogDebug("Fixed spin control -> MinSize: 70x-1");
 		}
-		
+
 		// Recurse into child containers
 		FixLinuxControlSizes(child);
 	}
+
+	// Force layout recalculation after setting minimum sizes
+	parent->Layout();
+	parent->Refresh();
 #endif
 }

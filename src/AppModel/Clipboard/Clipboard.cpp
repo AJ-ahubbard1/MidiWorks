@@ -29,7 +29,7 @@ void Clipboard::CopyNotes(const std::vector<NoteLocation>& notes, TrackSet& trac
 		clipNote.relativeStartTick = note.startTick - earliestTick;
 		clipNote.duration = note.endTick - note.startTick;
 		clipNote.pitch = note.pitch;
-		clipNote.velocity = noteOnEvent.mm.getVelocity();  
+		clipNote.velocity = note.velocity;
 		clipNote.trackIndex = note.trackIndex;
 
 		clipboardNotes.push_back(clipNote);

@@ -29,37 +29,37 @@ public:
 
 	void Execute() override
 	{
-		// Group notes by track
-		std::map<int, std::vector<NoteToDelete>> notesByTrack;
+		// Group notes by track with their indices
+		std::map<int, std::vector<std::pair<size_t, size_t>>> indicesByTrack; // track -> [(noteOnIndex, noteOffIndex), ...]
 		for (const auto& note : mNotesToDelete)
 		{
-			notesByTrack[note.trackIndex].push_back(note);
+			indicesByTrack[note.trackIndex].push_back({note.noteOnIndex, note.noteOffIndex});
 		}
 
-		// Delete from each track in descending index order
-		for (auto& [trackIndex, notes] : notesByTrack)
+		// Delete from each track
+		for (auto& [trackIndex, noteIndices] : indicesByTrack)
 		{
-			// Sort by noteOffIndex descending (delete noteOff first, then noteOn)
-			std::sort(notes.begin(), notes.end(),
-				[](const NoteToDelete& a, const NoteToDelete& b) {
-					return a.noteOffIndex > b.noteOffIndex;
-				});
+			// Collect all indices to delete
+			std::vector<size_t> indicesToDelete;
+			for (const auto& [noteOnIdx, noteOffIdx] : noteIndices)
+			{
+				indicesToDelete.push_back(noteOnIdx);
+				indicesToDelete.push_back(noteOffIdx);
+			}
+
+			// Sort indices in descending order
+			std::sort(indicesToDelete.begin(), indicesToDelete.end(),
+				[](size_t a, size_t b) { return a > b; });
 
 			Track& track = mTrackSet.GetTrack(trackIndex);
 
-			// Delete in descending order to maintain valid indices
-			for (const auto& note : notes)
+			// Delete in descending index order (highest index first)
+			// This ensures that deleting an element doesn't affect the validity of lower indices
+			for (size_t idx : indicesToDelete)
 			{
-				// Delete noteOff first (higher index)
-				if (note.noteOffIndex < track.size())
+				if (idx < track.size())
 				{
-					track.erase(track.begin() + note.noteOffIndex);
-				}
-
-				// Delete noteOn second (lower index, still valid after noteOff deletion)
-				if (note.noteOnIndex < track.size())
-				{
-					track.erase(track.begin() + note.noteOnIndex);
+					track.erase(track.begin() + idx);
 				}
 			}
 		}

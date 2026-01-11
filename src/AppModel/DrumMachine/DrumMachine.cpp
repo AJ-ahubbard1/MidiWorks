@@ -1,4 +1,5 @@
 #include "DrumMachine.h"
+#include <cmath>
 
 DrumMachine::DrumMachine()
 {

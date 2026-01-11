@@ -2049,6 +2049,85 @@ User confirmed fix by importing MIDI file that previously played at wrong tempo 
 
 ---
 
+### #38 - Ctrl+X cut command leaves orphaned MIDI events
+**Status:** Fixed
+**Priority:** High
+**Found:** 2026-01-10
+**Fixed:** 2026-01-10
+
+**Description:**
+When selecting two or more notes and using Ctrl+X (cut), the command was leaving orphaned MIDI events (unpaired NOTE_ON or NOTE_OFF events) instead of properly removing all related events. This resulted in broken MIDI pairs and visual artifacts in the piano roll.
+
+**Example Bug Behavior:**
+- **Before Cut**: 6 complete notes visible (12 MIDI events: 6 NOTE_ON + 6 NOTE_OFF)
+- **Select and Cut 2 notes**: Should remove 4 events (2 NOTE_ON + 2 NOTE_OFF)
+- **After Cut**: 4 complete notes + 2 orphaned dots (leftover unpaired events)
+
+**Root Cause:**
+The `DeleteMultipleNotesCommand::Execute()` method (DeleteMultipleNotesCommand.h:30-66) was deleting note events in the wrong order. When deleting multiple notes from the same track:
+
+1. Sort by `noteOffIndex` descending: `[Note2(15,25), Note1(10,20)]`
+2. Delete Note2's noteOff at index 25 ✓
+3. Delete Note2's noteOn at index 15 ✓ (but now indices shift!)
+4. Delete Note1's noteOff at index 20 ❌ **WRONG** - After step 3, index 20 now points to a different event!
+5. Delete Note1's noteOn at index 10 ❌ **WRONG** - Using stale index
+
+**The Problem:** Deleting at index 15 shifts all indices >= 15 downward. But the code tried to delete at the original indices (20, 10) without accounting for the shift. This caused it to delete wrong MIDI events, leaving the intended events orphaned.
+
+**Solution:**
+Refactored `DeleteMultipleNotesCommand::Execute()` to collect ALL indices into a single flat list, sort them in descending order globally, and delete from highest to lowest:
+
+**Before (Broken):**
+```cpp
+// Delete each note's events piecemeal
+for (const auto& note : notes)
+{
+    track.erase(track.begin() + note.noteOffIndex);  // Delete first...
+    track.erase(track.begin() + note.noteOnIndex);   // Then delete second (index now invalid!)
+}
+```
+
+**After (Fixed):**
+```cpp
+// Collect all indices to delete
+std::vector<size_t> indicesToDelete;
+for (const auto& [noteOnIdx, noteOffIdx] : noteIndices)
+{
+    indicesToDelete.push_back(noteOnIdx);
+    indicesToDelete.push_back(noteOffIdx);
+}
+
+// Sort in descending order
+std::sort(indicesToDelete.begin(), indicesToDelete.end(),
+    [](size_t a, size_t b) { return a > b; });
+
+// Delete from highest to lowest (indices stay valid)
+for (size_t idx : indicesToDelete)
+{
+    if (idx < track.size())
+    {
+        track.erase(track.begin() + idx);
+    }
+}
+```
+
+**Key Insight:** Deleting from highest index first means lower indices are never affected by the deletion, so they remain valid throughout the operation.
+
+**Files Modified:**
+- `src/Commands/DeleteMultipleNotesCommand.h` - Refactored Execute() method
+
+**Benefits:**
+- ✓ Ctrl+X cut now properly removes all MIDI events for selected notes
+- ✓ No orphaned events left behind
+- ✓ Works correctly for any number of selected notes
+- ✓ Works correctly across multiple tracks in same command
+- ✓ Undo still works properly (complete track snapshots stored)
+
+**Testing:**
+Verified with user's test case: Select 2 notes, Ctrl+X, all 4 events (2 NOTE_ON + 2 NOTE_OFF) now properly removed with no orphans.
+
+---
+
 ## Template (Copy for new bugs)
 
 ```markdown
