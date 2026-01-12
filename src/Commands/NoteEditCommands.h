@@ -1,9 +1,18 @@
+//==============================================================================
+// NoteEditCommands.h
+// Commands for single-note operations (add, delete, move, resize, velocity)
+//==============================================================================
+
 #pragma once
 #include "Command.h"
 #include "AppModel/TrackSet/TrackSet.h"
 #include <algorithm>
 #include <cstdint>
 using namespace MidiInterface;
+
+//==============================================================================
+// AddNoteCommand
+//==============================================================================
 
 /// <summary>
 /// Command to add a note to one or more tracks.
@@ -44,6 +53,10 @@ private:
 	std::vector<NoteIndices> mAddedNotes;  // Indices of notes added to each track
 };
 
+//==============================================================================
+// DeleteNoteCommand
+//==============================================================================
+
 /// <summary>
 /// Command to delete a note from a track.
 /// Stores the deleted note data to enable undo (re-adding the note).
@@ -70,6 +83,10 @@ private:
 	TimedMidiEvent mNoteOn;
 	TimedMidiEvent mNoteOff;
 };
+
+//==============================================================================
+// MoveNoteCommand
+//==============================================================================
 
 /// <summary>
 /// Command to move a note to a different tick/pitch position.
@@ -106,6 +123,10 @@ private:
 	size_t FindNoteIndex(uint64_t tick, uint8_t pitch, MidiEvent eventType);
 };
 
+//==============================================================================
+// ResizeNoteCommand
+//==============================================================================
+
 /// <summary>
 /// Command to resize a note (change its duration).
 /// Stores both old and new durations to enable undo/redo.
@@ -138,6 +159,10 @@ private:
 
 	size_t FindNoteIndex(uint64_t tick, uint8_t pitch, MidiEvent eventType);
 };
+
+//==============================================================================
+// EditNoteVelocityCommand
+//==============================================================================
 
 /// <summary>
 /// Command to edit a note's velocity.

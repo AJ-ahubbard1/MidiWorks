@@ -1,7 +1,7 @@
 // MainFrameEventHandlers.cpp
 // Event handler implementations for MainFrame
 #include "MainFrame.h"
-#include "Commands/QuantizeCommand.h"
+#include "Commands/TrackCommands.h"
 
 // TIMER EVENTS
 

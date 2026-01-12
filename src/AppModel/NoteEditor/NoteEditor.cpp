@@ -1,9 +1,8 @@
 // NoteEditor.cpp
 #include "NoteEditor.h"
 #include "Commands/NoteEditCommands.h"
-#include "Commands/DeleteMultipleNotesCommand.h"
-#include "Commands/MoveMultipleNotesCommand.h"
-#include "Commands/QuantizeCommand.h"
+#include "Commands/MultiNoteCommands.h"
+#include "Commands/TrackCommands.h"
 #include "MidiConstants.h"
 
 NoteEditor::NoteEditor(TrackSet& trackSet, SoundBank& soundBank)

@@ -1,6 +1,13 @@
+//==============================================================================
+// NoteEditCommands.cpp
+// Implementation of single-note operation commands
+//==============================================================================
+
 #include "NoteEditCommands.h"
 
-// AddNoteCommand implementations
+//==============================================================================
+// AddNoteCommand Implementation
+//==============================================================================
 void AddNoteCommand::Execute()
 {
 	// Clear any previous execution data (for redo)
@@ -76,7 +83,9 @@ std::string AddNoteCommand::GetDescription() const
 	return desc;
 }
 
-// DeleteNoteCommand implementations
+//==============================================================================
+// DeleteNoteCommand Implementation
+//==============================================================================
 void DeleteNoteCommand::Execute()
 {
 	// Delete note-off first (higher index) to avoid invalidating note-on index
@@ -108,7 +117,9 @@ std::string DeleteNoteCommand::GetDescription() const
 	       ", Tick: " + std::to_string(mNoteOn.tick) + ")";
 }
 
-// MoveNoteCommand implementations
+//==============================================================================
+// MoveNoteCommand Implementation
+//==============================================================================
 void MoveNoteCommand::Execute()
 {
 	// Update note-on position
@@ -172,7 +183,9 @@ size_t MoveNoteCommand::FindNoteIndex(uint64_t tick, uint8_t pitch, MidiEvent ev
 	return mTrack.size();  // Not found
 }
 
-// ResizeNoteCommand implementations
+//==============================================================================
+// ResizeNoteCommand Implementation
+//==============================================================================
 void ResizeNoteCommand::Execute()
 {
 	// Update note-off tick to reflect new duration
@@ -220,7 +233,9 @@ size_t ResizeNoteCommand::FindNoteIndex(uint64_t tick, uint8_t pitch, MidiEvent 
 	return mTrack.size();  // Not found
 }
 
-// EditNoteVelocityCommand implementations
+//==============================================================================
+// EditNoteVelocityCommand Implementation
+//==============================================================================
 void EditNoteVelocityCommand::Execute()
 {
 	if (mNoteOnIndex < mTrack.size())

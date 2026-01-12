@@ -8,7 +8,7 @@
 #include "AppModel/TrackSet/TrackSet.h"
 #include "AppModel/AppModel.h"
 #include "Commands/NoteEditCommands.h"
-#include "Commands/PasteCommand.h"
+#include "Commands/ClipboardCommands.h"
 #include "MidiConstants.h"
 #include "MidiCanvasConstants.h"
 

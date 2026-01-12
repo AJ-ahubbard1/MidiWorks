@@ -1,3 +1,8 @@
+//==============================================================================
+// TrackCommands.h
+// Commands for track-level operations (clear, quantize, etc.)
+//==============================================================================
+
 #pragma once
 #include "Command.h"
 #include "AppModel/TrackSet/TrackSet.h"
@@ -6,6 +11,58 @@
 #include <vector>
 #include <string>
 using namespace MidiInterface;
+
+//==============================================================================
+// ClearTrackCommand
+//==============================================================================
+
+/// <summary>
+/// Command to clear all notes from a single track.
+/// Stores a complete backup of the track to enable undo.
+/// </summary>
+class ClearTrackCommand : public Command
+{
+public:
+	/// <summary>
+	/// Construct a clear track command.
+	/// </summary>
+	/// <param name="track">Reference to the track to clear</param>
+	/// <param name="trackNumber">Track number for display purposes</param>
+	ClearTrackCommand(Track& track, int trackNumber)
+		: mTrack(track)
+		, mTrackNumber(trackNumber)
+	{
+	}
+
+	void Execute() override
+	{
+		// Backup all events before clearing
+		mBackup = mTrack;
+
+		// Clear the track
+		mTrack.clear();
+	}
+
+	void Undo() override
+	{
+		// Restore backed-up events
+		mTrack = mBackup;
+	}
+
+	std::string GetDescription() const override
+	{
+		return "Clear Track " + std::to_string(mTrackNumber + 1);
+	}
+
+private:
+	Track& mTrack;          // Reference to the track to clear
+	int mTrackNumber;       // Track number for description
+	Track mBackup;          // Backup storage for undo
+};
+
+//==============================================================================
+// QuantizeCommand
+//==============================================================================
 
 /// <summary>
 /// Command to quantize MIDI events in a track to a grid using duration-aware algorithm.
@@ -35,8 +92,8 @@ public:
 	/// <summary>
 	/// Construct a quantize command for a single track.
 	/// </summary>
-	/// <param name="track">: Reference to the track to quantize</param>
-	/// <param name="gridSize">: Grid size in ticks (e.g., 960 for quarter notes)</param>
+	/// <param name="track">Reference to the track to quantize</param>
+	/// <param name="gridSize">Grid size in ticks (e.g., 960 for quarter notes)</param>
 	QuantizeCommand(Track& track, uint64_t gridSize)
 		: mTrack(track)
 		, mGridSize(gridSize)
@@ -78,7 +135,7 @@ public:
 		// Post-process to fix any remaining overlaps
 		TrackSet::SeparateOverlappingNotes(mTrack);
 
-		// Re-sort track by tick to maintain chronological order
+		// Re-sort track to maintain chronological order
 		TrackSet::SortTrack(mTrack);
 	}
 
@@ -96,7 +153,7 @@ public:
 			mTrack[i].tick = mOriginalTicks[i];
 		}
 
-		// Re-sort track by tick to maintain chronological order
+		// Re-sort track to maintain chronological order
 		TrackSet::SortTrack(mTrack);
 	}
 
@@ -134,13 +191,15 @@ public:
 	}
 
 private:
-	// Helper to round a tick value to the nearest grid point
+	/// <summary>
+	/// Round a tick value to the nearest grid point.
+	/// </summary>
 	uint64_t RoundToGrid(uint64_t tick) const
 	{
 		return ((tick + mGridSize / 2) / mGridSize) * mGridSize;
 	}
 
-	Track& mTrack;
-	uint64_t mGridSize;	// tick amount to quantize notes 
-	std::vector<uint64_t> mOriginalTicks;  // Original timestamps for undo
+	Track& mTrack;                          // Reference to the track to quantize
+	uint64_t mGridSize;                     // Tick amount to quantize notes to
+	std::vector<uint64_t> mOriginalTicks;   // Original timestamps for undo
 };

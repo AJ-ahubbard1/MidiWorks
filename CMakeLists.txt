@@ -28,6 +28,7 @@ set(SOURCES
 	src/AppModel/TrackSet/TrackSet.cpp
 	src/AppModel/Transport/Transport.cpp
 	src/AppModel/UndoRedoManager/UndoRedoManager.cpp
+	src/Commands/MultiNoteCommands.cpp
 	src/Commands/NoteEditCommands.cpp
 	src/External/midifile/Binasc.cpp
 	src/External/midifile/MidiEvent.cpp
@@ -59,15 +60,12 @@ set(HEADERS
 	src/AppModel/TrackSet/TrackSet.h
 	src/AppModel/Transport/Transport.h
 	src/AppModel/UndoRedoManager/UndoRedoManager.h
-	src/Commands/ClearTrackCommand.h
+	src/Commands/ClipboardCommands.h
 	src/Commands/Command.h
-	src/Commands/DeleteMultipleNotesCommand.h
-	src/Commands/MoveMultipleNotesCommand.h
+	src/Commands/MultiNoteCommands.h
 	src/Commands/NoteEditCommands.h
-	src/Commands/PasteCommand.h
-	src/Commands/PasteToTracksCommand.h
-	src/Commands/QuantizeCommand.h
 	src/Commands/RecordCommand.h
+	src/Commands/TrackCommands.h
 	src/External/midifile/Binasc.h
 	src/External/midifile/MidiEvent.h
 	src/External/midifile/MidiEventList.h

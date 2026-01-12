@@ -151,6 +151,7 @@
     <ClCompile Include="src\AppModel\SoundBank\SoundBank.cpp" />
     <ClCompile Include="src\AppModel\TrackSet\TrackSet.cpp" />
     <ClCompile Include="src\AppModel\Transport\Transport.cpp" />
+    <ClCompile Include="src\Commands\MultiNoteCommands.cpp" />
     <ClCompile Include="src\Commands\NoteEditCommands.cpp" />
     <ClCompile Include="src\External\midifile\Binasc.cpp" />
     <ClCompile Include="src\External\midifile\MidiEvent.cpp" />
@@ -178,14 +179,17 @@
     <ClInclude Include="src\AppModel\SoundBank\ChannelColors.h" />
     <ClInclude Include="src\AppModel\UndoRedoManager\UndoRedoManager.h" />
     <ClInclude Include="src\Commands\ClearTrackCommand.h" />
+    <ClInclude Include="src\Commands\ClipboardCommands.h" />
     <ClInclude Include="src\Commands\Command.h" />
     <ClInclude Include="src\Commands\DeleteMultipleNotesCommand.h" />
     <ClInclude Include="src\Commands\MoveMultipleNotesCommand.h" />
+    <ClInclude Include="src\Commands\MultiNoteCommands.h" />
     <ClInclude Include="src\Commands\NoteEditCommands.h" />
     <ClInclude Include="src\Commands\PasteCommand.h" />
     <ClInclude Include="src\Commands\PasteToTracksCommand.h" />
     <ClInclude Include="src\Commands\QuantizeCommand.h" />
     <ClInclude Include="src\Commands\RecordCommand.h" />
+    <ClInclude Include="src\Commands\TrackCommands.h" />
     <ClInclude Include="src\External\json.hpp" />
     <ClInclude Include="src\External\midifile\Binasc.h" />
     <ClInclude Include="src\External\midifile\MidiEvent.h" />

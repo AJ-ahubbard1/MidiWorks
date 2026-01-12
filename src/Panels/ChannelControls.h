@@ -5,7 +5,7 @@
 #include <wx/textdlg.h>
 #include <wx/slider.h>
 #include "AppModel/AppModel.h"
-#include "Commands/ClearTrackCommand.h"
+#include "Commands/TrackCommands.h"
 
 // Individual Control Panel shown for each channel of the SoundBank
 class ChannelControlsPanel : public wxPanel

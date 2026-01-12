@@ -1,7 +1,7 @@
 // MainFrame.cpp
 #include "MainFrame.h"
 #include <wx/string.h>
-#include "Commands/QuantizeCommand.h"
+#include "Commands/TrackCommands.h"
 
 
 MainFrame::MainFrame()

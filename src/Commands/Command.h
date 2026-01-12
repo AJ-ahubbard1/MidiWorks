@@ -1,5 +1,14 @@
+//==============================================================================
+// Command.h
+// Abstract base class for the Command pattern (undo/redo system)
+//==============================================================================
+
 #pragma once
 #include <string>
+
+//==============================================================================
+// Command
+//==============================================================================
 
 /// <summary>
 /// Abstract base class for the Command pattern.
@@ -19,19 +28,19 @@ public:
 
 	/// <summary>
 	/// Execute the command - perform the action (add note, delete note, etc.)
-	/// Called when the user performs an action or presses Redo (Ctrl+Y)
+	/// Called when the user performs an action or presses Redo (Ctrl+Y).
 	/// </summary>
 	virtual void Execute() = 0;
 
 	/// <summary>
-	/// Undo the command - reverse the action
-	/// Called when the user presses Undo (Ctrl+Z)
+	/// Undo the command - reverse the action.
+	/// Called when the user presses Undo (Ctrl+Z).
 	/// </summary>
 	virtual void Undo() = 0;
 
 	/// <summary>
-	/// Get a human-readable description of this command
-	/// Used for displaying command history in the UI
+	/// Get a human-readable description of this command.
+	/// Used for displaying command history in the UI.
 	/// </summary>
 	virtual std::string GetDescription() const = 0;
 };

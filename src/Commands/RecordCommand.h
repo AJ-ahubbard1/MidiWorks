@@ -1,9 +1,18 @@
+//==============================================================================
+// RecordCommand.h
+// Command for MIDI recording with undo/redo support
+//==============================================================================
+
 #pragma once
 #include "Command.h"
 #include "AppModel/TrackSet/TrackSet.h"
 #include <algorithm>
 #include <vector>
 using namespace MidiInterface;
+
+//==============================================================================
+// RecordCommand
+//==============================================================================
 
 /// <summary>
 /// Command to handle recording MIDI data.

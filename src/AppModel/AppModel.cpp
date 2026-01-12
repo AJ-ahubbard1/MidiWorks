@@ -2,12 +2,10 @@
 #include "AppModel.h"
 #include <algorithm>
 #include "Commands/RecordCommand.h"
-#include "Commands/QuantizeCommand.h"
 #include "Commands/NoteEditCommands.h"
-#include "Commands/DeleteMultipleNotesCommand.h"
-#include "Commands/PasteCommand.h"
-#include "Commands/PasteToTracksCommand.h"
-#include "Commands/ClearTrackCommand.h"
+#include "Commands/MultiNoteCommands.h"
+#include "Commands/TrackCommands.h"
+#include "Commands/ClipboardCommands.h"
 
 AppModel::AppModel()
 	: mNoteEditor(mTrackSet, mSoundBank)
