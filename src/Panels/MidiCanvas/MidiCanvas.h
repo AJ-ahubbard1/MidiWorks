@@ -31,6 +31,7 @@ private:
 	Transport& mTransport;
 	TrackSet& mTrackSet;
 	Track& mRecordingBuffer;
+	NoteEditor& mNoteEditor;
 
 	// ========== UI Controls ==========
 	wxStaticText* mDebugMessage;

@@ -22,11 +22,6 @@ void SoundBank::SetMidiOutDevice(std::shared_ptr<MidiOut> device)
 	ApplyChannelSettings();
 }
 
-std::shared_ptr<MidiOut> SoundBank::GetMidiOutDevice() const
-{
-	return mMidiOut;
-}
-
 void SoundBank::ApplyChannelSettings()
 {
 	if (!mMidiOut) return;
@@ -43,21 +38,6 @@ void SoundBank::ApplyChannelSettings()
 	// Also set metronome sound (channel 15/16) - Program 115 = Woodblock
 	auto metronomePc = MidiMessage::ProgramChange(115, MidiConstants::METRONOME_CHANNEL);
 	mMidiOut->sendMessage(metronomePc);
-}
-
-MidiChannel& SoundBank::GetChannel(ubyte c) 
-{ 
-	return mChannels[c]; 
-}
-
-std::span<MidiChannel> SoundBank::GetAllChannels()
-{
-	return std::span<MidiChannel>(mChannels);
-}
-
-wxColour SoundBank::GetChannelColor(ubyte channelNumber) const
-{
-	return mChannels[channelNumber].customColor;
 }
 
 bool SoundBank::SolosFound() const
@@ -119,6 +99,23 @@ bool SoundBank::ShouldChannelPlay(const MidiChannel& channel, bool checkRecord) 
 	}
 	return false;
 }
+
+
+void SoundBank::PlayMessages(std::vector<MidiMessage> msgs)
+{
+	if (msgs.empty()) return;
+	
+	for (auto& mm : msgs)
+	{
+		ubyte c = mm.getChannel();
+		auto& channel = GetChannel(c);
+		if (ShouldChannelPlay(channel, false))
+		{
+			mMidiOut->sendMessage(mm);
+		}
+	}
+}
+
 
 void SoundBank::PlayNote(ubyte pitch, ubyte velocity, ubyte channel)
 {

@@ -44,24 +44,10 @@ void MainFrame::OnPaneClosed(wxAuiManagerEvent& event)
 {
 	wxString name = event.GetPane()->name;
 	ClosePane(name);
-	/*
-	wxString name = event.GetPane()->name;
-
-	for (const auto& [id, info] : GetAllPanels())
-	{
-		if (info.name == name)
-		{
-			GetMenuBar()->Check(id, false);
-			SetPanelVisibility(id, false);
-			break;
-		}
-	}
-	*/
 }
 
 void MainFrame::ClosePane(const wxString& paneName)
 {
-
 	for (const auto& [id, info] : GetAllPanels())
 	{
 		if (info.name == paneName)
@@ -72,7 +58,6 @@ void MainFrame::ClosePane(const wxString& paneName)
 		}
 	}
 }
-
 
 // Debug display for layout
 // when docked panes are resized, the dimensions are shown in controlbar
@@ -97,8 +82,7 @@ void MainFrame::OnUndo(wxCommandEvent& event)
 {
 	// Stop playback/recording to prevent iterator invalidation
 	// (can't modify tracks while they're being iterated during playback)
-	mAppModel->StopPlaybackIfActive();
-
+	mAppModel->GetTransport().StopPlaybackIfActive();
 	mAppModel->GetUndoRedoManager().Undo();
 	mUndoHistoryPanel->UpdateDisplay();  // Update command history display
 	Refresh();  // Redraw canvas to show changes
@@ -109,8 +93,7 @@ void MainFrame::OnRedo(wxCommandEvent& event)
 {
 	// Stop playback/recording to prevent iterator invalidation
 	// (can't modify tracks while they're being iterated during playback)
-	mAppModel->StopPlaybackIfActive();
-
+	mAppModel->GetTransport().StopPlaybackIfActive();
 	mAppModel->GetUndoRedoManager().Redo();
 	mUndoHistoryPanel->UpdateDisplay();  // Update command history display
 	Refresh();  // Redraw canvas to show changes
@@ -349,14 +332,15 @@ void MainFrame::OnClose(wxCloseEvent& event)
 {
 	if (PromptForUnsavedChanges() == UnsavedChangesAction::Cancel)
 	{
-		event.Veto();  	// Cancel the close
+		// Cancel the close
+		event.Veto();  	
 		return;
 	}
 
 	// Stop the timer before destroying panels to prevent slow shutdown
 	mTimer.Stop();
-
-	event.Skip(); 		// Allow the window to close
+	// Allow the window to close
+	event.Skip(); 		
 }
 
 // TRANSPORT CONTROL EVENTS

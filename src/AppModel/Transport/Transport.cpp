@@ -1,17 +1,5 @@
 #include "Transport.h"
 
-Transport::Transport() { }
-
-// State management
-Transport::State Transport::GetState() const { return mState; }
-void Transport::SetState(State state) { mState = state; }
-
-// State queries
-bool Transport::IsPlaying() const		 { return mState == State::Playing;			}
-bool Transport::IsRecording() const		 { return mState == State::Recording;		}
-bool Transport::IsStopped() const		 { return mState == State::Stopped;			}
-bool Transport::IsFastForwarding() const { return mState == State::FastForwarding;	}
-bool Transport::IsRewinding() const		 { return mState == State::Rewinding;		}
 // Is the Playhead currently moving?
 bool Transport::IsMoving() const 
 {
@@ -37,13 +25,7 @@ void Transport::ToggleRecord()
 	else if (mState == State::Recording) mState = State::StopRecording;
 }
 
-// Beat settings
-Transport::BeatSettings Transport::GetBeatSettings() const { return mBeatSettings; }
-void Transport::SetBeatSettings(const BeatSettings& settings) { mBeatSettings = settings; }
-
 // Loop control
-Transport::LoopSettings Transport::GetLoopSettings() const { return mLoopSettings; }
-
 void Transport::SetLoopSettings(const LoopSettings& settings)
 {
 	bool changed = (mLoopSettings.startTick != settings.startTick ||
@@ -83,9 +65,6 @@ void Transport::SetLoopEnd(uint64_t tick)
 	}
 }
 
-uint64_t Transport::GetLoopStart() const { return mLoopSettings.startTick; }
-uint64_t Transport::GetLoopEnd() const { return mLoopSettings.endTick; }
-
 uint64_t Transport::StartPlayBack()
 {
 	mStartPlayBackTick = GetCurrentTick();
@@ -100,9 +79,17 @@ void Transport::UpdatePlayBack(uint64_t deltaMs)
 	mCurrentTick = static_cast<uint64_t>(beats * mTicksPerQuarter);
 }
 
-uint64_t Transport::GetCurrentTick() const { return mCurrentTick; }
-
-uint64_t Transport::GetStartPlayBackTick() const { return mStartPlayBackTick; }
+void Transport::StopPlaybackIfActive()
+{
+	if (IsPlaying())
+	{
+		SetState(Transport::State::StopPlaying);
+	}
+	else if (IsRecording())
+	{
+		SetState(Transport::State::StopRecording);
+	}
+}
 
 void Transport::ShiftCurrentTime()
 {
@@ -126,11 +113,6 @@ void Transport::ShiftCurrentTime()
 
 }
 
-void Transport::ResetShiftRate()
-{
-	mShiftSpeed = DEFAULT_SHIFT_SPEED;
-}
-
 void Transport::ShiftToTick(uint64_t newTick)
 {
 	if (newTick > MidiConstants::MAX_TICK_VALUE) return;
@@ -139,16 +121,10 @@ void Transport::ShiftToTick(uint64_t newTick)
 	mCurrentTimeMs = (1.0f * newTick / mTicksPerQuarter) * (60000.0 / mBeatSettings.tempo);
 }
 
-void Transport::Stop()
-{
-	mStartPlayBackTick = 0;
-}
-
 void Transport::Reset()
 {
 	mCurrentTimeMs = 0;
 	mCurrentTick = 0;
-	Stop();
 }
 
 void Transport::JumpToNextMeasure()
@@ -186,7 +162,6 @@ void Transport::JumpToPreviousMeasure()
 	ShiftToTick(newTick);
 }
 
-wxString Transport::GetFormattedTime() const { return GetFormattedTime(mCurrentTimeMs); }
 wxString Transport::GetFormattedTime(uint64_t timeMs) const
 {
 	return wxString::Format("%02llu:%02llu:%03llu",

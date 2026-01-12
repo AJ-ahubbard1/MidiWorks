@@ -153,6 +153,12 @@ namespace MidiInterface
 			return static_cast<MidiEvent>(mData[0] & 0xF0);
 		}
 
+		bool isMusicalMessage() const
+		{
+			MidiEvent event = getEventType();
+			return (event >= NOTE_OFF && event <= PITCH_BEND && event != PROGRAM_CHANGE);
+		}
+
 		// Get the correct MIDI message size based on message type
 		size_t getMessageSize() const
 		{

@@ -31,18 +31,18 @@ public:
 		uint64_t endTick = MidiConstants::DEFAULT_LOOP_END;  // 4 bars in 4/4 time
 	};
 
-	Transport();
+	Transport() { }
 
 	// State management
-	State GetState() const;
-	void SetState(State state);
+	State GetState() const { return mState; }
+	void SetState(State state) { mState = state; }
 
 	// State queries
-	bool IsPlaying() const;
-	bool IsRecording() const;
-	bool IsStopped() const;
-	bool IsFastForwarding() const;
-	bool IsRewinding() const;
+	bool IsPlaying() const			{ return mState == State::Playing;			}
+	bool IsRecording() const		{ return mState == State::Recording;		}
+	bool IsStopped() const			{ return mState == State::Stopped;			}
+	bool IsFastForwarding() const	{ return mState == State::FastForwarding;	}
+	bool IsRewinding() const		{ return mState == State::Rewinding;		}
 	bool IsMoving() const;
 
 	// State transitions
@@ -50,31 +50,30 @@ public:
 	void ToggleRecord();
 	
 	// Beat settings
-	BeatSettings GetBeatSettings() const;
-	void SetBeatSettings(const BeatSettings& settings);
+	BeatSettings GetBeatSettings() const { return mBeatSettings; }
+	void SetBeatSettings(const BeatSettings& settings) { mBeatSettings = settings; }
 
 	// Loop control
-	LoopSettings GetLoopSettings() const;
+	LoopSettings GetLoopSettings() const { return mLoopSettings; }
 	void SetLoopSettings(const LoopSettings& settings);
 	void SetLoopStart(uint64_t tick);
 	void SetLoopEnd(uint64_t tick);
-	uint64_t GetLoopStart() const;
-	uint64_t GetLoopEnd() const;
+	uint64_t GetLoopStart() const { return mLoopSettings.startTick; }
+	uint64_t GetLoopEnd() const   { return mLoopSettings.endTick;   }
 
 	// Playback Controls
 	uint64_t StartPlayBack();
 	void UpdatePlayBack(uint64_t deltaMs);
-	uint64_t GetCurrentTick() const;
-	uint64_t GetStartPlayBackTick() const;
+	void StopPlaybackIfActive();
+	uint64_t GetCurrentTick() const { return mCurrentTick; }
 	void ShiftCurrentTime();
-	void ResetShiftRate();
+	void ResetShiftRate() { mShiftSpeed = DEFAULT_SHIFT_SPEED; }
 	void ShiftToTick(uint64_t newTick);
-	void Stop();
 	void Reset();
 	void JumpToNextMeasure();
 	void JumpToPreviousMeasure();
 	
-	wxString GetFormattedTime() const;
+	wxString GetFormattedTime() const { return GetFormattedTime(mCurrentTimeMs); }
 	wxString GetFormattedTime(uint64_t timeMs) const;
 	
 	// Check if a beat occurred between lastTick and currentTick
@@ -97,10 +96,10 @@ private:
 	uint64_t		mStartPlayBackTick = 0;
 	uint64_t		mCurrentTick = 0;
 	int				mTicksPerQuarter = MidiConstants::TICKS_PER_QUARTER;
-	const double	DEFAULT_SHIFT_SPEED = 20.0;
-	const double	MAX_SHIFT_SPEED = 500.0;
+	const double	DEFAULT_SHIFT_SPEED = 50.0;
+	const double	MAX_SHIFT_SPEED = 1000.0;
 	double			mShiftSpeed = DEFAULT_SHIFT_SPEED;
-	double			mShiftAccel = 1.01;
+	double			mShiftAccel = 1.025;
 
 	LoopChangedCallback mLoopChangedCallback;
 };

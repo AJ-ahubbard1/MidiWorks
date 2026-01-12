@@ -14,15 +14,16 @@ AppModel::AppModel()
 	, mProjectManager(mTransport, mSoundBank, mTrackSet, mRecordingSession)
 	, mMetronomeService(mSoundBank)
 {
-	mLastTick = std::chrono::steady_clock::now();
 	mMetronomeService.Initialize();
 
-	// Setup ProjectManager callbacks
+	// The ProjectManager uses callback to clear the undo history on 
+	// ClearProject() method calls and on LoadProject() method calls.
 	mProjectManager.SetClearUndoHistoryCallback([this]() {
 		mUndoRedoManager.ClearHistory();
 	});
 
-	// Setup UndoRedoManager callback
+	// The UndoRedoManager uses callback to mark projects dirty when 
+	// any commands are executed to show the project has unsaved changes
 	mUndoRedoManager.SetCommandExecutedCallback([this]() {
 		mProjectManager.MarkDirty();
 	});
@@ -33,58 +34,40 @@ void AppModel::Update()
 {
 	switch (mTransport.GetState())
 	{
-		case Transport::State::StopRecording:	HandleStopRecording();		break;
-		case Transport::State::StopPlaying:		HandleStopPlaying();		break;
-		case Transport::State::Stopped:										break; 
-		case Transport::State::ClickedPlay:		HandleClickedPlay();		break;
-		case Transport::State::Playing:			HandlePlaying();			break;
-		case Transport::State::ClickedRecord:	HandleClickedRecord();		break;
-		case Transport::State::Recording:		HandleRecording();			break;
-		case Transport::State::FastForwarding:
-		case Transport::State::Rewinding:		HandleFastForwardRewind();	break;
+	case Transport::State::StopRecording:	HandleStopRecording();		break;
+	case Transport::State::StopPlaying:		HandleStopPlaying();		break;
+	case Transport::State::Stopped:										break; // Do nothing 
+	case Transport::State::ClickedPlay:		HandleClickedPlay();		break;
+	case Transport::State::Playing:			HandlePlaying();			break;
+	case Transport::State::ClickedRecord:	HandleClickedRecord();		break;
+	case Transport::State::Recording:		HandleRecording();			break;
+	case Transport::State::FastForwarding:
+	case Transport::State::Rewinding:		HandleFastForwardRewind();	break;
 	}
 
 	HandleIncomingMidi();
 }
-/* Handles incoming MIDI messages from input device
-   Polls for incoming messages, routes them to appropriate channels,
-   plays them back, and records them if recording is active.
- */
-void AppModel::HandleIncomingMidi()
+
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// COMMMAND METHODS: creates the commands and uses UndoRedoManager to execute them, adding them to undo stack 
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+// Adds a note to all channels that have Record enabled
+void AppModel::AddNoteToRecordChannels(ubyte pitch, uint64_t startTick, uint64_t duration)
 {
-	auto message = mMidiInputManager.PollAndNotify(mTransport.GetCurrentTick());
-	if (!message) return;
-
-	RouteAndPlayMessage(*message, mTransport.GetCurrentTick());
-}
-
-void AppModel::StopPlaybackIfActive()
-{
-	if (mTransport.IsPlaying())
-	{
-		mTransport.SetState(Transport::State::StopPlaying);
-	}
-	else if (mTransport.IsRecording())
-	{
-		mTransport.SetState(Transport::State::StopRecording);
-	}
-}
-
-void AppModel::QuantizeAllTracks(uint64_t gridSize)
-{
-	StopPlaybackIfActive();
-
-	auto commands = mNoteEditor.CreateQuantizeAllTracks(gridSize);
-	for (auto& cmd : commands)
+	auto cmd = mNoteEditor.CreateAddNoteToRecordChannels(pitch, startTick, duration);
+	if (cmd)
 	{
 		mUndoRedoManager.ExecuteCommand(std::move(cmd));
 	}
 }
 
-void AppModel::AddNoteToRecordChannels(ubyte pitch, uint64_t startTick, uint64_t duration)
+void AppModel::QuantizeAllTracks(uint64_t gridSize)
 {
-	auto cmd = mNoteEditor.CreateAddNoteToRecordChannels(pitch, startTick, duration);
-	if (cmd)
+	mTransport.StopPlaybackIfActive();
+
+	auto commands = mNoteEditor.CreateQuantizeAllTracks(gridSize);
+	for (auto& cmd : commands)
 	{
 		mUndoRedoManager.ExecuteCommand(std::move(cmd));
 	}
@@ -153,6 +136,7 @@ void AppModel::EditNoteVelocity(const NoteLocation& note, ubyte newVelocity)
 	}
 }
 
+// First checks for collisions at the new note region before moving the preview note
 void AppModel::SetNoteMovePreview(const NoteLocation& note, uint64_t newStartTick, ubyte newPitch)
 {
 	uint64_t newEndTick = newStartTick + note.endTick - note.startTick;
@@ -195,56 +179,7 @@ void AppModel::SetNoteResizePreview(const NoteLocation& note, uint64_t newEndTic
 	}
 }
 
-void AppModel::ClearNoteEditPreview()
-{
-	mNoteEditor.ClearNoteEditPreview();
-}
-
-const NoteEditor::NoteEditPreview& AppModel::GetNoteEditPreview() const
-{
-	return mNoteEditor.GetNoteEditPreview();
-}
-
-const NoteEditor::MultiNoteEditPreview& AppModel::GetMultiNoteEditPreview() const
-{
-	return mNoteEditor.GetMultiNoteEditPreview();
-}
-
-bool AppModel::HasNoteEditPreview() const
-{
-	return mNoteEditor.HasNoteEditPreview();
-}
-
-bool AppModel::HasMultiNoteEditPreview() const
-{
-	return mNoteEditor.HasMultiNoteEditPreview();
-}
-
-void AppModel::SetNoteAddPreview(ubyte pitch, uint64_t tick, uint64_t snappedTick, uint64_t duration)
-{
-	mNoteEditor.SetNoteAddPreview(pitch, tick, snappedTick, duration);
-}
-
-void AppModel::ClearNoteAddPreview()
-{
-	mNoteEditor.ClearNoteAddPreview();
-}
-
-const NoteEditor::NoteAddPreview& AppModel::GetNoteAddPreview() const
-{
-	return mNoteEditor.GetNoteAddPreview();
-}
-
-bool AppModel::HasNoteAddPreview() const
-{
-	return mNoteEditor.HasNoteAddPreview();
-}
-
 // Clipboard operations
-void AppModel::CopyNotesToClipboard(const std::vector<NoteLocation>& notes)
-{
-	mClipboard.CopyNotes(notes, mTrackSet);
-}
 
 // Paste Clipboard notes at given tick position
 // param optional: default pasteTick is the transport's playhead
@@ -361,7 +296,7 @@ bool AppModel::IsRegionCollisionFree(uint64_t startTick, uint64_t endTick, ubyte
 
 	// If there's only one collision and it's the note we're excluding, that's fine
 	if (excludeNote && collisions.size() == 1 &&
-	    collisions[0].noteOnIndex == excludeNote->noteOnIndex)
+		collisions[0].noteOnIndex == excludeNote->noteOnIndex)
 		return true;
 
 	return false;
@@ -396,41 +331,29 @@ bool AppModel::IsRegionCollisionFree(uint64_t startTick, uint64_t endTick, ubyte
 }
 
 // Private Methods
+
+/* Handles incoming MIDI messages from input device
+   Polls for incoming messages, routes them to appropriate channels,
+   plays them back, and records them if recording is active.
+ */
+void AppModel::HandleIncomingMidi()
+{
+	auto message = mMidiInputManager.PollAndNotify(mTransport.GetCurrentTick());
+	if (!message) return;
+
+	RouteAndPlayMessage(*message, mTransport.GetCurrentTick());
+}
+
+
+// Returns the change in time from lastTick's last value to now, then updates lastTick 
 uint64_t AppModel::GetDeltaTimeMs()
 {
+	static std::chrono::steady_clock::time_point lastTick = std::chrono::steady_clock::now();
+
 	auto now = std::chrono::steady_clock::now();
-	auto delta = std::chrono::duration_cast<std::chrono::milliseconds>(now - mLastTick).count();
-	mLastTick = now;
+	auto delta = std::chrono::duration_cast<std::chrono::milliseconds>(now - lastTick).count();
+	lastTick = now;
 	return static_cast<uint64_t>(delta);
-}
-
-bool AppModel::IsMusicalMessage(const MidiMessage& msg)
-{
-	using MidiInterface::MidiEvent;
-	auto event = msg.getEventType();
-
-	return (event >= NOTE_OFF && event <= PITCH_BEND && event != PROGRAM_CHANGE);
-
-}
-
-void AppModel::PlayMessages(std::vector<MidiMessage> msgs)
-{
-	if (msgs.empty()) return;
-
-	auto player = mSoundBank.GetMidiOutDevice();
-	auto channels = mSoundBank.GetAllChannels();
-
-	bool solosFound = mSoundBank.SolosFound();
-
-	for (auto& mm : msgs)
-	{
-		ubyte c = mm.getChannel();
-		auto& channel = mSoundBank.GetChannel(c);
-		if (mSoundBank.ShouldChannelPlay(channel, false))
-		{
-			player->sendMessage(mm);
-		}
-	}
 }
 
 void AppModel::RouteAndPlayMessage(const MidiMessage& mm, uint64_t currentTick)
@@ -445,7 +368,7 @@ void AppModel::RouteAndPlayMessage(const MidiMessage& mm, uint64_t currentTick)
 			routed.setChannel(c.channelNumber);
 			mSoundBank.GetMidiOutDevice()->sendMessage(routed);
 
-			if (isRecording && c.record && IsMusicalMessage(routed))
+			if (isRecording && c.record && routed.isMusicalMessage())
 			{
 				mRecordingSession.RecordEvent(routed, currentTick);
 			}
@@ -488,8 +411,7 @@ std::vector<MidiMessage> AppModel::PlayDrumMachinePattern(uint64_t lastTick, uin
 
 void AppModel::HandleStopRecording()
 {
-	mTransport.Stop();
-	 mTransport.SetState(Transport::State::Stopped);
+	mTransport.SetState(Transport::State::Stopped);
 
 	// Close any notes still being held when stopping (prevents orphaned Note Ons)
 	if (mRecordingSession.HasActiveNotes())
@@ -512,7 +434,6 @@ void AppModel::HandleStopRecording()
 
 void AppModel::HandleStopPlaying()
 {
-	mTransport.Stop();
 	mTransport.SetState(Transport::State::Stopped);
 	mSoundBank.SilenceAllChannels();
 }
@@ -524,7 +445,7 @@ void AppModel::HandleClickedPlay()
 	// If call doesn't happen Delta would be HUGE 
 	// (total time when transport state was stopped)
 	// causing an unpredictable jump 
-	GetDeltaTimeMs(); 
+	GetDeltaTimeMs();
 
 	mTrackSet.FindStart(mTransport.StartPlayBack());
 	mTransport.SetState(Transport::State::Playing);
@@ -541,7 +462,7 @@ void AppModel::HandleClickedRecord()
 	// See HandleClickedPlay for reason behind GetDeltaTimeMs call
 	GetDeltaTimeMs();
 	// Move trackset iterators to start of playback based on the playhead tick
-	mTrackSet.FindStart(mTransport.StartPlayBack()); 
+	mTrackSet.FindStart(mTransport.StartPlayBack());
 	mTransport.SetState(Transport::State::Recording);
 }
 
@@ -552,6 +473,7 @@ void AppModel::HandleRecording()
 
 void AppModel::HandleFastForwardRewind()
 {
+	mSoundBank.SilenceAllChannels();
 	mTransport.ShiftCurrentTime();
 }
 
@@ -575,7 +497,7 @@ void AppModel::HandlePlaybackCore(bool isRecording)
 		{
 			// Fix overlapping same-pitch notes to prevent merging artifacts
 			TrackSet::SeparateOverlappingNotes(mRecordingSession.GetBuffer());
-			
+
 			// Wrap any notes still held at loop end to prevent stuck notes
 			// note offs will be added at the loop end, note ons will be added at loop start
 			uint64_t noteOffTick = loopSettings.endTick - MidiConstants::NOTE_SEPARATION_TICKS;
@@ -625,5 +547,5 @@ void AppModel::HandlePlaybackCore(bool isRecording)
 		messages.insert(messages.end(), drumMessages.begin(), drumMessages.end());
 	}
 
-	PlayMessages(messages);
+	mSoundBank.PlayMessages(messages);
 }

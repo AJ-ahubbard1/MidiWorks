@@ -147,7 +147,7 @@ void MidiCanvasPanel::OnLeftDown(wxMouseEvent& event)
 			// Start note add preview
 			uint64_t snappedTick = ApplyGridSnap(tick);
 			uint64_t duration = GetSelectedDuration();
-			mAppModel->SetNoteAddPreview(pitch, tick, snappedTick, duration);
+			mNoteEditor.SetNoteAddPreview(pitch, tick, snappedTick, duration);
 			mMouseMode = MouseMode::Adding;
 		}
 	}
@@ -164,36 +164,36 @@ void MidiCanvasPanel::OnLeftUp(wxMouseEvent& event)
 		return;
 	}
 
-	if (mMouseMode == MouseMode::Adding && mAppModel->HasNoteAddPreview())
+	// Finalize note addition using preview state
+	if (mMouseMode == MouseMode::Adding && mNoteEditor.HasNoteAddPreview())
 	{
-		// Finalize note addition using preview state
-		const auto& preview = mAppModel->GetNoteAddPreview();
+		const auto& preview = mNoteEditor.GetNoteAddPreview();
 		uint64_t snappedTick = ApplyGridSnap(preview.tick);
 		uint64_t duration = GetSelectedDuration();
 
 		// Add note to all record-enabled channels
 		mAppModel->AddNoteToRecordChannels(preview.pitch, snappedTick, duration);
-		mAppModel->ClearNoteAddPreview();
+		mNoteEditor.ClearNoteAddPreview();
 	}
+	// Finalize move using preview state (track data was never modified)
 	else if (mMouseMode == MouseMode::MovingNote && mSelectedNote.found)
 	{
-		// Finalize move using preview state (track data was never modified)
-		if (mAppModel->HasNoteEditPreview())
+		if (mNoteEditor.HasNoteEditPreview())
 		{
-			const auto& preview = mAppModel->GetNoteEditPreview();
+			const auto& preview = mNoteEditor.GetNoteEditPreview();
 			mAppModel->MoveNote(mSelectedNote, preview.previewStartTick, preview.previewPitch);
-			mAppModel->ClearNoteEditPreview();
+			mNoteEditor.ClearNoteEditPreview();
 		}
 		mSelectedNote.found = false;
 	}
 	else if (mMouseMode == MouseMode::MovingMultipleNotes && !mOriginalSelectedNotes.empty())
 	{
 		// Finalize multi-note move using preview state (track data was never modified)
-		if (mAppModel->HasMultiNoteEditPreview())
+		if (mNoteEditor.HasMultiNoteEditPreview())
 		{
-			const auto& preview = mAppModel->GetMultiNoteEditPreview();
+			const auto& preview = mNoteEditor.GetMultiNoteEditPreview();
 			mAppModel->MoveMultipleNotes(preview.originalNotes, preview.tickDelta, preview.pitchDelta);
-			mAppModel->ClearNoteEditPreview();
+			mNoteEditor.ClearNoteEditPreview();
 		}
 		mOriginalSelectedNotes.clear();
 		ClearSelection();  // Clear stale selection (old positions no longer valid)
@@ -201,12 +201,12 @@ void MidiCanvasPanel::OnLeftUp(wxMouseEvent& event)
 	else if (mMouseMode == MouseMode::ResizingNote && mSelectedNote.found)
 	{
 		// Finalize resize using preview state (track data was never modified)
-		if (mAppModel->HasNoteEditPreview())
+		if (mNoteEditor.HasNoteEditPreview())
 		{
-			const auto& preview = mAppModel->GetNoteEditPreview();
+			const auto& preview = mNoteEditor.GetNoteEditPreview();
 			uint64_t newDuration = preview.previewEndTick - preview.previewStartTick;
 			mAppModel->ResizeNote(mSelectedNote, newDuration);
-			mAppModel->ClearNoteEditPreview();
+			mNoteEditor.ClearNoteEditPreview();
 		}
 		mSelectedNote.found = false;
 	}
@@ -366,7 +366,7 @@ void MidiCanvasPanel::OnMouseMove(wxMouseEvent& event)
 	}
 
 	// Handle note preview while adding (left button held)
-	if (mMouseMode == MouseMode::Adding && mAppModel->HasNoteAddPreview())
+	if (mMouseMode == MouseMode::Adding && mNoteEditor.HasNoteAddPreview())
 	{
 		ubyte newPitch = ScreenYToPitch(pos.y);
 		uint64_t newTick = ScreenXToTick(pos.x);
@@ -374,7 +374,7 @@ void MidiCanvasPanel::OnMouseMove(wxMouseEvent& event)
 		uint64_t duration = GetSelectedDuration();
 
 		// Update preview (handles collision detection and audio automatically)
-		mAppModel->SetNoteAddPreview(newPitch, newTick, snappedTick, duration);
+		mNoteEditor.SetNoteAddPreview(newPitch, newTick, snappedTick, duration);
 		Refresh();
 		return;
 	}
@@ -520,9 +520,9 @@ void MidiCanvasPanel::OnMouseLeave(wxMouseEvent& event)
 {
 	// If we're previewing a note and the mouse leaves the window, stop the preview
 	// This prevents stuck notes if the mouse leaves while left button is held
-	if (mAppModel->HasNoteAddPreview() && mMouseMode == MouseMode::Adding)
+	if (mNoteEditor.HasNoteAddPreview() && mMouseMode == MouseMode::Adding)
 	{
-		mAppModel->ClearNoteAddPreview();
+		mNoteEditor.ClearNoteAddPreview();
 		mMouseMode = MouseMode::Idle;
 	}
 }
@@ -614,7 +614,7 @@ void MidiCanvasPanel::OnKeyDown(wxKeyEvent& event)
 void MidiCanvasPanel::CopySelectedNotesToClipboard()
 {
 	if (mSelectedNotes.empty()) return;
-	mAppModel->CopyNotesToClipboard(mSelectedNotes);
+	mAppModel->GetClipboard().CopyNotes(mSelectedNotes, mTrackSet);
 }
 
 void MidiCanvasPanel::DeleteSelectedNotes()

@@ -216,7 +216,6 @@ bool ProjectManager::LoadProject(const std::string& filepath)
 void ProjectManager::ClearProject()
 {
 	// Stop playback
-	mTransport.Stop();
 	mTransport.SetState(Transport::State::Stopped);
 
 	// Reset transport to defaults

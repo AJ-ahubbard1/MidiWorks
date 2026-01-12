@@ -24,25 +24,12 @@ class AppModel
 public:
 	AppModel();
 	void Update();
+
+	// Command Methods: creates the commands and uses UndoRedoManager to execute them, adding them to undo stack
 	
-	// Component Classes
-	SoundBank& GetSoundBank() { return mSoundBank; }
-	Transport& GetTransport() { return mTransport; }
-	TrackSet& GetTrackSet() { return mTrackSet; }
-	RecordingSession& GetRecordingSession() { return mRecordingSession; }
-	ProjectManager& GetProjectManager() { return mProjectManager; }
-	Clipboard& GetClipboard() { return mClipboard; }
-	UndoRedoManager& GetUndoRedoManager() { return mUndoRedoManager; }
-	MidiInputManager& GetMidiInputManager() { return mMidiInputManager; }
-	MetronomeService& GetMetronomeService() { return mMetronomeService; }
-	DrumMachine& GetDrumMachine() { return mDrumMachine; }
-
-	// Change transport state to stop
-	void StopPlaybackIfActive();
-
-	// Track operations
-	void QuantizeAllTracks(uint64_t gridSize);
 	void AddNoteToRecordChannels(ubyte pitch, uint64_t startTick, uint64_t duration);
+	
+	void QuantizeAllTracks(uint64_t gridSize);
 
 	// Note Editing - Deletion
 	void DeleteNote(const NoteLocation& note);
@@ -59,20 +46,8 @@ public:
 	void SetNoteMovePreview(const NoteLocation& note, uint64_t newStartTick, ubyte newPitch);
 	void SetMultipleNotesMovePreview(const std::vector<NoteLocation>& notes, int64_t tickDelta, int pitchDelta);
 	void SetNoteResizePreview(const NoteLocation& note, uint64_t newEndTick);
-	void ClearNoteEditPreview();
-	const NoteEditor::NoteEditPreview& GetNoteEditPreview() const;
-	const NoteEditor::MultiNoteEditPreview& GetMultiNoteEditPreview() const;
-	bool HasNoteEditPreview() const;
-	bool HasMultiNoteEditPreview() const;
-
-	// Note Add Preview (for mouse-based note creation)
-	void SetNoteAddPreview(ubyte pitch, uint64_t tick, uint64_t snappedTick, uint64_t duration);
-	void ClearNoteAddPreview();
-	const NoteEditor::NoteAddPreview& GetNoteAddPreview() const;
-	bool HasNoteAddPreview() const;
 
 	// Clipboard for copy/paste
-	void CopyNotesToClipboard(const std::vector<NoteLocation>& notes);
 	void PasteNotes(std::optional<uint64_t> pasteTick = std::nullopt);
 	void PasteNotesToRecordTracks(std::optional<uint64_t> pasteTick = std::nullopt);
 
@@ -87,26 +62,35 @@ public:
 	bool IsRegionCollisionFree(uint64_t startTick, uint64_t endTick, ubyte pitch, int channel,
 	                           const std::vector<NoteLocation>& excludeNotes) const;
 
+	// Component Classes
+	SoundBank& GetSoundBank() { return mSoundBank; }
+	Transport& GetTransport() { return mTransport; }
+	TrackSet& GetTrackSet() { return mTrackSet; }
+	MidiInputManager& GetMidiInputManager() { return mMidiInputManager; }
+	RecordingSession& GetRecordingSession() { return mRecordingSession; }
+	ProjectManager& GetProjectManager() { return mProjectManager; }
+	Clipboard& GetClipboard() { return mClipboard; }
+	UndoRedoManager& GetUndoRedoManager() { return mUndoRedoManager; }
+	MetronomeService& GetMetronomeService() { return mMetronomeService; }
+	NoteEditor& GetNoteEditor() { return mNoteEditor; } 	
+	DrumMachine& GetDrumMachine() { return mDrumMachine; }
 
 private:
-	std::chrono::steady_clock::time_point	mLastTick;
 	SoundBank								mSoundBank;
 	Transport								mTransport;
 	TrackSet								mTrackSet;
-	RecordingSession						mRecordingSession;
-	Clipboard								mClipboard;
-	NoteEditor								mNoteEditor;
-	ProjectManager							mProjectManager;
-	UndoRedoManager							mUndoRedoManager;
 	MidiInputManager						mMidiInputManager;
+	RecordingSession						mRecordingSession;
+	ProjectManager							mProjectManager;
+	Clipboard								mClipboard;
+	UndoRedoManager							mUndoRedoManager;
 	MetronomeService						mMetronomeService;
+	NoteEditor								mNoteEditor;
 	DrumMachine								mDrumMachine;
 
-	uint64_t GetDeltaTimeMs();
-	bool IsMusicalMessage(const MidiMessage& msg);
-	void PlayMessages(std::vector<MidiMessage> msgs);
-	void RouteAndPlayMessage(const MidiMessage& mm, uint64_t currentTick);
 	void HandleIncomingMidi();
+	uint64_t GetDeltaTimeMs();
+	void RouteAndPlayMessage(const MidiMessage& mm, uint64_t currentTick);
 	std::vector<MidiMessage> PlayDrumMachinePattern(uint64_t lastTick, uint64_t currentTick);
 
 	// Transport state handlers

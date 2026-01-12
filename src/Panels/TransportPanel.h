@@ -25,10 +25,8 @@ public:
 		mTimeDisplay->SetLabel(mTransport.GetFormattedTime());
 	}
 
-	/// <summary>
-	/// Updates the tempo control to reflect current Transport tempo.
-	/// Called after loading a project to sync UI with loaded tempo value.
-	/// </summary>
+	// Updates the tempo control to reflect current Transport tempo.
+	// Called after loading a project to sync UI with loaded tempo value.
 	void UpdateTempoDisplay()
 	{
 		auto beats = mTransport.GetBeatSettings();
@@ -162,14 +160,14 @@ private:
 
 	void BindEventHandlers()
 	{
-		mStopButton->Bind(wxEVT_BUTTON, &TransportPanel::OnStop, this);
-		mPlayButton->Bind(wxEVT_BUTTON, &TransportPanel::OnPlay, this);
+		mStopButton->Bind(wxEVT_BUTTON, &TransportPanel::OnStopButton, this);
+		mPlayButton->Bind(wxEVT_BUTTON, &TransportPanel::OnPlayButton, this);
 		mRewindButton->Bind(wxEVT_LEFT_DOWN, &TransportPanel::OnRewindDown, this);
-		mRewindButton->Bind(wxEVT_LEFT_UP, &TransportPanel::StopTransport, this);
+		mRewindButton->Bind(wxEVT_LEFT_UP, &TransportPanel::OnFastForwardOrRewindUp, this);
 		mFastForwardButton->Bind(wxEVT_LEFT_DOWN, &TransportPanel::OnFastForwardDown, this);
-		mFastForwardButton->Bind(wxEVT_LEFT_UP, &TransportPanel::StopTransport, this);
-		mResetButton->Bind(wxEVT_BUTTON, &TransportPanel::OnReset, this);
-		mRecordButton->Bind(wxEVT_BUTTON, &TransportPanel::OnRecord, this);
+		mFastForwardButton->Bind(wxEVT_LEFT_UP, &TransportPanel::OnFastForwardOrRewindUp, this);
+		mResetButton->Bind(wxEVT_BUTTON, &TransportPanel::OnResetButton, this);
+		mRecordButton->Bind(wxEVT_BUTTON, &TransportPanel::OnRecordButton, this);
 		mTempoControl->Bind(wxEVT_SPINCTRLDOUBLE, &TransportPanel::OnTempoChange, this);
 		mNumeratorChoice->Bind(wxEVT_CHOICE, &TransportPanel::OnNumeratorChange, this);
 		mDenominatorChoice->Bind(wxEVT_CHOICE, &TransportPanel::OnDenominatorChange, this);
@@ -177,21 +175,12 @@ private:
 		mLoopCheckBox->Bind(wxEVT_CHECKBOX, &TransportPanel::OnLoopToggle, this);
 	}
 
-	void OnStop(wxCommandEvent&)
-	{
-		if (mTransport.IsRecording())
-		{
-			mTransport.SetState(Transport::State::StopRecording);
-		}
-		else
-		{
-			mTransport.SetState(Transport::State::StopPlaying);
-		}
-	}
-	void OnPlay(wxCommandEvent&) { mTransport.SetState(Transport::State::ClickedPlay); }
-	void OnReset(wxCommandEvent&)
+	void OnStopButton(wxCommandEvent&) { mTransport.StopPlaybackIfActive(); }
+	void OnPlayButton(wxCommandEvent&) { mTransport.SetState(Transport::State::ClickedPlay); }
+	void OnResetButton(wxCommandEvent&)
 	{
 		mTransport.Reset();
+		// If Reset is pressed while Playing or Recording, return to that state.
 		if (mTransport.IsPlaying())
 		{
 			mTransport.SetState(Transport::State::ClickedPlay);
@@ -201,7 +190,7 @@ private:
 			mTransport.SetState(Transport::State::ClickedRecord);
 		}
 	}
-	void OnRecord(wxCommandEvent&) { mTransport.SetState(Transport::State::ClickedRecord); }
+	void OnRecordButton(wxCommandEvent&) { mTransport.SetState(Transport::State::ClickedRecord); }
 	void OnRewindDown(wxMouseEvent& event)
 	{
 		mPreviousState = mTransport.GetState();
@@ -214,9 +203,10 @@ private:
 		mTransport.SetState(Transport::State::FastForwarding);
 		event.Skip();
 	}
-	void StopTransport(wxMouseEvent& event)
+	void OnFastForwardOrRewindUp(wxMouseEvent& event)
 	{
 		mTransport.ResetShiftRate();
+		// Revert back to previous state after ff or rew
 		switch (mPreviousState)
 		{
 		case Transport::State::Stopped:

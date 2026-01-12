@@ -35,8 +35,8 @@ public:
 	/// <summary>
 	/// Construct a quantize command for a single track.
 	/// </summary>
-	/// <param name="track">Reference to the track to quantize</param>
-	/// <param name="gridSize">Grid size in ticks (e.g., 960 for quarter notes)</param>
+	/// <param name="track">: Reference to the track to quantize</param>
+	/// <param name="gridSize">: Grid size in ticks (e.g., 960 for quarter notes)</param>
 	QuantizeCommand(Track& track, uint64_t gridSize)
 		: mTrack(track)
 		, mGridSize(gridSize)
@@ -134,15 +134,13 @@ public:
 	}
 
 private:
-	/// <summary>
-	/// Helper to round a tick value to the nearest grid point
-	/// </summary>
+	// Helper to round a tick value to the nearest grid point
 	uint64_t RoundToGrid(uint64_t tick) const
 	{
 		return ((tick + mGridSize / 2) / mGridSize) * mGridSize;
 	}
 
 	Track& mTrack;
-	uint64_t mGridSize;
+	uint64_t mGridSize;	// tick amount to quantize notes 
 	std::vector<uint64_t> mOriginalTicks;  // Original timestamps for undo
 };

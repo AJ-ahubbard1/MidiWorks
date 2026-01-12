@@ -1,11 +1,14 @@
 #pragma once
+#include <wx/colour.h>
+#include <memory>
+#include <vector>
 #include <span>
 #include <string>
-#include <wx/colour.h>
 #include "RtMidiWrapper/RtMidiWrapper.h"
 #include "MidiConstants.h"
-#include <memory>
+
 using namespace MidiInterface;
+
 struct MidiChannel
 {
 	ubyte channelNumber = 0;
@@ -25,17 +28,18 @@ public:
 
 	SoundBank();
 	void SetMidiOutDevice(std::shared_ptr<MidiOut> device);
-	std::shared_ptr<MidiOut> GetMidiOutDevice() const;
+	std::shared_ptr<MidiOut> GetMidiOutDevice() const { return mMidiOut; }
 	void ApplyChannelSettings();
-	MidiChannel& GetChannel(ubyte c);
-	std::span<MidiChannel> GetAllChannels();
-	wxColour GetChannelColor(ubyte channelNumber) const;
+	MidiChannel& GetChannel(ubyte ch) { return mChannels[ch]; }
+	std::span<MidiChannel> GetAllChannels() { return std::span<MidiChannel>(mChannels); }
+	wxColour GetChannelColor(ubyte ch) const { return mChannels[ch].customColor; }
 	bool SolosFound() const;
 	std::vector<MidiChannel*> GetRecordEnabledChannels();
 	std::vector<MidiChannel*> GetSoloChannels();
 	bool ShouldChannelPlay(const MidiChannel& channel, bool checkRecord = false) const;
 
 	// MIDI Playback helpers
+	void PlayMessages(std::vector<MidiMessage> msgs);
 	void PlayNote(ubyte pitch, ubyte velocity, ubyte channel);
 	void StopNote(ubyte pitch, ubyte channel);
 	void SilenceAllChannels();
