@@ -8,7 +8,7 @@ MidiCanvasPanel::MidiCanvasPanel(wxWindow* parent, std::shared_ptr<AppModel> app
 	mTransport(appModel->GetTransport()),
 	mTrackSet(appModel->GetTrackSet()),
 	mRecordingBuffer(appModel->GetRecordingSession().GetBuffer()),
-	mNoteEditor(appModel->GetNoteEditor())
+	mPreviewManager(appModel->GetPreviewManager())
 {
 	SetBackgroundStyle(wxBG_STYLE_PAINT);
 
@@ -507,9 +507,9 @@ void MidiCanvasPanel::DrawTrackNotes(wxGraphicsContext* gc)
 		if (note.trackIndex >= USER_TRACK_COUNT) continue;
 
 		// Skip drawing the note being previewed (it's drawn separately as preview)
-		if (mNoteEditor.HasNoteEditPreview())
+		if (mPreviewManager.HasNoteEditPreview())
 		{
-			const auto& preview = mNoteEditor.GetNoteEditPreview();
+			const auto& preview = mPreviewManager.GetNoteEditPreview();
 			if (note.trackIndex == preview.originalNote.trackIndex &&
 			    note.noteOnIndex == preview.originalNote.noteOnIndex)
 			{
@@ -537,13 +537,13 @@ void MidiCanvasPanel::DrawRecordingBuffer(wxGraphicsContext* gc)
 
 void MidiCanvasPanel::DrawNoteAddPreview(wxGraphicsContext* gc)
 {
-	if (!mNoteEditor.HasNoteAddPreview() || mMouseMode != MouseMode::Adding)
+	if (!mPreviewManager.HasNoteAddPreview() || mMouseMode != MouseMode::Adding)
 		return;
 
 	gc->SetBrush(wxBrush(NOTE_ADD_PREVIEW));
 
 	// Get preview state from model
-	const auto& preview = mNoteEditor.GetNoteAddPreview();
+	const auto& preview = mPreviewManager.GetNoteAddPreview();
 	uint64_t snappedTick = ApplyGridSnap(preview.tick);
 	uint64_t duration = GetSelectedDuration();
 
@@ -556,9 +556,9 @@ void MidiCanvasPanel::DrawNoteAddPreview(wxGraphicsContext* gc)
 void MidiCanvasPanel::DrawNoteEditPreview(wxGraphicsContext* gc)
 {
 	// Draw single note preview
-	if (mNoteEditor.HasNoteEditPreview())
+	if (mPreviewManager.HasNoteEditPreview())
 	{
-		const auto& preview = mNoteEditor.GetNoteEditPreview();
+		const auto& preview = mPreviewManager.GetNoteEditPreview();
 		const auto& originalNote = preview.originalNote;
 
 		// Determine color based on track (match original note color with transparency)
@@ -581,9 +581,9 @@ void MidiCanvasPanel::DrawNoteEditPreview(wxGraphicsContext* gc)
 	}
 
 	// Draw multi-note preview
-	if (mNoteEditor.HasMultiNoteEditPreview())
+	if (mPreviewManager.HasMultiNoteEditPreview())
 	{
-		const auto& preview = mNoteEditor.GetMultiNoteEditPreview();
+		const auto& preview = mPreviewManager.GetMultiNoteEditPreview();
 		for (const auto& originalNote : preview.originalNotes)
 		{
 			// Calculate new position with delta
@@ -890,9 +890,9 @@ void MidiCanvasPanel::DrawPianoKeyboard(wxGraphicsContext* gc)
 
 	// Third pass: Highlight active notes (drawn on top)
 	// Check for preview note (during note add)
-	if (mNoteEditor.HasNoteAddPreview())
+	if (mPreviewManager.HasNoteAddPreview())
 	{
-		const auto& preview = mNoteEditor.GetNoteAddPreview();
+		const auto& preview = mPreviewManager.GetNoteAddPreview();
 		int y = PitchToScreenY(preview.pitch);
 
 		if (y >= CONTROL_BAR_HEIGHT && y < canvasHeight)

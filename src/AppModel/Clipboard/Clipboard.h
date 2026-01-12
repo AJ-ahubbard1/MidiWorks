@@ -2,6 +2,7 @@
 #pragma once
 #include <vector>
 #include <cstdint>
+#include <limits>
 #include "AppModel/TrackSet/TrackSet.h"
 
 class Clipboard
@@ -17,12 +18,47 @@ public:
 	};
 
 	// Copy notes to clipboard (converts NoteLocation to ClipboardNote)
-	void CopyNotes(const std::vector<NoteLocation>& notes, TrackSet& trackSet);
+	void CopyNotes(const std::vector<NoteLocation>& notes, TrackSet& trackSet)
+	{
+		if (notes.empty()) return;
+
+		// Find the earliest start tick to use as reference (for relative timing)
+		uint64_t earliestTick = UINT64_MAX;
+		for (const auto& note : notes)
+		{
+			if (note.startTick < earliestTick)
+			{
+				earliestTick = note.startTick;
+			}
+		}
+
+		// Convert selected notes to clipboard format
+		std::vector<ClipboardNote> clipboardNotes;
+		clipboardNotes.reserve(notes.size());
+
+		for (const auto& note : notes)
+		{
+			Track& track = trackSet.GetTrack(note.trackIndex);
+			const TimedMidiEvent& noteOnEvent = track[note.noteOnIndex];
+
+			ClipboardNote clipNote;
+			clipNote.relativeStartTick = note.startTick - earliestTick;
+			clipNote.duration = note.endTick - note.startTick;
+			clipNote.pitch = note.pitch;
+			clipNote.velocity = note.velocity;
+			clipNote.trackIndex = note.trackIndex;
+
+			clipboardNotes.push_back(clipNote);
+		}
+
+		// Store in clipboard
+		mNotes = clipboardNotes;
+	}
 
 	// Access clipboard data
-	const std::vector<ClipboardNote>& GetNotes() const;
-	bool HasData() const;
-	void Clear();
+	const std::vector<ClipboardNote>& GetNotes() const { return mNotes; }
+	bool HasData() const { return !mNotes.empty(); }
+	void Clear() { mNotes.clear(); }
 
 private:
 	std::vector<ClipboardNote> mNotes;

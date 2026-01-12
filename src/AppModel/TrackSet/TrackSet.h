@@ -61,7 +61,13 @@ public:
 	// Get all raw MIDI events from all tracks (for debugging)
 	std::vector<TimedMidiEvent> GetAllTimedMidiEvents();
 
-	// Static helper to extract note pairs from a single Track
+	/// <summary> 
+	/// Static helper to extract note pairs from a single track.
+	/// Use 2nd param when method called on trackset tracks.
+	/// Leave blank when used on non-trackset tracks like the recording buffer.
+	/// </summary>
+	/// <param name="track">: track to extract notes from</param>
+	/// <param name="trackIndex">: Index used to assign note pairs their trackIndex value, default: 0</param>
 	static std::vector<NoteLocation> GetNotesFromTrack(const Track& track, int trackIndex = 0);
 
 	// Static helper to sort a single track by tick

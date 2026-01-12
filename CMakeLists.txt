@@ -18,10 +18,9 @@ endif()
 set(SOURCES
 	src/App.cpp
 	src/AppModel/AppModel.cpp
-	src/AppModel/Clipboard/Clipboard.cpp
 	src/AppModel/DrumMachine/DrumMachine.cpp
 	src/AppModel/MidiInputManager/MidiInputManager.cpp
-	src/AppModel/NoteEditor/NoteEditor.cpp
+	src/AppModel/PreviewManager/PreviewManager.cpp
 	src/AppModel/ProjectManager/ProjectManager.cpp
 	src/AppModel/RecordingSession/RecordingSession.cpp
 	src/AppModel/SoundBank/SoundBank.cpp
@@ -52,7 +51,7 @@ set(HEADERS
 	src/AppModel/DrumMachine/DrumMachine.h
 	src/AppModel/MetronomeService/MetronomeService.h
 	src/AppModel/MidiInputManager/MidiInputManager.h
-	src/AppModel/NoteEditor/NoteEditor.h
+	src/AppModel/PreviewManager/PreviewManager.h
 	src/AppModel/ProjectManager/ProjectManager.h
 	src/AppModel/RecordingSession/RecordingSession.h
 	src/AppModel/SoundBank/ChannelColors.h

@@ -8,7 +8,7 @@
 #include "Commands/ClipboardCommands.h"
 
 AppModel::AppModel()
-	: mNoteEditor(mTrackSet, mSoundBank)
+	: mPreviewManager(mTrackSet, mSoundBank)
 	, mProjectManager(mTransport, mSoundBank, mTrackSet, mRecordingSession)
 	, mMetronomeService(mSoundBank)
 {
@@ -53,84 +53,152 @@ void AppModel::Update()
 // Adds a note to all channels that have Record enabled
 void AppModel::AddNoteToRecordChannels(ubyte pitch, uint64_t startTick, uint64_t duration)
 {
-	auto cmd = mNoteEditor.CreateAddNoteToRecordChannels(pitch, startTick, duration);
-	if (cmd)
+	auto recordOnChannels = mSoundBank.GetRecordEnabledChannels();
+	if (recordOnChannels.empty()) return;
+
+	// @TODO velocity should be based on recording settings, separate from preview settings
+	ubyte velocity = mSoundBank.GetPreviewVelocity();
+	
+	// Get a list of all record-enabled track indices 
+	std::vector<int> targetTracks;
+	targetTracks.reserve(recordOnChannels.size());
+	for (const MidiChannel* channel : recordOnChannels)
 	{
-		mUndoRedoManager.ExecuteCommand(std::move(cmd));
+		targetTracks.emplace_back(static_cast<int>(channel->channelNumber));
 	}
+	
+	auto cmd = std::make_unique<AddNoteCommand>(mTrackSet, targetTracks, pitch, velocity, startTick, duration);
+	mUndoRedoManager.ExecuteCommand(std::move(cmd));
+}
+
+void AppModel::DeleteNote(const NoteLocation& note)
+{
+	if (!note.found) return;
+
+	Track& track = mTrackSet.GetTrack(note.trackIndex);
+	auto cmd = std::make_unique<DeleteNoteCommand>(track, note.noteOnIndex, note.noteOffIndex);
+	mUndoRedoManager.ExecuteCommand(std::move(cmd));
+}
+
+void AppModel::DeleteNotes(const std::vector<NoteLocation>& notes)
+{
+	if (notes.empty()) return;
+
+	// Build deletion list
+	std::vector<DeleteMultipleNotesCommand::NoteToDelete> notesToDelete;
+	notesToDelete.reserve(notes.size());
+	for (const auto& note : notes)
+	{
+		Track& track = mTrackSet.GetTrack(note.trackIndex);
+
+		DeleteMultipleNotesCommand::NoteToDelete noteData;
+		noteData.trackIndex = note.trackIndex;
+		noteData.noteOnIndex = note.noteOnIndex;
+		noteData.noteOffIndex = note.noteOffIndex;
+		noteData.noteOn = track[note.noteOnIndex];
+		noteData.noteOff = track[note.noteOffIndex];
+
+		notesToDelete.push_back(noteData);
+	}
+
+	// Create single batch command
+	auto cmd = std::make_unique<DeleteMultipleNotesCommand>(mTrackSet, notesToDelete);
+	mUndoRedoManager.ExecuteCommand(std::move(cmd));
+}
+
+void AppModel::ClearTrack(ubyte trackNumber)
+{
+	auto cmd = std::make_unique<ClearTrackCommand>(mTrackSet.GetTrack(trackNumber), trackNumber);
+	mUndoRedoManager.ExecuteCommand(std::move(cmd));
+}
+
+void AppModel::MoveNote(const NoteLocation& note, uint64_t newStartTick, ubyte newPitch)
+{
+	if (!note.found) return;
+
+	// Only create command if position actually changed
+	if (newStartTick == note.startTick && newPitch == note.pitch) return;
+
+	Track& track = mTrackSet.GetTrack(note.trackIndex);
+	auto cmd = std::make_unique<MoveNoteCommand>(
+		track, note.noteOnIndex, note.noteOffIndex, newStartTick, newPitch);
+
+	mUndoRedoManager.ExecuteCommand(std::move(cmd));
+}
+
+void AppModel::MoveMultipleNotes(const std::vector<NoteLocation>& notes, int64_t tickDelta, int pitchDelta)
+{
+	if (notes.empty()) return;
+
+	// Don't create command if no movement
+	if (tickDelta == 0 && pitchDelta == 0) return;
+
+	// Build move list
+	std::vector<MoveMultipleNotesCommand::NoteToMove> notesToMove;
+	notesToMove.reserve(notes.size());
+	for (const auto& note : notes)
+	{
+		Track& track = mTrackSet.GetTrack(note.trackIndex);
+
+		MoveMultipleNotesCommand::NoteToMove noteData;
+		noteData.trackIndex = note.trackIndex;
+		noteData.noteOnIndex = note.noteOnIndex;
+		noteData.noteOffIndex = note.noteOffIndex;
+		noteData.originalStartTick = note.startTick;
+		noteData.originalPitch = note.pitch;
+		noteData.duration = note.endTick - note.startTick;
+
+		notesToMove.push_back(noteData);
+	}
+
+	// Create single batch command
+	auto cmd = std::make_unique<MoveMultipleNotesCommand>(mTrackSet, notesToMove, tickDelta, pitchDelta);
+	mUndoRedoManager.ExecuteCommand(std::move(cmd));
+}
+
+void AppModel::ResizeNote(const NoteLocation& note, uint64_t newDuration)
+{
+	if (!note.found) return;
+
+	uint64_t oldDuration = note.endTick - note.startTick;
+
+	// Only create command if duration actually changed
+	if (newDuration == oldDuration) return;
+
+	Track& track = mTrackSet.GetTrack(note.trackIndex);
+
+	auto cmd = std::make_unique<ResizeNoteCommand>(track, note.noteOnIndex, note.noteOffIndex, newDuration);
+	mUndoRedoManager.ExecuteCommand(std::move(cmd));
+}
+
+void AppModel::EditNoteVelocity(const NoteLocation& note, ubyte newVelocity)
+{
+	if (!note.found) return;
+
+	// Only create command if velocity actually changed
+	if (newVelocity == note.velocity) return;
+
+	Track& track = mTrackSet.GetTrack(note.trackIndex);
+
+	auto cmd = std::make_unique<EditNoteVelocityCommand>(track, note.noteOnIndex, newVelocity);
+	mUndoRedoManager.ExecuteCommand(std::move(cmd));
 }
 
 void AppModel::QuantizeAllTracks(uint64_t gridSize)
 {
 	mTransport.StopPlaybackIfActive();
 
-	auto commands = mNoteEditor.CreateQuantizeAllTracks(gridSize);
-	for (auto& cmd : commands)
+	// @TODO: This should be a single command QuantizeAllTracks, not a list of commmands
+	// @TODO: Create another Command, QuantizeMultipleNotes
+	
+	for (int i = 0; i < MidiConstants::CHANNEL_COUNT; i++)
 	{
-		mUndoRedoManager.ExecuteCommand(std::move(cmd));
-	}
-}
-
-void AppModel::DeleteNote(const NoteLocation& note)
-{
-	auto cmd = mNoteEditor.CreateDeleteNote(note);
-	if (cmd)
-	{
-		mUndoRedoManager.ExecuteCommand(std::move(cmd));
-	}
-}
-
-void AppModel::DeleteNotes(const std::vector<NoteLocation>& notes)
-{
-	auto cmd = mNoteEditor.CreateDeleteNotes(notes);
-	if (cmd)
-	{
-		mUndoRedoManager.ExecuteCommand(std::move(cmd));
-	}
-}
-
-void AppModel::ClearTrack(ubyte trackNumber)
-{
-	auto cmd = std::make_unique<ClearTrackCommand>(mTrackSet.GetTrack(trackNumber), trackNumber);
-	if (cmd)
-	{
-		mUndoRedoManager.ExecuteCommand(std::move(cmd));
-	}
-}
-
-void AppModel::MoveNote(const NoteLocation& note, uint64_t newStartTick, ubyte newPitch)
-{
-	auto cmd = mNoteEditor.CreateMoveNote(note, newStartTick, newPitch);
-	if (cmd)
-	{
-		mUndoRedoManager.ExecuteCommand(std::move(cmd));
-	}
-}
-
-void AppModel::MoveMultipleNotes(const std::vector<NoteLocation>& notes, int64_t tickDelta, int pitchDelta)
-{
-	auto cmd = mNoteEditor.CreateMoveMultipleNotes(notes, tickDelta, pitchDelta);
-	if (cmd)
-	{
-		mUndoRedoManager.ExecuteCommand(std::move(cmd));
-	}
-}
-
-void AppModel::ResizeNote(const NoteLocation& note, uint64_t newDuration)
-{
-	auto cmd = mNoteEditor.CreateResizeNote(note, newDuration);
-	if (cmd)
-	{
-		mUndoRedoManager.ExecuteCommand(std::move(cmd));
-	}
-}
-
-void AppModel::EditNoteVelocity(const NoteLocation& note, ubyte newVelocity)
-{
-	auto cmd = mNoteEditor.CreateEditNoteVelocity(note, newVelocity);
-	if (cmd)
-	{
-		mUndoRedoManager.ExecuteCommand(std::move(cmd));
+		Track& track = mTrackSet.GetTrack(i);
+		if (!track.empty())
+		{
+			auto cmd = std::make_unique<QuantizeCommand>(track, gridSize);
+			mUndoRedoManager.ExecuteCommand(std::move(cmd));
+		}
 	}
 }
 
@@ -141,7 +209,7 @@ void AppModel::SetNoteMovePreview(const NoteLocation& note, uint64_t newStartTic
 
 	if (IsRegionCollisionFree(newStartTick, newEndTick, newPitch, note.trackIndex, &note))
 	{
-		mNoteEditor.SetNoteMovePreview(note, newStartTick, newPitch);
+		mPreviewManager.SetNoteMovePreview(note, newStartTick, newPitch);
 	}
 }
 
@@ -166,14 +234,14 @@ void AppModel::SetMultipleNotesMovePreview(const std::vector<NoteLocation>& note
 	}
 
 	// All notes are collision-free, allow preview
-	mNoteEditor.SetMultipleNotesMovePreview(notes, tickDelta, pitchDelta);
+	mPreviewManager.SetMultipleNotesMovePreview(notes, tickDelta, pitchDelta);
 }
 
 void AppModel::SetNoteResizePreview(const NoteLocation& note, uint64_t newEndTick)
 {
 	if (IsRegionCollisionFree(note.startTick, newEndTick, note.pitch, note.trackIndex, &note))
 	{
-		mNoteEditor.SetNoteResizePreview(note, newEndTick);
+		mPreviewManager.SetNoteResizePreview(note, newEndTick);
 	}
 }
 
@@ -405,7 +473,9 @@ std::vector<MidiMessage> AppModel::PlayDrumMachinePattern(uint64_t lastTick, uin
 	return messages;
 }
 
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // TRANSPORT STATE HANDLERS
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 void AppModel::HandleStopRecording()
 {

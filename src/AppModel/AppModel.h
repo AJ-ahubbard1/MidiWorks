@@ -11,7 +11,7 @@
 #include "TrackSet/TrackSet.h"
 #include "RecordingSession/RecordingSession.h"
 #include "Clipboard/Clipboard.h"
-#include "NoteEditor/NoteEditor.h"
+#include "PreviewManager/PreviewManager.h"
 #include "ProjectManager/ProjectManager.h"
 #include "UndoRedoManager/UndoRedoManager.h"
 #include "MidiInputManager/MidiInputManager.h"
@@ -26,21 +26,15 @@ public:
 	void Update();
 
 	// Command Methods: creates the commands and uses UndoRedoManager to execute them, adding them to undo stack
-	
 	void AddNoteToRecordChannels(ubyte pitch, uint64_t startTick, uint64_t duration);
-	
-	void QuantizeAllTracks(uint64_t gridSize);
-
-	// Note Editing - Deletion
 	void DeleteNote(const NoteLocation& note);
 	void DeleteNotes(const std::vector<NoteLocation>& notes);
 	void ClearTrack(ubyte trackNumber);
-
-	// Note Editing - Move and Resize
 	void MoveNote(const NoteLocation& note, uint64_t newStartTick, ubyte newPitch);
 	void MoveMultipleNotes(const std::vector<NoteLocation>& notes, int64_t tickDelta, int pitchDelta);
 	void ResizeNote(const NoteLocation& note, uint64_t newDuration);
 	void EditNoteVelocity(const NoteLocation& note, ubyte newVelocity);
+	void QuantizeAllTracks(uint64_t gridSize);
 
 	// Note Edit Preview (for drag operations)
 	void SetNoteMovePreview(const NoteLocation& note, uint64_t newStartTick, ubyte newPitch);
@@ -72,7 +66,7 @@ public:
 	Clipboard& GetClipboard() { return mClipboard; }
 	UndoRedoManager& GetUndoRedoManager() { return mUndoRedoManager; }
 	MetronomeService& GetMetronomeService() { return mMetronomeService; }
-	NoteEditor& GetNoteEditor() { return mNoteEditor; } 	
+	PreviewManager& GetPreviewManager() { return mPreviewManager; } 	
 	DrumMachine& GetDrumMachine() { return mDrumMachine; }
 
 private:
@@ -85,7 +79,7 @@ private:
 	Clipboard								mClipboard;
 	UndoRedoManager							mUndoRedoManager;
 	MetronomeService						mMetronomeService;
-	NoteEditor								mNoteEditor;
+	PreviewManager								mPreviewManager;
 	DrumMachine								mDrumMachine;
 
 	void HandleIncomingMidi();

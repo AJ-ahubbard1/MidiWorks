@@ -141,10 +141,9 @@
   <ItemGroup>
     <ClCompile Include="src\App.cpp" />
     <ClCompile Include="src\AppModel\AppModel.cpp" />
-    <ClCompile Include="src\AppModel\Clipboard\Clipboard.cpp" />
     <ClCompile Include="src\AppModel\DrumMachine\DrumMachine.cpp" />
     <ClCompile Include="src\AppModel\MidiInputManager\MidiInputManager.cpp" />
-    <ClCompile Include="src\AppModel\NoteEditor\NoteEditor.cpp" />
+    <ClCompile Include="src\AppModel\PreviewManager\PreviewManager.cpp" />
     <ClCompile Include="src\AppModel\ProjectManager\ProjectManager.cpp" />
     <ClCompile Include="src\AppModel\RecordingSession\RecordingSession.cpp" />
     <ClCompile Include="src\AppModel\UndoRedoManager\UndoRedoManager.cpp" />
@@ -173,7 +172,7 @@
     <ClInclude Include="src\AppModel\DrumMachine\DrumMachine.h" />
     <ClInclude Include="src\AppModel\MetronomeService\MetronomeService.h" />
     <ClInclude Include="src\AppModel\MidiInputManager\MidiInputManager.h" />
-    <ClInclude Include="src\AppModel\NoteEditor\NoteEditor.h" />
+    <ClInclude Include="src\AppModel\PreviewManager\PreviewManager.h" />
     <ClInclude Include="src\AppModel\ProjectManager\ProjectManager.h" />
     <ClInclude Include="src\AppModel\RecordingSession\RecordingSession.h" />
     <ClInclude Include="src\AppModel\SoundBank\ChannelColors.h" />

@@ -1,4 +1,4 @@
-// NoteEditor.h
+// PreviewManager.h
 #pragma once
 #include <memory>
 #include <vector>
@@ -6,44 +6,14 @@
 #include "AppModel/SoundBank/SoundBank.h"
 #include "Commands/Command.h"
 
-class NoteEditor
+class PreviewManager
 {
 public:
-	NoteEditor(TrackSet& trackSet, SoundBank& soundBank);
-
-	// Note creation - handles business logic, returns command to execute
-	std::unique_ptr<Command> CreateAddNoteToRecordChannels(
-		ubyte pitch,
-		uint64_t startTick,
-		uint64_t duration
-	);
-
-	// Note deletion
-	std::unique_ptr<Command> CreateDeleteNote(const NoteLocation& note);
-	std::unique_ptr<Command> CreateDeleteNotes(const std::vector<NoteLocation>& notes);
-
-	// Note modification
-	std::unique_ptr<Command> CreateMoveNote(
-		const NoteLocation& note,
-		uint64_t newStartTick,
-		ubyte newPitch
-	);
-	std::unique_ptr<Command> CreateMoveMultipleNotes(
-		const std::vector<NoteLocation>& notes,
-		int64_t tickDelta,
-		int pitchDelta
-	);
-	std::unique_ptr<Command> CreateResizeNote(
-		const NoteLocation& note,
-		uint64_t newDuration
-	);
-	std::unique_ptr<Command> CreateEditNoteVelocity(
-		const NoteLocation& note,
-		ubyte newVelocity
-	);
-
-	// Quantization
-	std::vector<std::unique_ptr<Command>> CreateQuantizeAllTracks(uint64_t gridSize);
+	PreviewManager(TrackSet& trackSet, SoundBank& soundBank)
+		: mTrackSet(trackSet)
+		, mSoundBank(soundBank)
+	{
+	}
 
 	// Note edit preview (for drag operations)
 	struct NoteEditPreview

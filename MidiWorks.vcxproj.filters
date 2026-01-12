@@ -48,13 +48,10 @@
     <ClCompile Include="src\AppModel\RecordingSession\RecordingSession.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="src\AppModel\Clipboard\Clipboard.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
     <ClCompile Include="src\AppModel\MidiInputManager\MidiInputManager.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="src\AppModel\NoteEditor\NoteEditor.cpp">
+    <ClCompile Include="src\AppModel\PreviewManager\PreviewManager.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="src\AppModel\ProjectManager\ProjectManager.cpp">
@@ -203,7 +200,7 @@
     <ClInclude Include="src\AppModel\MidiInputManager\MidiInputManager.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="src\AppModel\NoteEditor\NoteEditor.h">
+    <ClInclude Include="src\AppModel\PreviewManager\PreviewManager.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="src\AppModel\ProjectManager\ProjectManager.h">

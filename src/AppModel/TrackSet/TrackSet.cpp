@@ -121,14 +121,15 @@ std::vector<NoteLocation> TrackSet::FindNotesInRegion(
 std::vector<NoteLocation> TrackSet::GetNotesFromTrack(const Track& track, int trackIndex)
 {
 	std::vector<NoteLocation> result;
-
+	
 	if (track.empty()) return result;
 
 	size_t end = track.size();
 	for (size_t i = 0; i < end; i++)
 	{
 		const TimedMidiEvent& noteOn = track[i];
-		if (noteOn.mm.getEventType() != MidiEvent::NOTE_ON) continue;
+		// if the note type is not note on, continue until note on found
+		if (!noteOn.mm.isNoteOn()) continue;
 
 		// Find corresponding note off
 		for (size_t j = i + 1; j < end; j++)
