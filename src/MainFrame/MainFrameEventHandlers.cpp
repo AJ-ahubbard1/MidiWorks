@@ -103,7 +103,7 @@ void MainFrame::OnRedo(wxCommandEvent& event)
 void MainFrame::OnQuantize(wxCommandEvent& event)
 {
 	uint64_t gridSize = mMidiCanvasPanel->GetGridSize();
-	mAppModel->QuantizeAllTracks(gridSize);
+	mAppModel->Quantize(gridSize);
 	mUndoHistoryPanel->UpdateDisplay();
 	Refresh();
 }

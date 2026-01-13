@@ -17,6 +17,7 @@
 #include "MidiInputManager/MidiInputManager.h"
 #include "MetronomeService/MetronomeService.h"
 #include "DrumMachine/DrumMachine.h"
+#include "Selection/Selection.h"
 #include "MidiConstants.h"
 
 class AppModel
@@ -34,7 +35,7 @@ public:
 	void MoveMultipleNotes(const std::vector<NoteLocation>& notes, int64_t tickDelta, int pitchDelta);
 	void ResizeNote(const NoteLocation& note, uint64_t newDuration);
 	void EditNoteVelocity(const NoteLocation& note, ubyte newVelocity);
-	void QuantizeAllTracks(uint64_t gridSize);
+	void Quantize(uint64_t gridSize);
 
 	// Note Edit Preview (for drag operations)
 	void SetNoteMovePreview(const NoteLocation& note, uint64_t newStartTick, ubyte newPitch);
@@ -68,19 +69,21 @@ public:
 	MetronomeService& GetMetronomeService() { return mMetronomeService; }
 	PreviewManager& GetPreviewManager() { return mPreviewManager; } 	
 	DrumMachine& GetDrumMachine() { return mDrumMachine; }
+	Selection& GetSelection() { return mSelection; }
 
 private:
-	SoundBank								mSoundBank;
-	Transport								mTransport;
-	TrackSet								mTrackSet;
-	MidiInputManager						mMidiInputManager;
-	RecordingSession						mRecordingSession;
-	ProjectManager							mProjectManager;
-	Clipboard								mClipboard;
-	UndoRedoManager							mUndoRedoManager;
-	MetronomeService						mMetronomeService;
-	PreviewManager								mPreviewManager;
-	DrumMachine								mDrumMachine;
+	SoundBank			mSoundBank;
+	Transport			mTransport;
+	TrackSet			mTrackSet;
+	MidiInputManager	mMidiInputManager;
+	RecordingSession	mRecordingSession;
+	ProjectManager		mProjectManager;
+	Clipboard			mClipboard;
+	UndoRedoManager		mUndoRedoManager;
+	MetronomeService	mMetronomeService;
+	PreviewManager		mPreviewManager;
+	DrumMachine			mDrumMachine;
+	Selection			mSelection;
 
 	void HandleIncomingMidi();
 	uint64_t GetDeltaTimeMs();

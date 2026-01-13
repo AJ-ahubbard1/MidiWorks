@@ -23,6 +23,7 @@ set(SOURCES
 	src/AppModel/PreviewManager/PreviewManager.cpp
 	src/AppModel/ProjectManager/ProjectManager.cpp
 	src/AppModel/RecordingSession/RecordingSession.cpp
+	src/AppModel/Selection/Selection.cpp
 	src/AppModel/SoundBank/SoundBank.cpp
 	src/AppModel/TrackSet/TrackSet.cpp
 	src/AppModel/Transport/Transport.cpp
@@ -54,6 +55,7 @@ set(HEADERS
 	src/AppModel/PreviewManager/PreviewManager.h
 	src/AppModel/ProjectManager/ProjectManager.h
 	src/AppModel/RecordingSession/RecordingSession.h
+	src/AppModel/Selection/Selection.h
 	src/AppModel/SoundBank/ChannelColors.h
 	src/AppModel/SoundBank/SoundBank.h
 	src/AppModel/TrackSet/TrackSet.h

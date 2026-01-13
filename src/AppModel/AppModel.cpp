@@ -184,10 +184,9 @@ void AppModel::EditNoteVelocity(const NoteLocation& note, ubyte newVelocity)
 	mUndoRedoManager.ExecuteCommand(std::move(cmd));
 }
 
-void AppModel::QuantizeAllTracks(uint64_t gridSize)
+void AppModel::Quantize(uint64_t gridSize)
 {
 	mTransport.StopPlaybackIfActive();
-
 	// @TODO: This should be a single command QuantizeAllTracks, not a list of commmands
 	// @TODO: Create another Command, QuantizeMultipleNotes
 	

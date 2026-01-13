@@ -8,7 +8,8 @@ MidiCanvasPanel::MidiCanvasPanel(wxWindow* parent, std::shared_ptr<AppModel> app
 	mTransport(appModel->GetTransport()),
 	mTrackSet(appModel->GetTrackSet()),
 	mRecordingBuffer(appModel->GetRecordingSession().GetBuffer()),
-	mPreviewManager(appModel->GetPreviewManager())
+	mPreviewManager(appModel->GetPreviewManager()),
+	mSelection(appModel->GetSelection())
 {
 	SetBackgroundStyle(wxBG_STYLE_PAINT);
 
@@ -287,21 +288,6 @@ std::vector<NoteLocation> MidiCanvasPanel::FindNotesInRectangle(wxPoint start, w
 	return FindNotesInRegionWithSoloFilter(minTick, maxTick, minPitch, maxPitch);
 }
 
-void MidiCanvasPanel::ClearSelection()
-{
-	mSelectedNotes.clear();
-}
-
-bool MidiCanvasPanel::IsNoteSelected(const NoteLocation& note) const
-{
-	for (const auto& selected : mSelectedNotes)
-	{
-		if (selected == note)
-			return true;
-	}
-	return false;
-}
-
 NoteLocation MidiCanvasPanel::FindVelocityControlAtPosition(int screenX, int screenY)
 {
 	// Check if mouse is within the velocity editor region (bottom 25% of canvas)
@@ -317,7 +303,7 @@ NoteLocation MidiCanvasPanel::FindVelocityControlAtPosition(int screenX, int scr
 	int controlsHeight = canvasHeight - controlsPadding - controlsTop;
 	int controlsRadius = 8;
 
-	for (const auto& note : mSelectedNotes)
+	for (const auto& note : mSelection.GetNotes())
 	{
 		int startNoteX = TickToScreenX(note.startTick);
 		int velocityControlY = controlsTop + (127 - note.velocity) * controlsHeight / 127;
@@ -618,12 +604,12 @@ void MidiCanvasPanel::DrawNoteEditPreview(wxGraphicsContext* gc)
 
 void MidiCanvasPanel::DrawSelectedNotes(wxGraphicsContext* gc)
 {
-	if (mSelectedNotes.empty()) return;
+	if (mSelection.IsEmpty()) return;
 
 	gc->SetBrush(*wxTRANSPARENT_BRUSH);
 	gc->SetPen(wxPen(SELECTION_BORDER, SELECTION_BORDER_WIDTH));
 
-	for (const auto& note : mSelectedNotes)
+	for (const auto& note : mSelection.GetNotes())
 	{
 		DrawNote(gc, note);
 	}
@@ -631,7 +617,7 @@ void MidiCanvasPanel::DrawSelectedNotes(wxGraphicsContext* gc)
 
 void MidiCanvasPanel::DrawHoverBorder(wxGraphicsContext* gc)
 {
-	if (!mHoveredNote.found || IsNoteSelected(mHoveredNote))
+	if (!mHoveredNote.found || mSelection.Contains(mHoveredNote))
 		return;
 
 	gc->SetBrush(*wxTRANSPARENT_BRUSH);
@@ -759,7 +745,7 @@ void MidiCanvasPanel::DrawMidiEventTooltip(wxGraphicsContext* gc, const MidiEven
 void MidiCanvasPanel::DrawVelocityEditor(wxGraphicsContext* gc)
 {
 	// Only draw velocity editor if notes are selected
-	if (mSelectedNotes.empty())
+	if (mSelection.IsEmpty())
 		return;
 
 	int canvasWidth = GetSize().GetWidth();
@@ -779,7 +765,7 @@ void MidiCanvasPanel::DrawVelocityEditor(wxGraphicsContext* gc)
 	int controlsHeight = canvasHeight - controlsPadding - controlsTop;
 	int controlsRadius = 8;
 
-	for (const NoteLocation& note : mSelectedNotes)
+	for (const NoteLocation& note : mSelection.GetNotes())
 	{
 		int startNoteX = TickToScreenX(note.startTick);
 

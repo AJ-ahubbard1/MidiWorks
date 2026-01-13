@@ -48,6 +48,9 @@
     <ClCompile Include="src\AppModel\RecordingSession\RecordingSession.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="src\AppModel\Selection\Selection.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
     <ClCompile Include="src\AppModel\MidiInputManager\MidiInputManager.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
@@ -189,6 +192,9 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="src\AppModel\RecordingSession\RecordingSession.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="src\AppModel\Selection\Selection.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="src\AppModel\Clipboard\Clipboard.h">

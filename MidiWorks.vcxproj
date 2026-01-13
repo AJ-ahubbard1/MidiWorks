@@ -146,6 +146,7 @@
     <ClCompile Include="src\AppModel\PreviewManager\PreviewManager.cpp" />
     <ClCompile Include="src\AppModel\ProjectManager\ProjectManager.cpp" />
     <ClCompile Include="src\AppModel\RecordingSession\RecordingSession.cpp" />
+    <ClCompile Include="src\AppModel\Selection\Selection.cpp" />
     <ClCompile Include="src\AppModel\UndoRedoManager\UndoRedoManager.cpp" />
     <ClCompile Include="src\AppModel\SoundBank\SoundBank.cpp" />
     <ClCompile Include="src\AppModel\TrackSet\TrackSet.cpp" />
@@ -175,6 +176,7 @@
     <ClInclude Include="src\AppModel\PreviewManager\PreviewManager.h" />
     <ClInclude Include="src\AppModel\ProjectManager\ProjectManager.h" />
     <ClInclude Include="src\AppModel\RecordingSession\RecordingSession.h" />
+    <ClInclude Include="src\AppModel\Selection\Selection.h" />
     <ClInclude Include="src\AppModel\SoundBank\ChannelColors.h" />
     <ClInclude Include="src\AppModel\UndoRedoManager\UndoRedoManager.h" />
     <ClInclude Include="src\Commands\ClearTrackCommand.h" />

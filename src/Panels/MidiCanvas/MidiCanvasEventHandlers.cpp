@@ -54,7 +54,7 @@ void MidiCanvasPanel::OnLeftDown(wxMouseEvent& event)
 	wxPoint pos = event.GetPosition();
 
 	// Check if we're clicking on velocity controls first (only if notes are selected)
-	if (!mSelectedNotes.empty())
+	if (!mSelection.IsEmpty())
 	{
 		NoteLocation velocityControl = FindVelocityControlAtPosition(pos.x, pos.y);
 		if (velocityControl.found)
@@ -99,13 +99,11 @@ void MidiCanvasPanel::OnLeftDown(wxMouseEvent& event)
 		else
 		{
 			// Check if clicked note is part of current selection
-			bool isPartOfSelection = IsNoteSelected(clickedNote);
-
-			if (isPartOfSelection && !mSelectedNotes.empty())
+			if (mSelection.Contains(clickedNote))
 			{
 				// Start multi-note move
 				mMouseMode = MouseMode::MovingMultipleNotes;
-				mOriginalSelectedNotes = mSelectedNotes;  // Store original positions
+				mOriginalSelectedNotes = mSelection.GetNotes();  // Store original positions
 			}
 			else
 			{
@@ -130,7 +128,7 @@ void MidiCanvasPanel::OnLeftDown(wxMouseEvent& event)
 			mIsSelecting = true;
 			mSelectionStart = pos;
 			mSelectionEnd = pos;
-			ClearSelection();
+			mSelection.Clear();
 			return;
 		}
 
@@ -159,7 +157,7 @@ void MidiCanvasPanel::OnLeftUp(wxMouseEvent& event)
 	if (mIsSelecting)
 	{
 		mIsSelecting = false;
-		// Final selection is already in mSelectedNotes (updated during drag)
+		// Final selection is already in mSelection (updated during drag)
 		Refresh();
 		return;
 	}
@@ -196,7 +194,7 @@ void MidiCanvasPanel::OnLeftUp(wxMouseEvent& event)
 			mPreviewManager.ClearNoteEditPreview();
 		}
 		mOriginalSelectedNotes.clear();
-		ClearSelection();  // Clear stale selection (old positions no longer valid)
+		mSelection.Clear();  // Clear stale selection (old positions no longer valid)
 	}
 	else if (mMouseMode == MouseMode::ResizingNote && mSelectedNote.found)
 	{
@@ -222,17 +220,9 @@ void MidiCanvasPanel::OnLeftUp(wxMouseEvent& event)
 		// Execute command (which will modify track data and enable undo/redo)
 		mAppModel->EditNoteVelocity(noteWithOriginalVelocity, finalVelocity);
 
-		// Update the velocity in mSelectedNotes to reflect the new value
-		for (auto& note : mSelectedNotes)
-		{
-			if (note.trackIndex == mVelocityEditNote.trackIndex &&
-			    note.noteOnIndex == mVelocityEditNote.noteOnIndex)
-			{
-				note.velocity = finalVelocity;
-				break;
-			}
-		}
-
+		// Update the velocity in mSelection to reflect the new value
+		mSelection.UpdateVelocity(mVelocityEditNote.trackIndex, mVelocityEditNote.noteOnIndex, finalVelocity);
+		
 		// Reset state
 		mVelocityEditNote.found = false;
 	}
@@ -241,7 +231,6 @@ void MidiCanvasPanel::OnLeftUp(wxMouseEvent& event)
 	mMouseMode = MouseMode::Idle;
 	Refresh();
 }
-
 
 // ============================================================================
 // MIDDLE MOUSE BUTTON - DELETE NOTE / MOVE PLAYHEAD
@@ -328,7 +317,7 @@ void MidiCanvasPanel::OnMouseMove(wxMouseEvent& event)
 	{
 		mSelectionEnd = pos;
 		// Find notes in current rectangle
-		mSelectedNotes = FindNotesInRectangle(mSelectionStart, mSelectionEnd);
+		mSelection.SelectNotes(FindNotesInRectangle(mSelectionStart, mSelectionEnd));
 		Refresh();
 		return;
 	}
@@ -538,7 +527,7 @@ void MidiCanvasPanel::OnKeyDown(wxKeyEvent& event)
 	int keyCode = event.GetKeyCode();
 
 	// Delete - Delete selected notes
-	if (keyCode == WXK_DELETE && !mSelectedNotes.empty())
+	if (keyCode == WXK_DELETE && !mSelection.IsEmpty())
 	{
 		DeleteSelectedNotes();
 		Refresh();
@@ -548,7 +537,7 @@ void MidiCanvasPanel::OnKeyDown(wxKeyEvent& event)
 	// Escape - Clear selection
 	if (keyCode == WXK_ESCAPE)
 	{
-		ClearSelection();
+		mSelection.Clear();
 		Refresh();
 		return;
 	}
@@ -556,17 +545,18 @@ void MidiCanvasPanel::OnKeyDown(wxKeyEvent& event)
 	// Ctrl+A - Select all notes
 	if (event.ControlDown() && keyCode == 'A')
 	{
-		ClearSelection();
-		mSelectedNotes = FindNotesInRegionWithSoloFilter(
-			0, MidiConstants::MAX_TICK_VALUE,
-			0, MidiConstants::MAX_MIDI_NOTE
+		mSelection.Clear();
+		mSelection.SelectNotes(
+			FindNotesInRegionWithSoloFilter( 
+				0, MidiConstants::MAX_TICK_VALUE, 0, MidiConstants::MAX_MIDI_NOTE
+			)
 		);
 		Refresh();
 		return;
 	}
 
 	// Ctrl+C - Copy selected notes to clipboard
-	if (event.ControlDown() && keyCode == 'C' && !mSelectedNotes.empty())
+	if (event.ControlDown() && keyCode == 'C' && !mSelection.IsEmpty())
 	{
 		CopySelectedNotesToClipboard();
 		return;
@@ -579,7 +569,7 @@ void MidiCanvasPanel::OnKeyDown(wxKeyEvent& event)
 		if (event.ShiftDown())
 		{
 			mAppModel->PasteNotesToRecordTracks();
-			ClearSelection();
+			mSelection.Clear();
 			Refresh();
 			return;
 		}
@@ -587,14 +577,14 @@ void MidiCanvasPanel::OnKeyDown(wxKeyEvent& event)
 		else
 		{
 			mAppModel->PasteNotes();
-			ClearSelection();
+			mSelection.Clear();
 			Refresh();
 			return;
 		}
 	}
 
 	// Ctrl+X - Cut selected notes (copy + delete)
-	if (event.ControlDown() && keyCode == 'X' && !mSelectedNotes.empty())
+	if (event.ControlDown() && keyCode == 'X' && !mSelection.IsEmpty())
 	{
 		CopySelectedNotesToClipboard();
 		DeleteSelectedNotes();
@@ -613,14 +603,14 @@ void MidiCanvasPanel::OnKeyDown(wxKeyEvent& event)
 
 void MidiCanvasPanel::CopySelectedNotesToClipboard()
 {
-	if (mSelectedNotes.empty()) return;
-	mAppModel->GetClipboard().CopyNotes(mSelectedNotes, mTrackSet);
+	if (mSelection.IsEmpty()) return;
+	mAppModel->GetClipboard().CopyNotes(mSelection.GetNotes(), mTrackSet);
 }
 
 void MidiCanvasPanel::DeleteSelectedNotes()
 {
-	if (mSelectedNotes.empty()) return;
+	if (mSelection.IsEmpty()) return;
 
-	mAppModel->DeleteNotes(mSelectedNotes);
-	ClearSelection();
+	mAppModel->DeleteNotes(mSelection.GetNotes());
+	mSelection.Clear();
 }

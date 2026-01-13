@@ -32,6 +32,7 @@ private:
 	TrackSet& mTrackSet;
 	Track& mRecordingBuffer;
 	PreviewManager& mPreviewManager;
+	Selection& mSelection;
 
 	// ========== UI Controls ==========
 	wxStaticText* mDebugMessage;
@@ -65,7 +66,6 @@ private:
 	// ========== Note Selection State ==========
 	NoteLocation mHoveredNote;              // Note currently under mouse cursor
 	NoteLocation mSelectedNote;             // Single selected note (for single-note operations)
-	std::vector<NoteLocation> mSelectedNotes;  // Multiple selected notes
 	bool mIsSelecting = false;              // Currently dragging selection rectangle
 	wxPoint mSelectionStart;                // Where selection drag started
 	wxPoint mSelectionEnd;                  // Current mouse position during drag
@@ -113,8 +113,6 @@ private:
 	NoteLocation FindNoteAtPosition(int screenX, int screenY);
 	bool IsOnResizeEdge(int screenX, const NoteLocation& note);
 	std::vector<NoteLocation> FindNotesInRectangle(wxPoint start, wxPoint end);
-	void ClearSelection();
-	bool IsNoteSelected(const NoteLocation& note) const;
 	NoteLocation FindVelocityControlAtPosition(int screenX, int screenY);
 
 	// Solo filtering helper
