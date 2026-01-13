@@ -36,11 +36,17 @@ MidiCanvasPanel::MidiCanvasPanel(wxWindow* parent, std::shared_ptr<AppModel> app
 	mDurationChoice = new wxChoice(this, wxID_ANY);
 
 	// Populate duration choices from constants
-	for (int i = 0; i < NOTE_DURATIONS_COUNT; i++)
+	for (int i = 0; i < MidiConstants::NOTE_DURATIONS_COUNT; i++)
 	{
-		mDurationChoice->Append(NOTE_DURATIONS[i].label, (void*)(intptr_t)NOTE_DURATIONS[i].ticks);
+		// Append tick value to label for display (e.g., "Quarter Note (960)")
+		std::string label = MidiConstants::NOTE_DURATIONS[i].label;
+		if (MidiConstants::NOTE_DURATIONS[i].ticks > 0)  // Skip for "Custom"
+		{
+			label += " (" + std::to_string(MidiConstants::NOTE_DURATIONS[i].ticks) + ")";
+		}
+		mDurationChoice->Append(label, (void*)(intptr_t)MidiConstants::NOTE_DURATIONS[i].ticks);
 	}
-	mDurationChoice->SetSelection(DEFAULT_DURATION_INDEX);
+	mDurationChoice->SetSelection(MidiConstants::DEFAULT_DURATION_INDEX);
 
 	controlsSizer->AddSpacer(5);
 	controlsSizer->Add(mDurationChoice, 0, wxALL | wxALIGN_CENTER_VERTICAL, 5);

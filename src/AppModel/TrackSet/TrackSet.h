@@ -81,6 +81,16 @@ public:
 	// shift Note Off Message of first note to keep them as separate notes
 	static void SeparateOverlappingNotes(Track& buffer);
 
+	/// <summary>
+	/// Apply duration-aware quantization to a single track.
+	/// Uses the centralized quantization algorithm from MidiConstants.
+	/// Short notes (< gridSize) are extended to one grid snap.
+	/// Long notes (>= gridSize) have both start and end quantized independently.
+	/// </summary>
+	/// <param name="track">Track to quantize</param>
+	/// <param name="gridSize">Grid size in ticks (e.g., 960 for quarter notes)</param>
+	static void QuantizeTrack(Track& track, uint64_t gridSize);
+
 	void FinalizeRecording(Track& recordingBuffer);
 
 private:

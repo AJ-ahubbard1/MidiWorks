@@ -85,25 +85,5 @@ namespace MidiCanvasConstants
 
 	// ========== Note Duration Options ==========
 	const int MAX_CUSTOM_TICKS = 10000;               // Maximum value for custom tick duration
-
-	struct NoteDuration 
-	{
-		const char* label;
-		uint64_t ticks;
-	};
-
-	const NoteDuration NOTE_DURATIONS[] = {
-		{ "Whole Note (3840)", 3840 },
-		{ "Half Note (1920)", 1920 },
-		{ "Quarter Note (960)", 960 },
-		{ "Quarter Triplet (640)", 640 },
-		{ "Eighth Note (480)", 480 },
-		{ "Eighth Triplet (320)", 320 },
-		{ "Sixteenth Note (240)", 240 },
-		{ "Sixteenth Triplet (160)", 160 },
-		{ "Custom", 0 }  // 0 = custom, tick value from spin control
-	};
-
-	const int NOTE_DURATIONS_COUNT = sizeof(NOTE_DURATIONS) / sizeof(NOTE_DURATIONS[0]);
-	const int DEFAULT_DURATION_INDEX = 2;  // Quarter note
+	// NOTE: NOTE_DURATIONS array moved to MidiConstants.h for centralized access
 }

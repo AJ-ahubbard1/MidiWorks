@@ -247,6 +247,38 @@ void TrackSet::SeparateOverlappingNotes(Track& buffer)
 	SortTrack(buffer);
 }
 
+void TrackSet::QuantizeTrack(Track& track, uint64_t gridSize)
+{
+	// Get note pairs (note-on + note-off) for intelligent quantization
+	std::vector<NoteLocation> notes = GetNotesFromTrack(track);
+
+	// Duration-aware quantization: handle short vs long notes differently
+	for (const auto& note : notes)
+	{
+		uint64_t duration = note.endTick - note.startTick;
+		uint64_t quantizedStart = MidiConstants::RoundToGrid(note.startTick, gridSize);
+
+		if (duration < gridSize)
+		{
+			// Short note (grace note/ornament): quantize start, extend to one grid snap
+			track[note.noteOnIndex].tick = quantizedStart;
+			track[note.noteOffIndex].tick = quantizedStart + gridSize - MidiConstants::NOTE_SEPARATION_TICKS;
+		}
+		else
+		{
+			// Long note: quantize both start and end independently
+			track[note.noteOnIndex].tick = quantizedStart;
+			track[note.noteOffIndex].tick = MidiConstants::RoundToGrid(note.endTick, gridSize) - MidiConstants::NOTE_SEPARATION_TICKS;
+		}
+	}
+
+	// Post-process to fix any remaining overlaps
+	SeparateOverlappingNotes(track);
+
+	// Re-sort track to maintain chronological order
+	SortTrack(track);
+}
+
 void TrackSet::FinalizeRecording(Track& recordingBuffer)
 {
 	for (const auto& event : recordingBuffer)

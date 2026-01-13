@@ -135,21 +135,7 @@ public:
 
 	std::string GetDescription() const override
 	{
-		// Convert grid size to musical notation
-		std::string gridName;
-		switch (mGridSize)
-		{
-			case 3840: gridName = "whole notes"; break;
-			case 1920: gridName = "half notes"; break;
-			case 960:  gridName = "quarter notes"; break;
-			case 640:  gridName = "quarter triplets"; break;
-			case 480:  gridName = "eighth notes"; break;
-			case 320:  gridName = "eighth triplets"; break;
-			case 240:  gridName = "sixteenth notes"; break;
-			case 160:  gridName = "sixteenth triplets"; break;
-			case 120:  gridName = "thirty-second notes"; break;
-			default:   gridName = std::to_string(mGridSize) + " ticks"; break;
-		}
+		std::string gridName = MidiConstants::GridSizeToName(mGridSize);
 
 		// Count total note-on events across all tracks
 		int totalNoteCount = 0;
@@ -181,46 +167,11 @@ private:
 	};
 
 	/// <summary>
-	/// Round a tick value to the nearest grid point.
-	/// </summary>
-	uint64_t RoundToGrid(uint64_t tick) const
-	{
-		return ((tick + mGridSize / 2) / mGridSize) * mGridSize;
-	}
-
-	/// <summary>
-	/// Apply quantization to a single track (same logic as QuantizeCommand).
+	/// Apply quantization to a single track using shared TrackSet helper.
 	/// </summary>
 	void QuantizeTrack(Track& track)
 	{
-		// Get note pairs (note-on + note-off) for intelligent quantization
-		std::vector<NoteLocation> notes = TrackSet::GetNotesFromTrack(track);
-
-		// Duration-aware quantization: handle short vs long notes differently
-		for (const auto& note : notes)
-		{
-			uint64_t duration = note.endTick - note.startTick;
-			uint64_t quantizedStart = RoundToGrid(note.startTick);
-
-			if (duration < mGridSize)
-			{
-				// Short note (grace note/ornament): quantize start, extend to one grid snap
-				track[note.noteOnIndex].tick = quantizedStart;
-				track[note.noteOffIndex].tick = quantizedStart + mGridSize - MidiConstants::NOTE_SEPARATION_TICKS;
-			}
-			else
-			{
-				// Long note: quantize both start and end independently
-				track[note.noteOnIndex].tick = quantizedStart;
-				track[note.noteOffIndex].tick = RoundToGrid(note.endTick) - MidiConstants::NOTE_SEPARATION_TICKS;
-			}
-		}
-
-		// Post-process to fix any remaining overlaps
-		TrackSet::SeparateOverlappingNotes(track);
-
-		// Re-sort track to maintain chronological order
-		TrackSet::SortTrack(track);
+		TrackSet::QuantizeTrack(track, mGridSize);
 	}
 
 	TrackSet& mTrackSet;                    // Reference to the TrackSet
@@ -304,21 +255,7 @@ public:
 
 	std::string GetDescription() const override
 	{
-		// Convert grid size to musical notation
-		std::string gridName;
-		switch (mGridSize)
-		{
-			case 3840: gridName = "whole notes"; break;
-			case 1920: gridName = "half notes"; break;
-			case 960:  gridName = "quarter notes"; break;
-			case 640:  gridName = "quarter triplets"; break;
-			case 480:  gridName = "eighth notes"; break;
-			case 320:  gridName = "eighth triplets"; break;
-			case 240:  gridName = "sixteenth notes"; break;
-			case 160:  gridName = "sixteenth triplets"; break;
-			case 120:  gridName = "thirty-second notes"; break;
-			default:   gridName = std::to_string(mGridSize) + " ticks"; break;
-		}
+		std::string gridName = MidiConstants::GridSizeToName(mGridSize);
 
 		// Count total note-on events across specified tracks
 		int totalNoteCount = 0;
@@ -352,46 +289,11 @@ private:
 	};
 
 	/// <summary>
-	/// Round a tick value to the nearest grid point.
-	/// </summary>
-	uint64_t RoundToGrid(uint64_t tick) const
-	{
-		return ((tick + mGridSize / 2) / mGridSize) * mGridSize;
-	}
-
-	/// <summary>
-	/// Apply quantization to a single track (same logic as QuantizeCommand).
+	/// Apply quantization to a single track using shared TrackSet helper.
 	/// </summary>
 	void QuantizeTrack(Track& track)
 	{
-		// Get note pairs (note-on + note-off) for intelligent quantization
-		std::vector<NoteLocation> notes = TrackSet::GetNotesFromTrack(track);
-
-		// Duration-aware quantization: handle short vs long notes differently
-		for (const auto& note : notes)
-		{
-			uint64_t duration = note.endTick - note.startTick;
-			uint64_t quantizedStart = RoundToGrid(note.startTick);
-
-			if (duration < mGridSize)
-			{
-				// Short note (grace note/ornament): quantize start, extend to one grid snap
-				track[note.noteOnIndex].tick = quantizedStart;
-				track[note.noteOffIndex].tick = quantizedStart + mGridSize - MidiConstants::NOTE_SEPARATION_TICKS;
-			}
-			else
-			{
-				// Long note: quantize both start and end independently
-				track[note.noteOnIndex].tick = quantizedStart;
-				track[note.noteOffIndex].tick = RoundToGrid(note.endTick) - MidiConstants::NOTE_SEPARATION_TICKS;
-			}
-		}
-
-		// Post-process to fix any remaining overlaps
-		TrackSet::SeparateOverlappingNotes(track);
-
-		// Re-sort track to maintain chronological order
-		TrackSet::SortTrack(track);
+		TrackSet::QuantizeTrack(track, mGridSize);
 	}
 
 	TrackSet& mTrackSet;                    // Reference to the TrackSet

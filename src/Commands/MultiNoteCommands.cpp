@@ -184,11 +184,6 @@ std::string MoveMultipleNotesCommand::GetDescription() const
 
 void QuantizeMultipleNotesCommand::Execute()
 {
-	// Helper to round a tick value to the nearest grid point
-	auto RoundToGrid = [this](uint64_t tick) -> uint64_t {
-		return ((tick + mGridSize / 2) / mGridSize) * mGridSize;
-	};
-
 	// Quantize each note using duration-aware algorithm
 	for (const auto& noteInfo : mNotesToQuantize)
 	{
@@ -196,7 +191,7 @@ void QuantizeMultipleNotesCommand::Execute()
 
 		// Calculate duration and quantized start
 		uint64_t duration = noteInfo.originalEndTick - noteInfo.originalStartTick;
-		uint64_t quantizedStart = RoundToGrid(noteInfo.originalStartTick);
+		uint64_t quantizedStart = MidiConstants::RoundToGrid(noteInfo.originalStartTick, mGridSize);
 
 		// Apply duration-aware quantization
 		if (duration < mGridSize)
@@ -209,7 +204,7 @@ void QuantizeMultipleNotesCommand::Execute()
 		{
 			// Long note: quantize both start and end independently
 			track[noteInfo.noteOnIndex].tick = quantizedStart;
-			track[noteInfo.noteOffIndex].tick = RoundToGrid(noteInfo.originalEndTick) - MidiConstants::NOTE_SEPARATION_TICKS;
+			track[noteInfo.noteOffIndex].tick = MidiConstants::RoundToGrid(noteInfo.originalEndTick, mGridSize) - MidiConstants::NOTE_SEPARATION_TICKS;
 		}
 	}
 
@@ -264,21 +259,7 @@ void QuantizeMultipleNotesCommand::Undo()
 
 std::string QuantizeMultipleNotesCommand::GetDescription() const
 {
-	// Convert grid size to musical notation
-	std::string gridName;
-	switch (mGridSize)
-	{
-		case 3840: gridName = "whole notes"; break;
-		case 1920: gridName = "half notes"; break;
-		case 960:  gridName = "quarter notes"; break;
-		case 640:  gridName = "quarter triplets"; break;
-		case 480:  gridName = "eighth notes"; break;
-		case 320:  gridName = "eighth triplets"; break;
-		case 240:  gridName = "sixteenth notes"; break;
-		case 160:  gridName = "sixteenth triplets"; break;
-		case 120:  gridName = "thirty-second notes"; break;
-		default:   gridName = std::to_string(mGridSize) + " ticks"; break;
-	}
+	std::string gridName = MidiConstants::GridSizeToName(mGridSize);
 
 	int noteCount = static_cast<int>(mNotesToQuantize.size());
 	return "Quantize " + std::to_string(noteCount) + " note" + (noteCount != 1 ? "s" : "") + " to " + gridName;
