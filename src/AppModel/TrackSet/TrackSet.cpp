@@ -11,6 +11,12 @@ bool TrackSet::IsTrackEmpty(ubyte channelNumber)
 	return GetTrack(channelNumber).empty();
 }
 
+bool TrackSet::IsEmpty() const
+{
+	auto notes = GetAllNotes();
+	return notes.empty();
+}
+
 std::vector<MidiMessage> TrackSet::PlayBack(uint64_t currentTick)
 {
 	std::vector<MidiMessage> scheduledMessages;

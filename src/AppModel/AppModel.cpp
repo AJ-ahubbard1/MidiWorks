@@ -47,6 +47,53 @@ void AppModel::Update()
 }
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// NOTE EDIT PREVIEW FOR DRAG OPERATIONS
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+// First checks for collisions at the new note region before moving the preview note
+void AppModel::SetNoteMovePreview(const NoteLocation& note, uint64_t newStartTick, ubyte newPitch)
+{
+	uint64_t newEndTick = newStartTick + note.endTick - note.startTick;
+
+	if (IsRegionCollisionFree(newStartTick, newEndTick, newPitch, note.trackIndex, &note))
+	{
+		mPreviewManager.SetNoteMovePreview(note, newStartTick, newPitch);
+	}
+}
+
+void AppModel::SetMultipleNotesMovePreview(const std::vector<NoteLocation>& notes, int64_t tickDelta, int pitchDelta)
+{
+	// Check each note for collisions
+	for (const auto& note : notes)
+	{
+		// Calculate new position
+		int64_t newStartTick = static_cast<int64_t>(note.startTick) + tickDelta;
+		int newPitch = static_cast<int>(note.pitch) + pitchDelta;
+
+		// Validate bounds
+		if (newStartTick < 0 || newPitch < 0 || newPitch > 127)
+			return;  // Out of bounds, reject entire move
+
+		uint64_t newEndTick = newStartTick + (note.endTick - note.startTick);
+
+		// Check if this note would collide (excluding all notes being moved)
+		if (!IsRegionCollisionFree(newStartTick, newEndTick, static_cast<ubyte>(newPitch), note.trackIndex, notes))
+			return;  // Collision detected, reject entire move
+	}
+
+	// All notes are collision-free, allow preview
+	mPreviewManager.SetMultipleNotesMovePreview(notes, tickDelta, pitchDelta);
+}
+
+void AppModel::SetNoteResizePreview(const NoteLocation& note, uint64_t newEndTick)
+{
+	if (IsRegionCollisionFree(note.startTick, newEndTick, note.pitch, note.trackIndex, &note))
+	{
+		mPreviewManager.SetNoteResizePreview(note, newEndTick);
+	}
+}
+
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // COMMMAND METHODS: creates the commands and uses UndoRedoManager to execute them, adding them to undo stack 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -58,7 +105,7 @@ void AppModel::AddNoteToRecordChannels(ubyte pitch, uint64_t startTick, uint64_t
 
 	// @TODO velocity should be based on recording settings, separate from preview settings
 	ubyte velocity = mSoundBank.GetPreviewVelocity();
-	
+
 	// Get a list of all record-enabled track indices 
 	std::vector<int> targetTracks;
 	targetTracks.reserve(recordOnChannels.size());
@@ -66,7 +113,7 @@ void AppModel::AddNoteToRecordChannels(ubyte pitch, uint64_t startTick, uint64_t
 	{
 		targetTracks.emplace_back(static_cast<int>(channel->channelNumber));
 	}
-	
+
 	auto cmd = std::make_unique<AddNoteCommand>(mTrackSet, targetTracks, pitch, velocity, startTick, duration);
 	mUndoRedoManager.ExecuteCommand(std::move(cmd));
 }
@@ -182,66 +229,59 @@ void AppModel::EditNoteVelocity(const NoteLocation& note, ubyte newVelocity)
 
 	auto cmd = std::make_unique<EditNoteVelocityCommand>(track, note.noteOnIndex, newVelocity);
 	mUndoRedoManager.ExecuteCommand(std::move(cmd));
+
+	// Update the velocity in mSelection to reflect the new value
+	mSelection.UpdateVelocity(note.trackIndex, note.noteOnIndex, newVelocity);
 }
 
+// Context-aware quantize: dispatch based on current state
 void AppModel::Quantize(uint64_t gridSize)
 {
+	// If there are no notes to quantize, exit
+	if (mTrackSet.IsEmpty()) return;
+
+	// Stop playback before quantizing
 	mTransport.StopPlaybackIfActive();
-	// @TODO: This should be a single command QuantizeAllTracks, not a list of commmands
-	// @TODO: Create another Command, QuantizeMultipleNotes
-	
-	for (int i = 0; i < MidiConstants::CHANNEL_COUNT; i++)
+
+	// Priority 1: If notes are selected, quantize only those notes
+	if (!mSelection.IsEmpty())
 	{
-		Track& track = mTrackSet.GetTrack(i);
-		if (!track.empty())
+		std::vector<QuantizeMultipleNotesCommand::NoteToQuantize> notesToQuantize;
+		for (const auto& note : mSelection.GetNotes())
 		{
-			auto cmd = std::make_unique<QuantizeCommand>(track, gridSize);
-			mUndoRedoManager.ExecuteCommand(std::move(cmd));
+			QuantizeMultipleNotesCommand::NoteToQuantize data;
+			data.trackIndex = note.trackIndex;
+			data.noteOnIndex = note.noteOnIndex;
+			data.noteOffIndex = note.noteOffIndex;
+			data.originalStartTick = note.startTick;
+			data.originalEndTick = note.endTick;
+			data.pitch = note.pitch;
+			notesToQuantize.push_back(data);
 		}
+
+		auto cmd = std::make_unique<QuantizeMultipleNotesCommand>(mTrackSet, notesToQuantize, gridSize);
+		mUndoRedoManager.ExecuteCommand(std::move(cmd));
+		return;
 	}
-}
 
-// First checks for collisions at the new note region before moving the preview note
-void AppModel::SetNoteMovePreview(const NoteLocation& note, uint64_t newStartTick, ubyte newPitch)
-{
-	uint64_t newEndTick = newStartTick + note.endTick - note.startTick;
-
-	if (IsRegionCollisionFree(newStartTick, newEndTick, newPitch, note.trackIndex, &note))
+	// Priority 2: If track(s) are solo'd, quantize only solo tracks (single undo)
+	std::vector<MidiChannel*> soloChannels = mSoundBank.GetSoloChannels();
+	if (!soloChannels.empty())
 	{
-		mPreviewManager.SetNoteMovePreview(note, newStartTick, newPitch);
-	}
-}
+		std::vector<int> trackIndices;
+		for (MidiChannel* channel : soloChannels)
+		{
+			trackIndices.push_back(channel->channelNumber);
+		}
 
-void AppModel::SetMultipleNotesMovePreview(const std::vector<NoteLocation>& notes, int64_t tickDelta, int pitchDelta)
-{
-	// Check each note for collisions
-	for (const auto& note : notes)
-	{
-		// Calculate new position
-		int64_t newStartTick = static_cast<int64_t>(note.startTick) + tickDelta;
-		int newPitch = static_cast<int>(note.pitch) + pitchDelta;
-
-		// Validate bounds
-		if (newStartTick < 0 || newPitch < 0 || newPitch > 127)
-			return;  // Out of bounds, reject entire move
-
-		uint64_t newEndTick = newStartTick + (note.endTick - note.startTick);
-
-		// Check if this note would collide (excluding all notes being moved)
-		if (!IsRegionCollisionFree(newStartTick, newEndTick, static_cast<ubyte>(newPitch), note.trackIndex, notes))
-			return;  // Collision detected, reject entire move
+		auto cmd = std::make_unique<QuantizeMultipleTracksCommand>(mTrackSet, trackIndices, gridSize);
+		mUndoRedoManager.ExecuteCommand(std::move(cmd));
+		return;
 	}
 
-	// All notes are collision-free, allow preview
-	mPreviewManager.SetMultipleNotesMovePreview(notes, tickDelta, pitchDelta);
-}
-
-void AppModel::SetNoteResizePreview(const NoteLocation& note, uint64_t newEndTick)
-{
-	if (IsRegionCollisionFree(note.startTick, newEndTick, note.pitch, note.trackIndex, &note))
-	{
-		mPreviewManager.SetNoteResizePreview(note, newEndTick);
-	}
+	// Priority 3: Default - quantize all tracks
+	auto cmd = std::make_unique<QuantizeAllCommand>(mTrackSet, gridSize);
+	mUndoRedoManager.ExecuteCommand(std::move(cmd));
 }
 
 // Clipboard operations
@@ -301,6 +341,10 @@ void AppModel::RecordDrumPatternToTrack()
 	auto cmd = std::make_unique<RecordCommand>(mTrackSet, buffer);
 	mUndoRedoManager.ExecuteCommand(std::move(cmd));
 }
+
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// END OF COMMAND METHODS 
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 // Trigger drum pad via keyboard - plays sound immediately and enables pad if loop is playing
 int AppModel::TriggerDrumPad(int rowIndex)
@@ -408,7 +452,6 @@ void AppModel::HandleIncomingMidi()
 
 	RouteAndPlayMessage(*message, mTransport.GetCurrentTick());
 }
-
 
 // Returns the change in time from lastTick's last value to now, then updates lastTick 
 uint64_t AppModel::GetDeltaTimeMs()

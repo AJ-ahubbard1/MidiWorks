@@ -218,10 +218,8 @@ void MidiCanvasPanel::OnLeftUp(wxMouseEvent& event)
 		noteWithOriginalVelocity.velocity = mOriginalVelocity;
 
 		// Execute command (which will modify track data and enable undo/redo)
+		// Updates Selection to show the new velocity value 
 		mAppModel->EditNoteVelocity(noteWithOriginalVelocity, finalVelocity);
-
-		// Update the velocity in mSelection to reflect the new value
-		mSelection.UpdateVelocity(mVelocityEditNote.trackIndex, mVelocityEditNote.noteOnIndex, finalVelocity);
 		
 		// Reset state
 		mVelocityEditNote.found = false;

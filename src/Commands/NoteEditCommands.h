@@ -38,7 +38,8 @@ public:
 	std::string GetDescription() const override;
 
 private:
-	struct NoteIndices {
+	struct NoteIndices 
+	{
 		int trackIndex = 0;
 		size_t noteOnIndex = 0;
 		size_t noteOffIndex = 0;

@@ -26,6 +26,11 @@ public:
 	AppModel();
 	void Update();
 
+	// Note Edit Preview (for drag operations)
+	void SetNoteMovePreview(const NoteLocation& note, uint64_t newStartTick, ubyte newPitch);
+	void SetMultipleNotesMovePreview(const std::vector<NoteLocation>& notes, int64_t tickDelta, int pitchDelta);
+	void SetNoteResizePreview(const NoteLocation& note, uint64_t newEndTick);
+	
 	// Command Methods: creates the commands and uses UndoRedoManager to execute them, adding them to undo stack
 	void AddNoteToRecordChannels(ubyte pitch, uint64_t startTick, uint64_t duration);
 	void DeleteNote(const NoteLocation& note);
@@ -35,17 +40,11 @@ public:
 	void MoveMultipleNotes(const std::vector<NoteLocation>& notes, int64_t tickDelta, int pitchDelta);
 	void ResizeNote(const NoteLocation& note, uint64_t newDuration);
 	void EditNoteVelocity(const NoteLocation& note, ubyte newVelocity);
-	void Quantize(uint64_t gridSize);
-
-	// Note Edit Preview (for drag operations)
-	void SetNoteMovePreview(const NoteLocation& note, uint64_t newStartTick, ubyte newPitch);
-	void SetMultipleNotesMovePreview(const std::vector<NoteLocation>& notes, int64_t tickDelta, int pitchDelta);
-	void SetNoteResizePreview(const NoteLocation& note, uint64_t newEndTick);
-
+	// Creates quantize command based on solo & selection context
+	void Quantize(uint64_t gridSize);                   
 	// Clipboard for copy/paste
 	void PasteNotes(std::optional<uint64_t> pasteTick = std::nullopt);
 	void PasteNotesToRecordTracks(std::optional<uint64_t> pasteTick = std::nullopt);
-
 	// Drum Machine
 	void RecordDrumPatternToTrack();
 	int TriggerDrumPad(int rowIndex);  // Trigger drum pad via keyboard (returns column index if pad enabled, -1 otherwise)

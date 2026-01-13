@@ -45,6 +45,9 @@ public:
 
 	bool IsTrackEmpty(ubyte channelNumber);
 
+	// returns true if there are no notes in any tracks
+	bool IsEmpty() const;
+
 	std::vector<MidiMessage> PlayBack(uint64_t currentTick);
 
 	void FindStart(uint64_t startTick);

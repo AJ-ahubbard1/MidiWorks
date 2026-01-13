@@ -12,6 +12,39 @@ Track bugs and issues discovered during testing of MidiWorks.
 
 ## Bugs
 
+### #39 - Loop region editing doesn't respect time signatures with non-4 denominators
+**Status:** Open
+**Priority:** Medium
+**Found:** 2026-01-12
+
+**Description:**
+When editing the loop region (dragging loop start/end boundaries), the system doesn't correctly calculate measure boundaries for time signatures with denominators other than 4. This causes loop regions to snap to incorrect positions when the time signature is set to values like 3/8, 6/8, 2/2, or 3/4.
+
+**Problem Examples:**
+- **4/4 time** - Works correctly (denominator = 4)
+- **3/8 time** - Loop boundaries don't align with actual measure boundaries
+- **6/8 time** - Incorrect measure length calculation
+- **2/2 time** - Measure duration miscalculated
+
+**Root Cause:**
+The measure calculation logic likely assumes a quarter note (denominator = 4) as the beat unit and doesn't account for the actual time signature denominator when calculating ticks per measure.
+
+**Expected Behavior:**
+Loop region boundaries should snap to measure lines that respect the current time signature, correctly calculating measure duration based on both the numerator and denominator:
+- Measure duration = (numerator / denominator) * 4 * quarter note ticks
+- Example for 3/8: (3/8) * 4 * 960 = 1440 ticks per measure
+- Example for 6/8: (6/8) * 4 * 960 = 2880 ticks per measure
+
+**Files to Investigate:**
+- `src/AppModel/Transport/Transport.h` - `GetTicksPerMeasure()` method
+- Loop region drag handlers in MidiCanvas
+- Any code that calculates measure boundaries for UI snapping
+
+**Notes:**
+This affects the user experience when working with compound meters or time signatures commonly used in classical, jazz, or progressive music. The fix should ensure measure calculations use the time signature denominator in addition to the numerator.
+
+---
+
 ### #37 - Linux GTK3 widget sizing issues causing missing button/control text
 **Status:** Open
 **Priority:** Medium

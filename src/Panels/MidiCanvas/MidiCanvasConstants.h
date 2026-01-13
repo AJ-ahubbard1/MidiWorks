@@ -86,7 +86,8 @@ namespace MidiCanvasConstants
 	// ========== Note Duration Options ==========
 	const int MAX_CUSTOM_TICKS = 10000;               // Maximum value for custom tick duration
 
-	struct NoteDuration {
+	struct NoteDuration 
+	{
 		const char* label;
 		uint64_t ticks;
 	};
