@@ -130,26 +130,8 @@ void AppModel::DeleteNote(const NoteLocation& note)
 void AppModel::DeleteNotes(const std::vector<NoteLocation>& notes)
 {
 	if (notes.empty()) return;
-
-	// Build deletion list
-	std::vector<DeleteMultipleNotesCommand::NoteToDelete> notesToDelete;
-	notesToDelete.reserve(notes.size());
-	for (const auto& note : notes)
-	{
-		Track& track = mTrackSet.GetTrack(note.trackIndex);
-
-		DeleteMultipleNotesCommand::NoteToDelete noteData;
-		noteData.trackIndex = note.trackIndex;
-		noteData.noteOnIndex = note.noteOnIndex;
-		noteData.noteOffIndex = note.noteOffIndex;
-		noteData.noteOn = track[note.noteOnIndex];
-		noteData.noteOff = track[note.noteOffIndex];
-
-		notesToDelete.push_back(noteData);
-	}
-
 	// Create single batch command
-	auto cmd = std::make_unique<DeleteMultipleNotesCommand>(mTrackSet, notesToDelete);
+	auto cmd = std::make_unique<DeleteMultipleNotesCommand>(mTrackSet, notes);
 	mUndoRedoManager.ExecuteCommand(std::move(cmd));
 }
 
@@ -180,26 +162,8 @@ void AppModel::MoveMultipleNotes(const std::vector<NoteLocation>& notes, int64_t
 	// Don't create command if no movement
 	if (tickDelta == 0 && pitchDelta == 0) return;
 
-	// Build move list
-	std::vector<MoveMultipleNotesCommand::NoteToMove> notesToMove;
-	notesToMove.reserve(notes.size());
-	for (const auto& note : notes)
-	{
-		Track& track = mTrackSet.GetTrack(note.trackIndex);
-
-		MoveMultipleNotesCommand::NoteToMove noteData;
-		noteData.trackIndex = note.trackIndex;
-		noteData.noteOnIndex = note.noteOnIndex;
-		noteData.noteOffIndex = note.noteOffIndex;
-		noteData.originalStartTick = note.startTick;
-		noteData.originalPitch = note.pitch;
-		noteData.duration = note.endTick - note.startTick;
-
-		notesToMove.push_back(noteData);
-	}
-
 	// Create single batch command
-	auto cmd = std::make_unique<MoveMultipleNotesCommand>(mTrackSet, notesToMove, tickDelta, pitchDelta);
+	auto cmd = std::make_unique<MoveMultipleNotesCommand>(mTrackSet, notes, tickDelta, pitchDelta);
 	mUndoRedoManager.ExecuteCommand(std::move(cmd));
 }
 
@@ -246,20 +210,7 @@ void AppModel::Quantize(uint64_t gridSize)
 	// Priority 1: If notes are selected, quantize only those notes
 	if (!mSelection.IsEmpty())
 	{
-		std::vector<QuantizeMultipleNotesCommand::NoteToQuantize> notesToQuantize;
-		for (const auto& note : mSelection.GetNotes())
-		{
-			QuantizeMultipleNotesCommand::NoteToQuantize data;
-			data.trackIndex = note.trackIndex;
-			data.noteOnIndex = note.noteOnIndex;
-			data.noteOffIndex = note.noteOffIndex;
-			data.originalStartTick = note.startTick;
-			data.originalEndTick = note.endTick;
-			data.pitch = note.pitch;
-			notesToQuantize.push_back(data);
-		}
-
-		auto cmd = std::make_unique<QuantizeMultipleNotesCommand>(mTrackSet, notesToQuantize, gridSize);
+		auto cmd = std::make_unique<QuantizeMultipleNotesCommand>(mTrackSet, mSelection.GetNotes(), gridSize);
 		mUndoRedoManager.ExecuteCommand(std::move(cmd));
 		return;
 	}

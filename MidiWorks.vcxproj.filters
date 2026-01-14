@@ -269,5 +269,8 @@
     <ClInclude Include="src\Commands\TrackCommands.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="src\NoteTypes.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
 </Project>

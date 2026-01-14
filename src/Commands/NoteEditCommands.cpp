@@ -37,16 +37,12 @@ void AddNoteCommand::Execute()
 		// Sort track to maintain chronological order
 		TrackSet::SortTrack(track);
 
-		// Find and store indices for undo using TrackSet::FindNoteInTrack
+		// Find and store note location for undo
 		uint64_t noteOffTick = mStartTick + mDuration - MidiConstants::NOTE_SEPARATION_TICKS;
 		NoteLocation found = mTrackSet.FindNoteInTrack(targetTrack, mStartTick, noteOffTick, mPitch);
 		if (found.found)
 		{
-			NoteIndices indices;
-			indices.trackIndex = targetTrack;
-			indices.noteOnIndex = found.noteOnIndex;
-			indices.noteOffIndex = found.noteOffIndex;
-			mAddedNotes.push_back(indices);
+			mAddedNotes.push_back(found);
 		}
 	}
 }

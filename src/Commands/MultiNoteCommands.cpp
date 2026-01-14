@@ -53,10 +53,11 @@ void DeleteMultipleNotesCommand::Undo()
 	for (const auto& note : mNotesToDelete)
 	{
 		Track& track = mTrackSet.GetTrack(note.trackIndex);
-
+		MidiMessage noteOn = MidiMessage::NoteOn(note.pitch, note.velocity, note.trackIndex);
+		MidiMessage noteOff = MidiMessage::NoteOff(note.pitch, note.trackIndex);
 		// Add both events back
-		track.push_back(note.noteOn);
-		track.push_back(note.noteOff);
+		track.emplace_back(noteOn, note.startTick);
+		track.emplace_back(noteOff, note.endTick);
 
 		// Re-sort track to maintain chronological order
 		TrackSet::SortTrack(track);
@@ -81,10 +82,10 @@ void MoveMultipleNotesCommand::Execute()
 		Track& track = mTrackSet.GetTrack(noteInfo.trackIndex);
 
 		// Calculate new position with delta (clamp to valid ranges)
-		int64_t newTickSigned = static_cast<int64_t>(noteInfo.originalStartTick) + mTickDelta;
+		int64_t newTickSigned = static_cast<int64_t>(noteInfo.startTick) + mTickDelta;
 		uint64_t newTick = (newTickSigned < 0) ? 0 : static_cast<uint64_t>(newTickSigned);
 
-		int newPitchSigned = static_cast<int>(noteInfo.originalPitch) + mPitchDelta;
+		int newPitchSigned = static_cast<int>(noteInfo.pitch) + mPitchDelta;
 		ubyte newPitch = std::clamp(newPitchSigned, 0, MidiConstants::MAX_MIDI_NOTE);
 
 		// Update note-on event
@@ -97,7 +98,7 @@ void MoveMultipleNotesCommand::Execute()
 		// Update note-off event (maintain duration)
 		if (noteInfo.noteOffIndex < track.size())
 		{
-			track[noteInfo.noteOffIndex].tick = newTick + noteInfo.duration;
+			track[noteInfo.noteOffIndex].tick = newTick + noteInfo.GetDuration();
 			track[noteInfo.noteOffIndex].mm.mData[1] = newPitch;  // Set pitch
 		}
 	}
@@ -124,10 +125,10 @@ void MoveMultipleNotesCommand::Undo()
 		Track& track = mTrackSet.GetTrack(noteInfo.trackIndex);
 
 		// Calculate where the notes ended up after the move
-		int64_t newTickSigned = static_cast<int64_t>(noteInfo.originalStartTick) + mTickDelta;
+		int64_t newTickSigned = static_cast<int64_t>(noteInfo.startTick) + mTickDelta;
 		uint64_t newTick = (newTickSigned < 0) ? 0 : static_cast<uint64_t>(newTickSigned);
 
-		int newPitchSigned = static_cast<int>(noteInfo.originalPitch) + mPitchDelta;
+		int newPitchSigned = static_cast<int>(noteInfo.pitch) + mPitchDelta;
 		ubyte newPitch = std::clamp(newPitchSigned, 0, MidiConstants::MAX_MIDI_NOTE);
 
 		// Search for note-on with new position and restore original values
@@ -137,22 +138,22 @@ void MoveMultipleNotesCommand::Undo()
 				track[i].mm.isNoteOn() &&
 				track[i].mm.getPitch() == newPitch)
 			{
-				track[i].tick = noteInfo.originalStartTick;
-				track[i].mm.mData[1] = noteInfo.originalPitch;
+				track[i].tick = noteInfo.startTick;
+				track[i].mm.mData[1] = noteInfo.pitch;
 				break;
 			}
 		}
 
 		// Search for note-off with new position and restore original values
-		uint64_t newEndTick = newTick + noteInfo.duration;
+		uint64_t newEndTick = newTick + noteInfo.GetDuration();
 		for (size_t i = 0; i < track.size(); i++)
 		{
 			if (track[i].tick == newEndTick &&
 				!track[i].mm.isNoteOn() &&
 				track[i].mm.getPitch() == newPitch)
 			{
-				track[i].tick = noteInfo.originalStartTick + noteInfo.duration;
-				track[i].mm.mData[1] = noteInfo.originalPitch;
+				track[i].tick = noteInfo.startTick + noteInfo.GetDuration();
+				track[i].mm.mData[1] = noteInfo.pitch;
 				break;
 			}
 		}
@@ -190,8 +191,8 @@ void QuantizeMultipleNotesCommand::Execute()
 		Track& track = mTrackSet.GetTrack(noteInfo.trackIndex);
 
 		// Calculate duration and quantized start
-		uint64_t duration = noteInfo.originalEndTick - noteInfo.originalStartTick;
-		uint64_t quantizedStart = MidiConstants::RoundToGrid(noteInfo.originalStartTick, mGridSize);
+		uint64_t duration = noteInfo.GetDuration();
+		uint64_t quantizedStart = MidiConstants::RoundToGrid(noteInfo.startTick, mGridSize);
 
 		// Apply duration-aware quantization
 		if (duration < mGridSize)
@@ -204,7 +205,7 @@ void QuantizeMultipleNotesCommand::Execute()
 		{
 			// Long note: quantize both start and end independently
 			track[noteInfo.noteOnIndex].tick = quantizedStart;
-			track[noteInfo.noteOffIndex].tick = MidiConstants::RoundToGrid(noteInfo.originalEndTick, mGridSize) - MidiConstants::NOTE_SEPARATION_TICKS;
+			track[noteInfo.noteOffIndex].tick = MidiConstants::RoundToGrid(noteInfo.endTick, mGridSize) - MidiConstants::NOTE_SEPARATION_TICKS;
 		}
 	}
 
@@ -233,13 +234,13 @@ void QuantizeMultipleNotesCommand::Undo()
 		// Restore note-on tick
 		if (noteInfo.noteOnIndex < track.size())
 		{
-			track[noteInfo.noteOnIndex].tick = noteInfo.originalStartTick;
+			track[noteInfo.noteOnIndex].tick = noteInfo.startTick;
 		}
 
 		// Restore note-off tick
 		if (noteInfo.noteOffIndex < track.size())
 		{
-			track[noteInfo.noteOffIndex].tick = noteInfo.originalEndTick;
+			track[noteInfo.noteOffIndex].tick = noteInfo.endTick;
 		}
 	}
 

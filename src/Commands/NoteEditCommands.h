@@ -38,20 +38,13 @@ public:
 	std::string GetDescription() const override;
 
 private:
-	struct NoteIndices 
-	{
-		int trackIndex = 0;
-		size_t noteOnIndex = 0;
-		size_t noteOffIndex = 0;
-	};
-
 	TrackSet& mTrackSet;
 	std::vector<int> mTargetTracks;
 	ubyte mPitch;
 	ubyte mVelocity;
 	uint64_t mStartTick;
 	uint64_t mDuration;
-	std::vector<NoteIndices> mAddedNotes;  // Indices of notes added to each track
+	std::vector<NoteLocation> mAddedNotes;  // Notes added to each track
 };
 
 //==============================================================================

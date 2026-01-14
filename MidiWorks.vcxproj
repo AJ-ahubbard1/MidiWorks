@@ -206,6 +206,7 @@
     <ClInclude Include="src\AppModel\Transport\Transport.h" />
     <ClInclude Include="src\MainFrame\MainFrame.h" />
     <ClInclude Include="src\MidiConstants.h" />
+    <ClInclude Include="src\NoteTypes.h" />
     <ClInclude Include="src\Panels\ChannelControls.h" />
     <ClInclude Include="src\Panels\DrumMachine\DrumMachinePanel.h" />
     <ClInclude Include="src\Panels\Log.h" />

@@ -1,6 +1,7 @@
 #pragma once
 #include <cstdint>
 #include <string>
+
 namespace MidiConstants
 {
 	// Timing - True constants
@@ -48,16 +49,17 @@ namespace MidiConstants
 		uint64_t ticks;
 	};
 
-	const NoteDuration NOTE_DURATIONS[] = {
-		{ "Whole Note", 3840 },
-		{ "Half Note", 1920 },
-		{ "Quarter Note", 960 },
-		{ "Quarter Triplet", 640 },
-		{ "Eighth Note", 480 },
-		{ "Eighth Triplet", 320 },
-		{ "Sixteenth Note", 240 },
+	const NoteDuration NOTE_DURATIONS[] = 
+	{
+		{ "Whole Note",       3840 },
+		{ "Half Note",        1920 },
+		{ "Quarter Note",      960 },
+		{ "Quarter Triplet",   640 },
+		{ "Eighth Note",       480 },
+		{ "Eighth Triplet",    320 },
+		{ "Sixteenth Note",	   240 },
 		{ "Sixteenth Triplet", 160 },
-		{ "Custom", 0 }  // 0 = custom, tick value from spin control
+		{ "Custom",              0 }  // 0 = custom, tick value from spin control
 	};
 
 	const int NOTE_DURATIONS_COUNT = sizeof(NOTE_DURATIONS) / sizeof(NOTE_DURATIONS[0]);
@@ -67,6 +69,7 @@ namespace MidiConstants
 
 	/// <summary>
 	/// Round a tick value to the nearest grid point.
+	/// Algorithm used for quantization.
 	/// </summary>
 	/// <param name="tick">The tick value to round</param>
 	/// <param name="gridSize">The grid size in ticks</param>
