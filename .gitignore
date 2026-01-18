@@ -4,3 +4,6 @@ import-midi.log
 filelist.txt
 *claude*
 *CLAUDE*
+docs/Tests/
+docs/archive/
+docs/ErrorHandlingImplementation.md

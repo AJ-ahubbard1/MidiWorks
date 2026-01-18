@@ -22,11 +22,9 @@ set(SOURCES
 	src/AppModel/PreviewManager/PreviewManager.cpp
 	src/AppModel/ProjectManager/ProjectManager.cpp
 	src/AppModel/RecordingSession/RecordingSession.cpp
-	src/AppModel/Selection/Selection.cpp
 	src/AppModel/SoundBank/SoundBank.cpp
 	src/AppModel/TrackSet/TrackSet.cpp
 	src/AppModel/Transport/Transport.cpp
-	src/AppModel/UndoRedoManager/UndoRedoManager.cpp
 	src/Commands/MultiNoteCommands.cpp
 	src/Commands/NoteEditCommands.cpp
 	src/External/midifile/Binasc.cpp

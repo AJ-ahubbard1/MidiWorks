@@ -48,16 +48,10 @@
     <ClCompile Include="src\AppModel\RecordingSession\RecordingSession.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="src\AppModel\Selection\Selection.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
     <ClCompile Include="src\AppModel\PreviewManager\PreviewManager.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="src\AppModel\ProjectManager\ProjectManager.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="src\AppModel\UndoRedoManager\UndoRedoManager.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="src\AppModel\Transport\Transport.cpp">

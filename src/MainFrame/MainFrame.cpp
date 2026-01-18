@@ -18,7 +18,8 @@ MainFrame::MainFrame()
 
 	Bind(wxEVT_AUI_PANE_CLOSE, &MainFrame::OnPaneClosed, this);
 	Bind(wxEVT_CLOSE_WINDOW, &MainFrame::OnClose, this);
-	mTimer.Bind(wxEVT_TIMER, &MainFrame::OnTimer, this);
+	mModelTimer.Bind(wxEVT_TIMER, &MainFrame::OnModelTimer, this);
+	mDisplayTimer.Bind(wxEVT_TIMER, &MainFrame::OnDisplayTimer, this);
 
 	// Set up Keyboard Shortcuts, now delegated to KeyboardHandler
 	mKeyboardHandler = std::make_unique<KeyboardHandler>(this, mAppModel);
@@ -28,7 +29,8 @@ MainFrame::MainFrame()
 	FixLinuxControlSizes(this);
 
 	mAuiManager.Update();
-	mTimer.Start(1);
+	mModelTimer.Start(1);
+	mDisplayTimer.Start(16);
 	Bind(wxEVT_AUI_RENDER, &MainFrame::OnAuiRender, this);
 
 	CreateStatusBar();

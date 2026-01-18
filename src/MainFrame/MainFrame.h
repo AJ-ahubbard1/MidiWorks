@@ -28,9 +28,10 @@ private:
     // MEMBER VARIABLES
     std::shared_ptr<AppModel> mAppModel;  // Contains all app data & business logic 
     wxAuiManager mAuiManager;			  // Advanced UI, enables dockable panes
-    wxTimer mTimer;						  // Triggers Update method every 1ms 
+    wxTimer mModelTimer;	                // 1 ms timer for model updates 
+    wxTimer mDisplayTimer;					// Slower timer for UI refresh 
     std::unique_ptr<KeyboardHandler> mKeyboardHandler;
-    int mNextPanelId = ID_PANELS_BEGIN;   // Auto-incrementing panel ID counter
+    int mNextPanelId = ID_PANELS_BEGIN;     // Auto-incrementing panel ID counter
     
     // Panel Pointers
 	std::unordered_map<int, PanelInfo> mPanels; // Map used to toggle visibility
@@ -52,7 +53,8 @@ private:
     void SetPanelVisibility(int id, bool vis);
     void CreateMenuBar();
     void CreateSizer();
-    void OnTimer(wxTimerEvent&);
+    void OnModelTimer(wxTimerEvent&);
+    void OnDisplayTimer(wxTimerEvent&);
     void SyncMenuChecks();
     void UpdateTitle();
     uint64_t GetDeltaTimeMs();

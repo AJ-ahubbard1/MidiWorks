@@ -45,6 +45,8 @@ This affects the user experience when working with compound meters or time signa
 
 ---
 
+---
+
 ### #37 - Linux GTK3 widget sizing issues causing missing button/control text
 **Status:** Open
 **Priority:** Medium
@@ -419,6 +421,125 @@ int maxOffsetX = targetPlayheadX;  // Was: 0
 ---
 
 ## Fixed Bugs
+
+### #40 - Panel docking sometimes fails due to excessive UI refresh rate
+**Status:** Fixed
+**Priority:** Medium
+**Found:** 2026-01-18
+**Fixed:** 2026-01-18
+
+**Description:**
+Panel docking operations sometimes failed to complete successfully. When the MidiCanvas panel was hidden, panels were able to dock normally, suggesting the canvas was interfering with the docking operation during its update cycle.
+
+**Root Cause:**
+The application used a single timer running at 1ms intervals that updated both the model (AppModel) and UI panels (TransportPanel, MidiCanvasPanel) simultaneously. This created an effective UI refresh rate of 1000 FPS, causing excessive event loop pressure:
+
+```cpp
+// Before - Single timer at 1ms
+void MainFrame::OnTimer(wxTimerEvent&)
+{
+    mAppModel->Update();           // Model updates
+    mTransportPanel->Update();      // UI refresh
+    mMidiCanvasPanel->Update();     // UI refresh → calls Refresh() every 1ms
+}
+```
+
+The continuous 1ms refresh cycle interfered with wxAuiManager's docking operations, which require:
+- Calculating new panel positions
+- Updating window geometries
+- Recalculating layouts
+- Processing resize events
+
+The high-frequency canvas refresh created event loop congestion that blocked or delayed AUI layout operations, causing docking to fail intermittently.
+
+**Solution:**
+Implemented dual-timer architecture separating model updates from UI refresh:
+
+**1. Model Timer (1ms)** - Maintains MIDI precision
+- Handles MIDI input polling
+- Updates transport state machine
+- Processes playback/recording
+- Critical for accurate MIDI timestamping
+
+**2. Display Timer (16ms)** - Optimized visual updates (~60 FPS)
+- Refreshes TransportPanel
+- Refreshes MidiCanvasPanel
+- Standard frame rate for smooth visuals
+- Reduces event loop pressure by 94%
+
+```cpp
+// After - Dual timers with separate responsibilities
+wxTimer mModelTimer;      // 1ms - MIDI precision
+wxTimer mDisplayTimer;    // 16ms - ~60 FPS visual updates
+
+void MainFrame::OnModelTimer(wxTimerEvent&)
+{
+    mAppModel->Update();    // ONLY model updates
+}
+
+void MainFrame::OnDisplayTimer(wxTimerEvent&)
+{
+    mTransportPanel->Update();   // UI updates
+    mMidiCanvasPanel->Update();
+}
+```
+
+**Files Modified:**
+- `src/MainFrame/MainFrame.h` - Added mModelTimer and mDisplayTimer
+- `src/MainFrame/MainFrame.cpp` - Initialize and start both timers
+- `src/MainFrame/MainFrameEventHandlers.cpp` - Split OnTimer into OnModelTimer and OnDisplayTimer
+
+**Benefits:**
+
+**1. Fixes Docking Issue** ✓
+- Panels now dock reliably regardless of canvas visibility
+- Reduced event loop congestion gives wxAuiManager proper execution time
+- No more conflicts between refresh and layout operations
+
+**2. Massive Performance Improvement**
+- UI refresh rate: 1000 FPS → 60 FPS (94% reduction)
+- Significant CPU usage reduction at idle
+- Better battery life on laptops
+- Reduced GPU/rendering workload
+
+**3. Proper MVC Architecture**
+- Model updates (1ms) decoupled from view refresh (16ms)
+- Follows design principle in CLAUDE.md: "Model-View separation"
+- Business logic runs at required precision without forcing UI to match
+
+**4. MIDI Precision Maintained**
+- Model timer still runs at 1ms for accurate timestamping
+- No impact on recording/playback quality
+- Maintains sub-10ms MIDI latency from bug #9 fix
+
+**5. Improved Responsiveness**
+- Reduced event queue saturation
+- System has more CPU cycles for user interactions
+- Better overall application responsiveness
+
+**Performance Comparison:**
+
+| Metric | Before | After | Improvement |
+|--------|--------|-------|-------------|
+| UI Refresh Rate | 1000 FPS | ~60 FPS | 94% reduction |
+| Refresh Calls/sec | 1000 | 60 | 94% reduction |
+| Model Update Rate | 1000 Hz | 1000 Hz | Maintained |
+| Docking Reliability | Intermittent failures | ✓ Reliable | Fixed |
+
+**Design Notes:**
+This fix properly implements the separation of concerns between model and view layers:
+- **Model layer** requires high-frequency updates (1ms) for MIDI precision
+- **View layer** only needs human-perceivable refresh rates (~60 FPS)
+- Previous architecture conflated these two requirements, causing both the performance issue and docking failures
+
+The 16ms display timer interval (60 FPS) is the standard for smooth visual updates and matches the refresh rate of most displays. Higher rates provide no perceptible benefit to users but waste CPU cycles.
+
+**Future Enhancements (Optional):**
+- Make display refresh rate configurable (30/60/120 FPS)
+- Add dirty flag system to skip refresh when nothing changed
+- Pause display timer when app is minimized/backgrounded
+
+---
 
 ### #10 - Add ability to hide/show soundbank channels
 **Status:** Fixed

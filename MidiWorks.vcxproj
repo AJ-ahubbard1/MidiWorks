@@ -145,8 +145,6 @@
     <ClCompile Include="src\AppModel\PreviewManager\PreviewManager.cpp" />
     <ClCompile Include="src\AppModel\ProjectManager\ProjectManager.cpp" />
     <ClCompile Include="src\AppModel\RecordingSession\RecordingSession.cpp" />
-    <ClCompile Include="src\AppModel\Selection\Selection.cpp" />
-    <ClCompile Include="src\AppModel\UndoRedoManager\UndoRedoManager.cpp" />
     <ClCompile Include="src\AppModel\SoundBank\SoundBank.cpp" />
     <ClCompile Include="src\AppModel\TrackSet\TrackSet.cpp" />
     <ClCompile Include="src\AppModel\Transport\Transport.cpp" />

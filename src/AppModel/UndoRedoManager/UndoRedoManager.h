@@ -28,13 +28,58 @@ public:
 
 	/// Execute a command and add it to the undo stack.
 	/// Clears redo stack, calls command executed callback, enforces stack size limit.
-	void ExecuteCommand(std::unique_ptr<Command> cmd);
+	void ExecuteCommand(std::unique_ptr<Command> cmd)
+	{
+		cmd->Execute();
+		mUndoStack.push_back(std::move(cmd));
+
+		// Clear redo stack - can't redo after new action
+		mRedoStack.clear();
+
+		// Notify that a command was executed (for dirty state tracking)
+		if (mCommandExecutedCallback)
+		{
+			mCommandExecutedCallback();
+		}
+
+		// Limit stack size to prevent unbounded memory growth
+		if (mUndoStack.size() > MAX_UNDO_STACK_SIZE)
+		{
+			mUndoStack.erase(mUndoStack.begin());
+		}
+	}
 
 	/// Undo the last executed command (moves to redo stack)
-	void Undo();
+	void Undo()
+	{
+		if (mUndoStack.empty()) return;
+
+		// Get command from undo stack
+		auto cmd = std::move(mUndoStack.back());
+		mUndoStack.pop_back();
+
+		// Undo the command
+		cmd->Undo();
+
+		// Move to redo stack
+		mRedoStack.push_back(std::move(cmd));
+	}
 
 	/// Redo the last undone command (moves back to undo stack)
-	void Redo();
+	void Redo()
+	{
+		if (mRedoStack.empty()) return;
+
+		// Get command from redo stack
+		auto cmd = std::move(mRedoStack.back());
+		mRedoStack.pop_back();
+
+		// Re-execute the command
+		cmd->Execute();
+
+		// Move back to undo stack
+		mUndoStack.push_back(std::move(cmd));
+	}
 
 	/// Check if undo is available
 	bool CanUndo() const { return !mUndoStack.empty(); }
@@ -49,7 +94,11 @@ public:
 	const std::vector<std::unique_ptr<Command>>& GetRedoStack() const { return mRedoStack; }
 
 	/// Clear both undo and redo stacks (called when loading/creating project)
-	void ClearHistory();
+	void ClearHistory()
+	{
+		mUndoStack.clear();
+		mRedoStack.clear();
+	}
 
 	// Callbacks
 
@@ -65,3 +114,4 @@ private:
 	std::vector<std::unique_ptr<Command>> mRedoStack;
 	CommandExecutedCallback mCommandExecutedCallback;
 };
+

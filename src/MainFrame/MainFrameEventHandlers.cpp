@@ -5,14 +5,20 @@
 
 // TIMER EVENTS
 
-/// Update the App Model, then necessary panels
+/// Update the App Model 
 /// Updates here should be reserved for real-time state changes
 /// Opt for event-driven callbacks for discrete state changes
 /// Every millisecond counts!
-void MainFrame::OnTimer(wxTimerEvent&)
+void MainFrame::OnModelTimer(wxTimerEvent&)
 {
 	mAppModel->Update();
 
+}
+
+/// Update the UI, now separated from model updates
+/// This timer is slower to improve performance
+void MainFrame::OnDisplayTimer(wxTimerEvent&)
+{
 	mTransportPanel->Update(); // Update the tick display 
 	mMidiCanvasPanel->Update();
 	// Note: Logging and drum machine updates now handled via callbacks
@@ -324,7 +330,8 @@ void MainFrame::OnClose(wxCloseEvent& event)
 	}
 
 	// Stop the timer before destroying panels to prevent slow shutdown
-	mTimer.Stop();
+	mModelTimer.Stop();
+	mDisplayTimer.Stop();
 	// Allow the window to close
 	event.Skip(); 		
 }
