@@ -218,7 +218,7 @@ bool ProjectManager::LoadProject(const std::string& filepath)
 	{
 		if (mErrorCallback)
 		{
-			mErrorCallback("Load Failed", "Project file is corrupted or not valid JSON.");
+			mErrorCallback("Load Failed", std::string("Project file is corrupted or not valid JSON: ") + e.what());
 		}
 		return false;
 	}
@@ -226,7 +226,7 @@ bool ProjectManager::LoadProject(const std::string& filepath)
 	{
 		if (mErrorCallback)
 		{
-			mErrorCallback("Load Failed", "Project file has invalid data format.");
+			mErrorCallback("Load Failed", std::string("Project file has invalid data format: ") + e.what());
 		}
 		return false;
 	}
@@ -234,7 +234,7 @@ bool ProjectManager::LoadProject(const std::string& filepath)
 	{
 		if (mErrorCallback)
 		{
-			mErrorCallback("Load Failed", "Project file is missing required data.");
+			mErrorCallback("Load Failed", std::string("Project file is missing required data: ") + e.what());
 		}
 		return false;
 	}

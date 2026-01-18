@@ -2,7 +2,7 @@
 
 A wxWidgets-based Digital Audio Workstation (DAW) for MIDI composition and editing.
 
-**Version 1.0** - MVP Complete! 🎉
+**Current Version:** 1.1 (In Progress) | [Roadmap to v2.0](GettingToVersion2.md)
 
 ## Overview
 
@@ -21,6 +21,11 @@ MidiWorks is a focused MIDI composition tool that makes creating music fast and 
 - **Channel Mixer** - Per-channel volume, mute, solo, record, and patch selection
 - **Project Files** - Save/load projects in JSON format (.mwp)
 - **Keyboard Shortcuts** - Comprehensive shortcuts for fast workflow
+- **MIDI Import/Export** - Share compositions with other DAWs via standard .mid files
+- **Track Organization** - Custom track naming, colors, and minimize/collapse
+- **Time Signature Control** - Compose in 3/4, 6/8, 7/8, and other meters
+- **Velocity Editing** - Edit note dynamics with visual velocity controls
+- **Solo Visual Filtering** - Isolate tracks visually for precise editing
 
 ## System Requirements
 
@@ -238,21 +243,38 @@ This project is currently private. License TBD.
 
 ## Version History
 
-### Version 1.0 (December 2025)
-- ✅ Complete piano roll editing system
-- ✅ Multi-selection and clipboard operations
-- ✅ Quantize with triplet support
-- ✅ Full undo/redo system
-- ✅ Loop recording with overdub merging
-- ✅ Project save/load
-- ✅ Metronome with downbeat
-- ✅ Comprehensive keyboard shortcuts
-- ✅ 15-track recording and playback
-- ✅ Professional channel mixer
-- ✅ Tempo control (40-300 BPM)
+### Version 1.1 (In Progress - January 2026)
+**Production Ready** - Track organization, MIDI file exchange, and editing enhancements.
 
-**MVP Complete!** All core composition features implemented.
+New features:
+- MIDI file export (share with other DAWs)
+- MIDI file import (bring in external compositions)
+- Track naming (custom names for each channel)
+- Track colors (visual organization with color picker)
+- Track minimize (collapse tracks to focus on active ones)
+- Clear track (delete all notes with undo support)
+- Global time signature control (3/4, 6/8, 7/8, etc.)
+- Velocity editing (single-note dynamics control)
+- Solo visual filtering (isolate tracks for precise editing)
+
+Remaining:
+- Error handling and stability improvements
+
+### Version 1.0 (December 2025)
+**MVP Complete** - All core composition features implemented.
+
+- Complete piano roll editing system
+- Multi-selection and clipboard operations
+- Quantize with triplet support
+- Full undo/redo system
+- Loop recording with overdub merging
+- Project save/load
+- Metronome with downbeat
+- Comprehensive keyboard shortcuts
+- 15-track recording and playback
+- Professional channel mixer
+- Tempo control (40-300 BPM)
 
 ---
 
-**Made with ❤️ for musicians who want to compose MIDI quickly and intuitively.**
+**Made for musicians who want to compose MIDI quickly and intuitively.**

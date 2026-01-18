@@ -59,8 +59,15 @@ private:
 		AddShortcut("Q", "Quantize notes to grid");
 		AddShortcut("Ctrl+C", "Copy selected notes");
 		AddShortcut("Ctrl+V", "Paste notes at playhead");
-		AddShortcut("Ctrl+Shift+V", "Paste notes to record-enabled tracks");
+		AddShortcut("Ctrl+Shift+V", "Paste to record-enabled tracks");
 		AddShortcut("Ctrl+X", "Cut selected notes");
+
+		mMainSizer->AddSpacer(10);
+
+		// Drum Pad Section
+		AddSection("Drum Pad (Channel 10)");
+		AddShortcut("1-0 Keys", "Trigger drum sounds (rows 0-9)");
+		AddInfo("Keys 1-9 and 0 trigger drum notes on channel 10");
 
 		mMainSizer->AddSpacer(10);
 
@@ -79,10 +86,10 @@ private:
 		AddShortcut("Left Click", "Add note (on empty space)");
 		AddShortcut("Left Drag", "Move note (click and drag note)");
 		AddShortcut("Left Drag", "Resize note (drag note edge)");
-		AddShortcut("Middle Click", "Delete note");
+		AddShortcut("Middle Click", "Delete note / Move playhead (empty space)");
 		AddShortcut("Right Drag", "Pan view");
-		AddShortcut("Mouse Wheel", "Zoom vertically (pitch)");
-		AddShortcut("Shift+Wheel", "Zoom horizontally (time)");
+		AddShortcut("Mouse Wheel", "Zoom horizontally (time)");
+		AddShortcut("Shift+Wheel", "Zoom vertically (pitch)");
 
 		mMainSizer->AddSpacer(10);
 
@@ -127,6 +134,9 @@ private:
 		AddTip("Quantize (Q) snaps all notes to the selected grid size.");
 		AddTip("Use Shift+Drag to select multiple notes, then copy/paste them!");
 		AddTip("Solo mode: When any channel is solo'd, only solo channels play.");
+		AddTip("Solo also filters piano roll - only soloed track notes are visible/editable.");
+		AddTip("Select notes to see velocity controls at the bottom of the piano roll.");
+		AddTip("Export to .mid files (File menu) to share with other DAWs.");
 		AddTip("Metronome uses channel 16 and plays woodblock sound.");
 		AddTip("Grid lines: Light gray = beats, darker gray = measures.");
 		AddTip("Your work is saved in .mwp files (JSON format).");
@@ -185,7 +195,7 @@ private:
 
 	void AddTip(const wxString& tip)
 	{
-		auto* tipLabel = new wxStaticText(this, wxID_ANY, "• " + tip);
+		auto* tipLabel = new wxStaticText(this, wxID_ANY, "- " + tip);
 		mMainSizer->Add(tipLabel, wxSizerFlags().Border(wxLEFT | wxTOP, 20).Proportion(0));
 		tipLabel->Wrap(300); // Wrap text at 300 pixels
 	}
