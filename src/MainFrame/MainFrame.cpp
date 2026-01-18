@@ -99,6 +99,24 @@ void MainFrame::CreateCallbackFunctions()
 		}
 	});
 
+	// Error handling callback - displays errors to user
+	mAppModel->SetErrorCallback([this](const std::string& title, const std::string& msg, ErrorLevel level) 
+	{
+    	long style = wxOK;
+    	switch (level) 
+		{
+        case ErrorLevel::Info:    
+			style |= wxICON_INFORMATION; 
+			break;
+        case ErrorLevel::Warning: 
+			style |= wxICON_WARNING; 
+			break;
+        case ErrorLevel::Error:   
+			style |= wxICON_ERROR; 
+			break;
+    	}
+    	wxMessageBox(msg, title, style);
+	});
 }
 
 // Add Panels to map, used to toggle visibility

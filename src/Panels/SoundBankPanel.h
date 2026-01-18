@@ -1,9 +1,17 @@
+// SoundBankPanel.h
 #pragma once
 #include <wx/wx.h>
 #include "AppModel/SoundBank/SoundBank.h"
 #include "ChannelControls.h"
 #include <array>
 
+/// Panel displaying all 15 channel control panels (channel 16 reserved for metronome).
+///
+/// Responsibilities:
+/// - Display MIDI output port selection
+/// - Manage 15 ChannelControlsPanel instances
+/// - Provide scrollable container for all channel controls
+/// - Sync UI with loaded project data
 class SoundBankPanel : public wxScrolledWindow
 {
 public: 
@@ -18,10 +26,7 @@ public:
 		BindEventHandlers();
 	}
 
-	/// <summary>
-	/// Updates all channel control panels to reflect current SoundBank data.
-	/// Called after loading a project to sync UI with loaded channel settings.
-	/// </summary>
+	/// Updates all channel control panels to reflect current SoundBank data (called after project load)
 	void UpdateFromModel()
 	{
 		// Update all 15 channel control panels

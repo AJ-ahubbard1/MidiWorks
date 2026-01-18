@@ -1,8 +1,14 @@
+// MidiSettings.h
 #pragma once
 
 #include <wx/wx.h>
 #include "AppModel/AppModel.h"
 
+/// Panel for MIDI input port selection.
+///
+/// Responsibilities:
+/// - Display available MIDI input ports
+/// - Allow user to select active input port
 class MidiSettingsPanel : public wxPanel
 {
 public:

@@ -1,10 +1,6 @@
 // UndoRedoManager.cpp
 #include "UndoRedoManager.h"
 
-UndoRedoManager::UndoRedoManager()
-{
-}
-
 void UndoRedoManager::ExecuteCommand(std::unique_ptr<Command> cmd)
 {
 	cmd->Execute();
@@ -56,33 +52,8 @@ void UndoRedoManager::Redo()
 	mUndoStack.push_back(std::move(cmd));
 }
 
-bool UndoRedoManager::CanUndo() const
-{
-	return !mUndoStack.empty();
-}
-
-bool UndoRedoManager::CanRedo() const
-{
-	return !mRedoStack.empty();
-}
-
-const std::vector<std::unique_ptr<Command>>& UndoRedoManager::GetUndoStack() const
-{
-	return mUndoStack;
-}
-
-const std::vector<std::unique_ptr<Command>>& UndoRedoManager::GetRedoStack() const
-{
-	return mRedoStack;
-}
-
 void UndoRedoManager::ClearHistory()
 {
 	mUndoStack.clear();
 	mRedoStack.clear();
-}
-
-void UndoRedoManager::SetCommandExecutedCallback(CommandExecutedCallback callback)
-{
-	mCommandExecutedCallback = callback;
 }

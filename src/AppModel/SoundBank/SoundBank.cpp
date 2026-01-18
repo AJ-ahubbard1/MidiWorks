@@ -129,6 +129,28 @@ void SoundBank::StopNote(ubyte pitch, ubyte channel)
 	mMidiOut->sendMessage(MidiMessage::NoteOff(pitch, channel));
 }
 
+void SoundBank::SilenceAllChannels()
+{
+	if (!mMidiOut) return;
+
+	for (ubyte c = 0; c < MidiConstants::CHANNEL_COUNT; c++)
+	{
+		mMidiOut->sendMessage(MidiMessage::AllNotesOff(c));
+	}
+}
+
+void SoundBank::PlayMetronomeClick(bool isDownbeat)
+{
+	if (!mMidiOut) return;
+
+	// Different pitches and velocities for downbeat vs other beats
+	ubyte note = isDownbeat ? 76 : 72;      // High E vs High C
+	ubyte velocity = isDownbeat ? MidiConstants::MAX_MIDI_NOTE : 90;
+
+	// Send note on metronome channel (channel 16)
+	mMidiOut->sendMessage(MidiMessage::NoteOn(note, velocity, MidiConstants::METRONOME_CHANNEL));
+}
+
 void SoundBank::PlayPreviewNote(ubyte pitch)
 {
 	// Clear previous preview
@@ -160,27 +182,5 @@ void SoundBank::StopPreviewNote()
 
 	mIsPreviewingNote = false;
 	mPreviewChannels.clear();
-}
-
-void SoundBank::PlayMetronomeClick(bool isDownbeat)
-{
-	if (!mMidiOut) return;
-
-	// Different pitches and velocities for downbeat vs other beats
-	ubyte note = isDownbeat ? 76 : 72;      // High E vs High C
-	ubyte velocity = isDownbeat ? MidiConstants::MAX_MIDI_NOTE : 90;
-
-	// Send note on metronome channel (channel 16)
-	mMidiOut->sendMessage(MidiMessage::NoteOn(note, velocity, MidiConstants::METRONOME_CHANNEL));
-}
-
-void SoundBank::SilenceAllChannels()
-{
-	if (!mMidiOut) return;
-
-	for (ubyte c = 0; c < MidiConstants::CHANNEL_COUNT; c++)
-	{
-		mMidiOut->sendMessage(MidiMessage::AllNotesOff(c));
-	}
 }
 

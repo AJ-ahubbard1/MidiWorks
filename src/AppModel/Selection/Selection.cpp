@@ -9,12 +9,6 @@ void Selection::SelectNote(const NoteLocation& note)
 	mSelectedNotes.push_back(note);
 }
 
-void Selection::SelectNotes(const std::vector<NoteLocation>& notes)
-{
-	// Replace current selection entirely
-	mSelectedNotes = notes;
-}
-
 void Selection::DeselectNote(const NoteLocation& note)
 {
 	// Remove the note from selection if present
@@ -29,11 +23,6 @@ void Selection::DeselectNote(const NoteLocation& note)
 	}
 }
 
-void Selection::Clear()
-{
-	mSelectedNotes.clear();
-}
-
 bool Selection::Contains(const NoteLocation& note) const
 {
 	for (const auto& selected : mSelectedNotes)
@@ -42,16 +31,6 @@ bool Selection::Contains(const NoteLocation& note) const
 			return true;
 	}
 	return false;
-}
-
-bool Selection::IsEmpty() const
-{
-	return mSelectedNotes.empty();
-}
-
-const std::vector<NoteLocation>& Selection::GetNotes() const
-{
-	return mSelectedNotes;
 }
 
 void Selection::UpdateVelocity(ubyte trackIndex, int noteOnIndex, ubyte newVelocity)

@@ -1,11 +1,15 @@
+// ShortcutsPanel.h
 #pragma once
 #include <wx/wx.h>
 #include <wx/scrolwin.h>
 
-/// <summary>
 /// Panel displaying all keyboard shortcuts and mouse interactions.
-/// Helps users discover and learn how to use MidiWorks effectively.
-/// </summary>
+///
+/// Responsibilities:
+/// - Display complete keyboard shortcut reference
+/// - Show mouse interaction guide
+/// - Provide tips for effective usage
+/// - Enable scrolling for long content
 class ShortcutsPanel : public wxScrolledWindow
 {
 public:

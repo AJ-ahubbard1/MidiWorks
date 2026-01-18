@@ -1,8 +1,4 @@
-//==============================================================================
 // MultiNoteCommands.h
-// Commands for batch operations on multiple notes
-//==============================================================================
-
 #pragma once
 #include "Command.h"
 #include "AppModel/TrackSet/TrackSet.h"
@@ -12,22 +8,22 @@
 #include <set>
 using namespace MidiInterface;
 
-//==============================================================================
-// DeleteMultipleNotesCommand
-//==============================================================================
+// Multi-Note Batch Commands
 
-/// <summary>
-/// Command to delete multiple notes across multiple tracks.
-/// Handles batch deletion efficiently while maintaining undo capability.
-/// </summary>
+/// Deletes multiple notes across multiple tracks.
+///
+/// Responsibilities:
+/// - Handle batch deletion efficiently
+/// - Maintain undo capability for all deleted notes
+///
+/// Usage:
+///   auto cmd = std::make_unique<DeleteMultipleNotesCommand>(trackSet, notesToDelete);
+///   appModel.ExecuteCommand(std::move(cmd));
 class DeleteMultipleNotesCommand : public Command
 {
 public:
-	/// <summary>
-	/// Construct a delete multiple notes command.
-	/// </summary>
-	/// <param name="trackSet">Reference to the track set</param>
-	/// <param name="notesToDelete">Vector of notes to delete</param>
+	/// Construct a delete multiple notes command
+	/// @param notesToDelete Vector of notes to delete
 	DeleteMultipleNotesCommand(TrackSet& trackSet, const std::vector<NoteLocation>& notesToDelete)
 		: mTrackSet(trackSet)
 		, mNotesToDelete(notesToDelete)
@@ -43,24 +39,22 @@ private:
 	std::vector<NoteLocation> mNotesToDelete;
 };
 
-//==============================================================================
-// MoveMultipleNotesCommand
-//==============================================================================
-
-/// <summary>
-/// Command to move multiple notes by applying a tick and pitch delta.
-/// Stores original positions to enable undo.
-/// </summary>
+/// Moves multiple notes by applying a tick and pitch delta.
+///
+/// Responsibilities:
+/// - Apply tick and pitch deltas to multiple notes
+/// - Store original positions for undo
+///
+/// Usage:
+///   auto cmd = std::make_unique<MoveMultipleNotesCommand>(trackSet, notesToMove, tickDelta, pitchDelta);
+///   appModel.ExecuteCommand(std::move(cmd));
 class MoveMultipleNotesCommand : public Command
 {
 public:
-	/// <summary>
-	/// Construct a move multiple notes command.
-	/// </summary>
-	/// <param name="trackSet">Reference to the track set</param>
-	/// <param name="notesToMove">Vector of notes to move</param>
-	/// <param name="tickDelta">Tick offset to apply (can be negative)</param>
-	/// <param name="pitchDelta">Pitch offset to apply (can be negative)</param>
+	/// Construct a move multiple notes command
+	/// @param notesToMove Vector of notes to move
+	/// @param tickDelta Tick offset to apply (can be negative)
+	/// @param pitchDelta Pitch offset to apply (can be negative)
 	MoveMultipleNotesCommand(TrackSet& trackSet, const std::vector<NoteLocation>& notesToMove,
 		int64_t tickDelta, int pitchDelta)
 		: mTrackSet(trackSet)
@@ -81,24 +75,22 @@ private:
 	int mPitchDelta;     // Pitch offset to apply to all notes
 };
 
-//==============================================================================
-// QuantizeMultipleNotesCommand
-//==============================================================================
-
-/// <summary>
-/// Command to quantize a specific set of notes (e.g., selected notes only).
-/// Uses the same duration-aware quantization algorithm as QuantizeCommand.
-/// Provides surgical control over which notes to quantize without affecting others.
-/// </summary>
+/// Quantizes a specific set of notes (e.g., selected notes only).
+///
+/// Responsibilities:
+/// - Quantize specific notes to grid
+/// - Use duration-aware quantization algorithm
+/// - Provide surgical control without affecting other notes
+///
+/// Usage:
+///   auto cmd = std::make_unique<QuantizeMultipleNotesCommand>(trackSet, notesToQuantize, gridSize);
+///   appModel.ExecuteCommand(std::move(cmd));
 class QuantizeMultipleNotesCommand : public Command
 {
 public:
-	/// <summary>
-	/// Construct a quantize multiple notes command.
-	/// </summary>
-	/// <param name="trackSet">Reference to the track set</param>
-	/// <param name="notesToQuantize">Vector of notes to quantize</param>
-	/// <param name="gridSize">Grid size in ticks (e.g., 960 for quarter notes)</param>
+	/// Construct a quantize multiple notes command
+	/// @param notesToQuantize Vector of notes to quantize
+	/// @param gridSize Grid size in ticks (e.g., 960 for quarter notes)
 	QuantizeMultipleNotesCommand(TrackSet& trackSet, const std::vector<NoteLocation>& notesToQuantize,
 		uint64_t gridSize)
 		: mTrackSet(trackSet)

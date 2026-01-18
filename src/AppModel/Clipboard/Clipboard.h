@@ -17,7 +17,7 @@ public:
 		int trackIndex;  // Which track it came from
 	};
 
-	// Copy notes to clipboard (converts NoteLocation to ClipboardNote)
+	/// Copy notes to clipboard (converts NoteLocation to ClipboardNote)
 	void CopyNotes(const std::vector<NoteLocation>& notes, TrackSet& trackSet)
 	{
 		if (notes.empty()) return;
@@ -55,9 +55,14 @@ public:
 		mNotes = clipboardNotes;
 	}
 
-	// Access clipboard data
+	/// Access clipboard data
+	/// @return the vector of clipboard notes
 	const std::vector<ClipboardNote>& GetNotes() const { return mNotes; }
+	
+	/// returns true if the clipboard has notes (is not empty) 	
 	bool HasData() const { return !mNotes.empty(); }
+
+	/// clear the clipboard notes vector 
 	void Clear() { mNotes.clear(); }
 
 private:

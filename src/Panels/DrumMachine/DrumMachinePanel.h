@@ -6,15 +6,32 @@
 #include <memory>
 #include "AppModel/AppModel.h"
 
+/// Panel for drum machine sequencer interface.
+///
+/// Responsibilities:
+/// - Display drum pad grid for pattern programming
+/// - Allow user to toggle pads on/off for each column/pitch
+/// - Support variable column count and rows
+/// - Enable recording patterns to MIDI tracks
+/// - Sync UI with loaded patterns
 class DrumMachinePanel : public wxPanel
 {
 public:
 	DrumMachinePanel(wxWindow* parent, std::shared_ptr<AppModel> appModel);
 
-	void RebuildGrid();  // Rebuild drum grid (called when column count or rows change)
-	void UpdateFromModel();  // Sync UI with loaded DrumMachine pattern
-	void RefreshPadButtonColor(size_t rowIndex, size_t columnIndex);  // Update single pad button color (efficient)
-	void RefreshAllPadButtonColors();  // Refresh all pad colors (efficient for loop changes)
+	/// Rebuild drum grid (called when column count or rows change)
+	void RebuildGrid();
+
+	/// Sync UI with loaded DrumMachine pattern
+	void UpdateFromModel();
+
+	/// Update single pad button color (efficient)
+	void RefreshPadButtonColor(size_t rowIndex, size_t columnIndex);
+
+	/// Refresh all pad colors (efficient for loop changes)
+	void RefreshAllPadButtonColors();
+
+	/// Update ticks-per-column display
 	void UpdateTicksPerColumnDisplay();
 
 private:

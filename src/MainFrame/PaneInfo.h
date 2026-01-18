@@ -4,8 +4,10 @@
 #include <wx/window.h>
 #include <wx/aui/floatpane.h>
 
+/// Default docking position for panels
 enum class PanePosition { Left, Right, Bottom, Center, Top, Float };
 
+/// Panel metadata for wxAuiManager registration
 struct PanelInfo
 {
 	wxString		name;
@@ -18,6 +20,7 @@ struct PanelInfo
 	int				menuId = -1;  // Moved to end for optional initialization
 };
 
+/// Convert PanelInfo to wxAuiPaneInfo for AUI manager registration
 inline wxAuiPaneInfo CreatePaneInfo(const PanelInfo& info)
 {
 	wxAuiPaneInfo pane;

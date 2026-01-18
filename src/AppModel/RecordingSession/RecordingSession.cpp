@@ -2,35 +2,12 @@
 #include "RecordingSession.h"
 #include <algorithm>
 
-RecordingSession::RecordingSession()
-{
-}
-
-Track& RecordingSession::GetBuffer()
-{
-	return mBuffer;
-}
-
-const Track& RecordingSession::GetBuffer() const
-{
-	return mBuffer;
-}
 
 void RecordingSession::Clear()
 {
 	mBuffer.clear();
 	mBufferIterator = -1;
 	mActiveNotes.clear();
-}
-
-bool RecordingSession::IsEmpty() const
-{
-	return mBuffer.empty();
-}
-
-void RecordingSession::AddEvent(const TimedMidiEvent& event)
-{
-	mBuffer.push_back(event);
 }
 
 void RecordingSession::RecordEvent(const MidiMessage& msg, uint64_t currentTick)
@@ -49,21 +26,6 @@ void RecordingSession::RecordEvent(const MidiMessage& msg, uint64_t currentTick)
 	{
 		StopNote(msg.getChannel(), msg.getPitch());
 	}
-}
-
-void RecordingSession::StartNote(const TimedMidiEvent & note)
-{
-	mActiveNotes.push_back(note);
-}
-
-void RecordingSession::StopNote(ubyte channel, ubyte pitch)
-{
-	auto it = std::remove_if(mActiveNotes.begin(), mActiveNotes.end(),
-		[channel, pitch](const TimedMidiEvent& note) 
-		{
-			return note.mm.getPitch() == pitch && note.mm.getChannel() == channel;
-		});
-	mActiveNotes.erase(it, mActiveNotes.end());
 }
 
 void RecordingSession::WrapActiveNotesAtLoop(uint64_t endTick, uint64_t loopStartTick)
@@ -96,11 +58,6 @@ void RecordingSession::CloseAllActiveNotes(uint64_t endTick)
 	mActiveNotes.clear();
 }
 
-bool RecordingSession::HasActiveNotes() const
-{
-	return !mActiveNotes.empty();
-}
-
 void RecordingSession::ResetLoopPlayback(uint64_t loopStartTick)
 {
 	// Handle case where user enables loop recording but hasn't played anything yet
@@ -119,17 +76,14 @@ void RecordingSession::ResetLoopPlayback(uint64_t loopStartTick)
 	mBufferIterator = (i < mBuffer.size()) ? i : -1;
 }
 
-// We only listen to recording buffer messages after they've been added to buffer 
-// and we've looped back to them,
-// Midi In Playback handles hearing the notes the first time
 std::vector<MidiMessage> RecordingSession::GetLoopPlaybackMessages(uint64_t currentTick)
 {
 	std::vector<MidiMessage> messages;
 
 	// Process all events at or before currentTick
 	while (mBufferIterator != -1 &&
-	       mBufferIterator < mBuffer.size() &&
-	       mBuffer[mBufferIterator].tick <= currentTick)
+		mBufferIterator < mBuffer.size() &&
+		mBuffer[mBufferIterator].tick <= currentTick)
 	{
 		messages.push_back(mBuffer[mBufferIterator].mm);
 		mBufferIterator++;
@@ -141,4 +95,14 @@ std::vector<MidiMessage> RecordingSession::GetLoopPlaybackMessages(uint64_t curr
 	}
 
 	return messages;
+}
+
+void RecordingSession::StopNote(ubyte channel, ubyte pitch)
+{
+	auto it = std::remove_if(mActiveNotes.begin(), mActiveNotes.end(),
+		[channel, pitch](const TimedMidiEvent& note)
+		{
+			return note.mm.getPitch() == pitch && note.mm.getChannel() == channel;
+		});
+	mActiveNotes.erase(it, mActiveNotes.end());
 }

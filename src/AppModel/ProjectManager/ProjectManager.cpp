@@ -28,7 +28,8 @@ ProjectManager::ProjectManager(
 
 bool ProjectManager::SaveProject(const std::string& filepath)
 {
-	try {
+	try 
+	{
 		json project;
 
 		// Metadata
@@ -49,7 +50,8 @@ bool ProjectManager::SaveProject(const std::string& filepath)
 		// 2. Channels (CHANNEL_COUNT channels, 0-14)
 		project["channels"] = json::array();
 		auto channels = mSoundBank.GetAllChannels();
-		for (const auto& ch : channels) {
+		for (const auto& ch : channels) 
+		{
 			project["channels"].push_back({
 				{"channelNumber", ch.channelNumber},
 				{"programNumber", ch.programNumber},
@@ -69,13 +71,15 @@ bool ProjectManager::SaveProject(const std::string& filepath)
 
 		// 3. Tracks (CHANNEL_COUNT tracks, one per channel)
 		project["tracks"] = json::array();
-		for (int i = 0; i < MidiConstants::CHANNEL_COUNT; i++) {
+		for (int i = 0; i < MidiConstants::CHANNEL_COUNT; i++) 
+		{
 			Track& track = mTrackSet.GetTrack(i);
 			json trackJson;
 			trackJson["channel"] = i;
 			trackJson["events"] = json::array();
 
-			for (const auto& event : track) {
+			for (const auto& event : track) 
+			{
 				trackJson["events"].push_back({
 					{"tick", event.tick},
 					{"midiData", {
@@ -91,7 +95,12 @@ bool ProjectManager::SaveProject(const std::string& filepath)
 
 		// Write to file (pretty-printed with 4-space indent)
 		std::ofstream file(filepath);
-		if (!file.is_open()) {
+		if (!file.is_open())
+		{
+			if (mErrorCallback)
+			{
+				mErrorCallback("Save Failed", "Could not open file for writing: " + filepath);
+			}
 			return false;
 		}
 
@@ -104,18 +113,28 @@ bool ProjectManager::SaveProject(const std::string& filepath)
 
 		return true;
 	}
-	catch (const std::exception& e) {
-		// Log error or show dialog
+	catch (const std::exception& e)
+	{
+		if (mErrorCallback)
+		{
+			mErrorCallback("Save Failed", std::string("Error saving project: ") + e.what());
+		}
 		return false;
 	}
 }
 
 bool ProjectManager::LoadProject(const std::string& filepath)
 {
-	try {
+	try
+	{
 		// Read file
 		std::ifstream file(filepath);
-		if (!file.is_open()) {
+		if (!file.is_open())
+		{
+			if (mErrorCallback)
+			{
+				mErrorCallback("Load Failed", "Could not open file: " + filepath);
+			}
 			return false;
 		}
 
@@ -195,20 +214,36 @@ bool ProjectManager::LoadProject(const std::string& filepath)
 
 		return true;
 	}
-	catch (json::parse_error& e) {
-		// Invalid JSON
+	catch (json::parse_error& e)
+	{
+		if (mErrorCallback)
+		{
+			mErrorCallback("Load Failed", "Project file is corrupted or not valid JSON.");
+		}
 		return false;
 	}
-	catch (json::type_error& e) {
-		// Wrong data type (e.g., expected number, got string)
+	catch (json::type_error& e)
+	{
+		if (mErrorCallback)
+		{
+			mErrorCallback("Load Failed", "Project file has invalid data format.");
+		}
 		return false;
 	}
-	catch (json::out_of_range& e) {
-		// Missing required field
+	catch (json::out_of_range& e)
+	{
+		if (mErrorCallback)
+		{
+			mErrorCallback("Load Failed", "Project file is missing required data.");
+		}
 		return false;
 	}
-	catch (const std::exception& e) {
-		// Other errors
+	catch (const std::exception& e)
+	{
+		if (mErrorCallback)
+		{
+			mErrorCallback("Load Failed", std::string("Error loading project: ") + e.what());
+		}
 		return false;
 	}
 }
@@ -257,11 +292,6 @@ void ProjectManager::ClearProject()
 	MarkClean();
 }
 
-bool ProjectManager::IsProjectDirty() const
-{
-	return mIsDirty;
-}
-
 void ProjectManager::MarkDirty()
 {
 	if (!mIsDirty)  // Only update if state actually changes
@@ -284,21 +314,6 @@ void ProjectManager::MarkClean()
 			mDirtyStateCallback(false);
 		}
 	}
-}
-
-const std::string& ProjectManager::GetCurrentProjectPath() const
-{
-	return mCurrentProjectPath;
-}
-
-void ProjectManager::SetDirtyStateCallback(DirtyStateCallback callback)
-{
-	mDirtyStateCallback = callback;
-}
-
-void ProjectManager::SetClearUndoHistoryCallback(ClearUndoHistoryCallback callback)
-{
-	mClearUndoHistoryCallback = callback;
 }
 
 bool ProjectManager::ExportMIDI(const std::string& filepath)
@@ -343,7 +358,10 @@ bool ProjectManager::ExportMIDI(const std::string& filepath)
 	}
 	catch (const std::exception& e)
 	{
-		// Log error or show dialog
+		if (mErrorCallback)
+		{
+			mErrorCallback("Export Failed", std::string("Error exporting MIDI file: ") + e.what());
+		}
 		return false;
 	}
 }
@@ -355,6 +373,10 @@ bool ProjectManager::ImportMIDI(const std::string& filepath)
 		smf::MidiFile midifile;
 		if (!midifile.read(filepath))
 		{
+			if (mErrorCallback)
+			{
+				mErrorCallback("Import Failed", "Could not read MIDI file: " + filepath);
+			}
 			return false;
 		}
 
@@ -520,7 +542,10 @@ bool ProjectManager::ImportMIDI(const std::string& filepath)
 	}
 	catch (const std::exception& e)
 	{
-		// Log error or show dialog
+		if (mErrorCallback)
+		{
+			mErrorCallback("Import Failed", std::string("Error importing MIDI file: ") + e.what());
+		}
 		return false;
 	}
 }

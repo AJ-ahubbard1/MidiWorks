@@ -1,15 +1,6 @@
+// TrackSet.cpp
 #include "TrackSet.h"
 #include <set>
-
-Track& TrackSet::GetTrack(ubyte channelNumber)
-{
-	return mTracks[channelNumber];
-}
-
-bool TrackSet::IsTrackEmpty(ubyte channelNumber)
-{
-	return GetTrack(channelNumber).empty();
-}
 
 bool TrackSet::IsEmpty() const
 {
@@ -124,10 +115,37 @@ std::vector<NoteLocation> TrackSet::FindNotesInRegion(
 	return result;
 }
 
+std::vector<NoteLocation> TrackSet::GetAllNotes() const
+{
+	std::vector<NoteLocation> result;
+
+	for (int trackIndex = 0; trackIndex < MidiConstants::CHANNEL_COUNT; trackIndex++)
+	{
+		const Track& track = mTracks[trackIndex];
+		std::vector<NoteLocation> trackNotes = GetNotesFromTrack(track, trackIndex);
+		result.insert(result.end(), trackNotes.begin(), trackNotes.end());
+	}
+
+	return result;
+}
+
+std::vector<TimedMidiEvent> TrackSet::GetAllTimedMidiEvents()
+{
+	std::vector<TimedMidiEvent> result;
+
+	for (int trackIndex = 0; trackIndex < MidiConstants::CHANNEL_COUNT; trackIndex++)
+	{
+		const Track& track = mTracks[trackIndex];
+		result.insert(result.end(), track.begin(), track.end());
+	}
+
+	return result;
+}
+
 std::vector<NoteLocation> TrackSet::GetNotesFromTrack(const Track& track, int trackIndex)
 {
 	std::vector<NoteLocation> result;
-	
+
 	if (track.empty()) return result;
 
 	size_t end = track.size();
@@ -156,33 +174,6 @@ std::vector<NoteLocation> TrackSet::GetNotesFromTrack(const Track& track, int tr
 			result.push_back(note);
 			break;
 		}
-	}
-
-	return result;
-}
-
-std::vector<NoteLocation> TrackSet::GetAllNotes() const
-{
-	std::vector<NoteLocation> result;
-
-	for (int trackIndex = 0; trackIndex < MidiConstants::CHANNEL_COUNT; trackIndex++)
-	{
-		const Track& track = mTracks[trackIndex];
-		std::vector<NoteLocation> trackNotes = GetNotesFromTrack(track, trackIndex);
-		result.insert(result.end(), trackNotes.begin(), trackNotes.end());
-	}
-
-	return result;
-}
-
-std::vector<TimedMidiEvent> TrackSet::GetAllTimedMidiEvents()
-{
-	std::vector<TimedMidiEvent> result;
-
-	for (int trackIndex = 0; trackIndex < MidiConstants::CHANNEL_COUNT; trackIndex++)
-	{
-		const Track& track = mTracks[trackIndex];
-		result.insert(result.end(), track.begin(), track.end());
 	}
 
 	return result;
@@ -228,7 +219,7 @@ void TrackSet::SeparateOverlappingNotes(Track& buffer)
 				for (size_t k = j + 1; k < buffer.size(); k++)
 				{
 					auto& eventK = buffer[k].mm;
-					if (eventK.isNoteOff() && eventK.getPitch() == eventI.getPitch() && 
+					if (eventK.isNoteOff() && eventK.getPitch() == eventI.getPitch() &&
 						movedIndices.find(k) == movedIndices.end())
 					{
 						// Move this NoteOff to prevent overlap with the second NoteOn
@@ -290,7 +281,6 @@ void TrackSet::FinalizeRecording(Track& recordingBuffer)
 	recordingBuffer.clear();
 }
 
-// Private Methods
 void TrackSet::Sort()
 {
 	for (auto& track : mTracks)

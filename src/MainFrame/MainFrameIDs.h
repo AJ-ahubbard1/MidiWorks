@@ -1,7 +1,8 @@
+// MainFrameIDs.h
 #pragma once
 #include <wx/wx.h>
 
-// Custom wxWidgets IDs for MainFrame
+/// Custom wxWidgets IDs for MainFrame menu items and keyboard shortcuts
 enum MainFrameIDs
 {
 	// Keyboard shortcuts

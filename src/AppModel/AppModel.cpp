@@ -8,7 +8,8 @@
 #include "Commands/ClipboardCommands.h"
 
 AppModel::AppModel()
-	: mPreviewManager(mTrackSet, mSoundBank)
+	: mLastTick(std::chrono::steady_clock::now())
+	, mPreviewManager(mTrackSet, mSoundBank)
 	, mProjectManager(mTransport, mSoundBank, mTrackSet, mRecordingSession)
 	, mMetronomeService(mSoundBank)
 {
@@ -19,6 +20,12 @@ AppModel::AppModel()
 	mProjectManager.SetClearUndoHistoryCallback([this]() {
 		mUndoRedoManager.ClearHistory();
 	});
+	
+	// Wire ProjectManager errors to central error callback
+	mProjectManager.SetErrorCallback([this](const std::string& title, const std::string& msg) {
+		ReportError(title, msg, ErrorLevel::Error);
+	});
+
 
 	// The UndoRedoManager uses callback to mark projects dirty when 
 	// any commands are executed to show the project has unsaved changes
@@ -390,12 +397,17 @@ bool AppModel::IsRegionCollisionFree(uint64_t startTick, uint64_t endTick, ubyte
 	return true;
 }
 
+// Error Handling
+void AppModel::ReportError(const std::string& title, const std::string& msg, ErrorLevel level)
+{
+	if (mErrorCallback) 
+	{
+		mErrorCallback(title, msg, level);
+	}
+}
+
 // Private Methods
 
-/* Handles incoming MIDI messages from input device
-   Polls for incoming messages, routes them to appropriate channels,
-   plays them back, and records them if recording is active.
- */
 void AppModel::HandleIncomingMidi()
 {
 	auto message = mMidiInputManager.PollAndNotify(mTransport.GetCurrentTick());
@@ -407,11 +419,10 @@ void AppModel::HandleIncomingMidi()
 // Returns the change in time from lastTick's last value to now, then updates lastTick 
 uint64_t AppModel::GetDeltaTimeMs()
 {
-	static std::chrono::steady_clock::time_point lastTick = std::chrono::steady_clock::now();
 
 	auto now = std::chrono::steady_clock::now();
-	auto delta = std::chrono::duration_cast<std::chrono::milliseconds>(now - lastTick).count();
-	lastTick = now;
+	auto delta = std::chrono::duration_cast<std::chrono::milliseconds>(now - mLastTick).count();
+	mLastTick = now;
 	return static_cast<uint64_t>(delta);
 }
 

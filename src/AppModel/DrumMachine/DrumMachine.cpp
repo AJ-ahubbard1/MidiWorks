@@ -1,10 +1,6 @@
+// DrumMachine.cpp
 #include "DrumMachine.h"
 #include <cmath>
-
-DrumMachine::DrumMachine()
-{
-	InitializeDefaultRows();
-}
 
 void DrumMachine::SetColumnCount(int columns)
 {
@@ -127,6 +123,11 @@ int DrumMachine::GetColumnAtTick(uint64_t tick, uint64_t loopStartTick) const
 	return column;
 }
 
+uint64_t DrumMachine::CalculatePadDuration(uint64_t loopDuration) const
+{
+	return loopDuration / mColumnCount;
+}
+
 void DrumMachine::InitializeDefaultRows()
 {
     // General MIDI drum map (Channel 10 standard)
@@ -165,11 +166,5 @@ void DrumMachine::RegeneratePattern()
         }
     }
     TrackSet::SortTrack(mPattern);
-}
-
-
-uint64_t DrumMachine::CalculatePadDuration(uint64_t loopDuration) const
-{
-	return loopDuration / mColumnCount;
 }
 

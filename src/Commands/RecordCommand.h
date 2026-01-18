@@ -1,8 +1,4 @@
-//==============================================================================
 // RecordCommand.h
-// Command for MIDI recording with undo/redo support
-//==============================================================================
-
 #pragma once
 #include "Command.h"
 #include "AppModel/TrackSet/TrackSet.h"
@@ -10,33 +6,24 @@
 #include <vector>
 using namespace MidiInterface;
 
-//==============================================================================
-// RecordCommand
-//==============================================================================
-
-/// <summary>
-/// Command to handle recording MIDI data.
-/// Stores all recorded notes and enables undo/redo of entire recording takes.
+/// Handles MIDI recording with undo/redo support.
 ///
-/// When recording stops, all notes in the recording buffer become a single
-/// undoable operation. This allows users to quickly undo bad takes and try again.
+/// Responsibilities:
+/// - Store all recorded notes from recording buffer
+/// - Enable undo/redo of entire recording takes as single operation
+/// - Distribute recorded events to appropriate tracks by channel
 ///
-/// Example workflow:
-/// 1. Record phrase
-/// 2. Stop and listen
-/// 3. If bad: Ctrl+Z removes entire recording
-/// 4. Record again
-/// 5. If still bad: Ctrl+Z again
-/// 6. Keep iterating until satisfied
-/// </summary>
+/// When recording stops, all notes become a single undoable operation.
+/// This allows quick iteration: record, listen, Ctrl+Z if bad, try again.
+///
+/// Usage:
+///   auto cmd = std::make_unique<RecordCommand>(trackSet, recordingBuffer);
+///   appModel.ExecuteCommand(std::move(cmd));
 class RecordCommand : public Command
 {
 public:
-	/// <summary>
-	/// Construct a record command with all recorded notes.
-	/// </summary>
-	/// <param name="trackSet">Reference to the TrackSet containing all tracks</param>
-	/// <param name="recordedNotes">All notes from the recording buffer</param>
+	/// Construct a record command with all recorded notes
+	/// @param recordedNotes All notes from the recording buffer
 	RecordCommand(TrackSet& trackSet, const Track& recordedNotes)
 		: mTrackSet(trackSet)
 		, mRecordedNotes(recordedNotes)

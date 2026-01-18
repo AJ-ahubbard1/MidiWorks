@@ -1,3 +1,4 @@
+// MidiCanvas.h
 #pragma once
 #include <wx/wx.h>
 #include <wx/dcbuffer.h>
@@ -15,6 +16,16 @@
 using namespace MidiInterface;
 using namespace MidiCanvasConstants;
 
+/// Piano roll editor panel for MIDI note editing.
+///
+/// Responsibilities:
+/// - Display piano roll grid with notes from all tracks
+/// - Support note creation, editing, moving, resizing, deletion
+/// - Handle multi-note selection and batch operations
+/// - Provide zoom and pan controls
+/// - Support snap-to-grid functionality
+/// - Display playhead, loop region, and recording buffer
+/// - Enable keyboard shortcuts for editing operations
 class MidiCanvasPanel : public wxPanel
 {
 public:

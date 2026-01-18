@@ -3,7 +3,8 @@
 ## When to Use Callbacks
 
 Use callbacks when:
-- A component needs to **notify** another component about events (e.g., "project became dirty", "command executed")
+- A component needs to **notify** another component about events 
+ 	e.g., "project became dirty", "command executed"
 - You want to **avoid tight coupling** - the component shouldn't know who needs the notification
 - The component is **reusable** and different users might need different behavior
 

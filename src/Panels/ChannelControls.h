@@ -1,3 +1,4 @@
+// ChannelControls.h
 #pragma once
 #include <wx/panel.h>
 #include <wx/statline.h>
@@ -7,7 +8,13 @@
 #include "AppModel/AppModel.h"
 #include "Commands/TrackCommands.h"
 
-// Individual Control Panel shown for each channel of the SoundBank
+/// Individual control panel shown for each channel of the SoundBank.
+///
+/// Responsibilities:
+/// - Display channel settings (program, volume, mute, solo, record)
+/// - Allow user to change channel settings via UI controls
+/// - Support channel customization (name, color)
+/// - Provide minimize/expand functionality
 class ChannelControlsPanel : public wxPanel
 {
 public:
@@ -23,10 +30,7 @@ public:
 		BindEvents();
 	}
 
-	/// <summary>
-	/// Updates all UI controls to reflect current channel data.
-	/// Called after loading a project to sync UI with loaded values.
-	/// </summary>
+	/// Updates all UI controls to reflect current channel data (called after project load)
 	void UpdateFromModel()
 	{
 		mPatchChoice->SetSelection(mChannel.programNumber);

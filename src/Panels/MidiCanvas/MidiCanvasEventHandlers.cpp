@@ -22,8 +22,11 @@ void MidiCanvasPanel::OnMouseWheel(wxMouseEvent& event)
 		else if (lines < 0)
 			mNoteHeight = std::max(mMinNoteHeight, mNoteHeight + lines); // zoom out (shorter notes)
 
+#ifdef _DEBUG
 		wxString msg = wxString::Format("Note Height: %d pixels", mNoteHeight);
 		mDebugMessage->SetLabelText(msg);
+#endif // _DEBUG
+
 	}
 	else
 	{
@@ -33,8 +36,10 @@ void MidiCanvasPanel::OnMouseWheel(wxMouseEvent& event)
 		else if (lines < 0)
 			mTicksPerPixel += -lines;                             // zoom out
 
+#ifdef _DEBUG
 		wxString msg = wxString::Format("Ticks Per Pixel: %d", mTicksPerPixel);
 		mDebugMessage->SetLabelText(msg);
+#endif 
 	}
 
 	ClampOffset(); // Apply boundaries after zoom
@@ -304,9 +309,11 @@ void MidiCanvasPanel::OnMouseMove(wxMouseEvent& event)
 	// Update debug message with mouse position
 	uint64_t tick = ScreenXToTick(pos.x);
 	ubyte pitch = ScreenYToPitch(pos.y);
+#ifdef _DEBUG
 	wxString msg = wxString::Format("Mouse: (%d, %d) | Tick: %llu, Pitch: %d",
-	                                 pos.x, pos.y, tick, pitch);
+									 pos.x, pos.y, tick, pitch);
 	mDebugMessage->SetLabelText(msg);
+#endif
 
 	bool outOfBounds = (pos.x < GetSize().GetWidth() * AUTOSCROLL_TARGET_POSITION);
 
@@ -324,11 +331,20 @@ void MidiCanvasPanel::OnMouseMove(wxMouseEvent& event)
 	if (mIsDragging)
 	{
 		wxPoint delta = pos - mLastMouse;
+		// Because canvas is locked to playhead when moving, prevent left-right jitters
+		if (mTransport.IsMoving()) 
+		{
+			delta.x = 0;
+		}
 		mOriginOffset += delta;
 		ClampOffset(); // Apply boundaries after panning
 		mLastMouse = pos;
+
+#ifdef _DEBUG
 		wxString msg = wxString::Format("Offset (%d, %d)", mOriginOffset.x, mOriginOffset.y);
 		mDebugMessage->SetLabelText(msg);
+#endif
+
 		Refresh();
 		return;
 	}

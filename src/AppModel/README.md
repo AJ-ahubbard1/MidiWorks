@@ -163,7 +163,7 @@ StopPlaying  StopRecording
 ## Update Loop Timeline
 
 ```
-Every 10ms:
+Every 1ms:
   MainFrame::OnTimer()
     │
     └─→ AppModel::Update()

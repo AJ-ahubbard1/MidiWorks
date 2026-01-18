@@ -19,7 +19,6 @@ set(SOURCES
 	src/App.cpp
 	src/AppModel/AppModel.cpp
 	src/AppModel/DrumMachine/DrumMachine.cpp
-	src/AppModel/MidiInputManager/MidiInputManager.cpp
 	src/AppModel/PreviewManager/PreviewManager.cpp
 	src/AppModel/ProjectManager/ProjectManager.cpp
 	src/AppModel/RecordingSession/RecordingSession.cpp

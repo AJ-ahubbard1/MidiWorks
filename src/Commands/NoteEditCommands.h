@@ -1,8 +1,4 @@
-//==============================================================================
 // NoteEditCommands.h
-// Commands for single-note operations (add, delete, move, resize, velocity)
-//==============================================================================
-
 #pragma once
 #include "Command.h"
 #include "AppModel/TrackSet/TrackSet.h"
@@ -10,15 +6,18 @@
 #include <cstdint>
 using namespace MidiInterface;
 
-//==============================================================================
-// AddNoteCommand
-//==============================================================================
+// Single-Note Edit Commands
 
-/// <summary>
-/// Command to add a note to one or more tracks.
-/// Stores note indices per track to enable efficient undo.
-/// When multiple tracks are provided, adds the same note to all tracks (useful for layering).
-/// </summary>
+/// Adds a note to one or more tracks.
+///
+/// Responsibilities:
+/// - Add note-on and note-off events to target tracks
+/// - Store note indices per track for efficient undo
+/// - Support multi-track layering (same note to multiple tracks)
+///
+/// Usage:
+///   auto cmd = std::make_unique<AddNoteCommand>(trackSet, targetTracks, pitch, velocity, startTick, duration);
+///   appModel.ExecuteCommand(std::move(cmd));
 class AddNoteCommand : public Command
 {
 public:
@@ -47,14 +46,15 @@ private:
 	std::vector<NoteLocation> mAddedNotes;  // Notes added to each track
 };
 
-//==============================================================================
-// DeleteNoteCommand
-//==============================================================================
-
-/// <summary>
-/// Command to delete a note from a track.
-/// Stores the deleted note data to enable undo (re-adding the note).
-/// </summary>
+/// Deletes a note from a track.
+///
+/// Responsibilities:
+/// - Remove note-on and note-off events from track
+/// - Store deleted note data for undo
+///
+/// Usage:
+///   auto cmd = std::make_unique<DeleteNoteCommand>(track, noteOnIndex, noteOffIndex);
+///   appModel.ExecuteCommand(std::move(cmd));
 class DeleteNoteCommand : public Command
 {
 public:
@@ -78,14 +78,16 @@ private:
 	TimedMidiEvent mNoteOff;
 };
 
-//==============================================================================
-// MoveNoteCommand
-//==============================================================================
-
-/// <summary>
-/// Command to move a note to a different tick/pitch position.
-/// Stores both old and new positions to enable undo/redo.
-/// </summary>
+/// Moves a note to a different tick/pitch position.
+///
+/// Responsibilities:
+/// - Change note position (tick and pitch)
+/// - Store old and new positions for undo/redo
+/// - Maintain note duration
+///
+/// Usage:
+///   auto cmd = std::make_unique<MoveNoteCommand>(track, noteOnIndex, noteOffIndex, newTick, newPitch);
+///   appModel.ExecuteCommand(std::move(cmd));
 class MoveNoteCommand : public Command
 {
 public:
@@ -117,14 +119,15 @@ private:
 	size_t FindNoteIndex(uint64_t tick, uint8_t pitch, MidiEvent eventType);
 };
 
-//==============================================================================
-// ResizeNoteCommand
-//==============================================================================
-
-/// <summary>
-/// Command to resize a note (change its duration).
-/// Stores both old and new durations to enable undo/redo.
-/// </summary>
+/// Resizes a note (changes its duration).
+///
+/// Responsibilities:
+/// - Change note duration by moving note-off event
+/// - Store old and new durations for undo/redo
+///
+/// Usage:
+///   auto cmd = std::make_unique<ResizeNoteCommand>(track, noteOnIndex, noteOffIndex, newDuration);
+///   appModel.ExecuteCommand(std::move(cmd));
 class ResizeNoteCommand : public Command
 {
 public:
@@ -154,14 +157,15 @@ private:
 	size_t FindNoteIndex(uint64_t tick, uint8_t pitch, MidiEvent eventType);
 };
 
-//==============================================================================
-// EditNoteVelocityCommand
-//==============================================================================
-
-/// <summary>
-/// Command to edit a note's velocity.
-/// Stores both old and new velocities to enable undo/redo.
-/// </summary>
+/// Edits a note's velocity.
+///
+/// Responsibilities:
+/// - Change note-on velocity
+/// - Store old and new velocities for undo/redo
+///
+/// Usage:
+///   auto cmd = std::make_unique<EditNoteVelocityCommand>(track, noteOnIndex, newVelocity);
+///   appModel.ExecuteCommand(std::move(cmd));
 class EditNoteVelocityCommand : public Command
 {
 public:

@@ -1,7 +1,14 @@
+// Log.h
 #pragma once
 #include <wx/wx.h>
 #include "AppModel/AppModel.h"
 
+/// Panel that displays MIDI event log in real-time.
+///
+/// Responsibilities:
+/// - Display incoming and outgoing MIDI events
+/// - Show event details (tick, type, pitch, velocity)
+/// - Provide scrollable text display
 class LogPanel : public wxPanel
 {
 public:

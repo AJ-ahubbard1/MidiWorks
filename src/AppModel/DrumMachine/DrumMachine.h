@@ -1,3 +1,4 @@
+// DrumMachine.h
 #pragma once
 #include "../TrackSet/TrackSet.h"
 #include <vector>
@@ -20,7 +21,7 @@ struct DrumRow
 class DrumMachine
 {
 public:
-	DrumMachine();
+	DrumMachine() { InitializeDefaultRows(); }
 
 	// Pattern Management
 	void SetColumnCount(int columns);

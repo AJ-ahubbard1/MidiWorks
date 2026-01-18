@@ -1,12 +1,16 @@
+// UndoHistoryPanel.h
 #pragma once
 #include <wx/wx.h>
 #include <memory>
 #include "AppModel/AppModel.h"
 
-/// <summary>
 /// Panel that displays the undo and redo command stacks.
-/// Shows command descriptions in two lists for visual feedback of history.
-/// </summary>
+///
+/// Responsibilities:
+/// - Display undo stack (commands that can be undone)
+/// - Display redo stack (commands that can be redone)
+/// - Show command descriptions for visual feedback
+/// - Update display after command execution/undo/redo
 class UndoHistoryPanel : public wxPanel
 {
 public:
@@ -34,10 +38,7 @@ public:
 		UpdateDisplay();
 	}
 
-	/// <summary>
-	/// Update the display to show current command stacks.
-	/// Call this after any command execution, undo, or redo.
-	/// </summary>
+	/// Update the display to show current command stacks (call after command execution/undo/redo)
 	void UpdateDisplay()
 	{
 		// Clear both lists

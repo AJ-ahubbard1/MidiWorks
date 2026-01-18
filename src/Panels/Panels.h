@@ -1,3 +1,4 @@
+// Panels.h
 #pragma once
 #include "MidiSettings.h"
 #include "SoundBankPanel.h"

@@ -9,6 +9,14 @@
 #include "MainFrameIDs.h"
 #include "KeyboardHandler.h"
 
+/// Main application window with dockable panels.
+///
+/// Responsibilities:
+/// - Create and manage all UI panels using wxAuiManager
+/// - Orchestrate update loop (10ms timer)
+/// - Handle menu events and keyboard shortcuts
+/// - Manage file operations (new, open, save, import/export)
+/// - Coordinate between panels and AppModel
 class MainFrame : public wxFrame 
 {
     friend class KeyboardHandler;
@@ -23,7 +31,7 @@ private:
     wxTimer mTimer;						  // Triggers Update method every 1ms 
     std::unique_ptr<KeyboardHandler> mKeyboardHandler;
     int mNextPanelId = ID_PANELS_BEGIN;   // Auto-incrementing panel ID counter
-
+    
     // Panel Pointers
 	std::unordered_map<int, PanelInfo> mPanels; // Map used to toggle visibility
     MidiSettingsPanel* mMidiSettingsPanel;

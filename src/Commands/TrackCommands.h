@@ -1,8 +1,4 @@
-//==============================================================================
 // TrackCommands.h
-// Commands for track-level operations (clear, quantize, etc.)
-//==============================================================================
-
 #pragma once
 #include "Command.h"
 #include "AppModel/TrackSet/TrackSet.h"
@@ -12,22 +8,22 @@
 #include <string>
 using namespace MidiInterface;
 
-//==============================================================================
-// ClearTrackCommand
-//==============================================================================
+// Track-Level Commands
 
-/// <summary>
-/// Command to clear all notes from a single track.
-/// Stores a complete backup of the track to enable undo.
-/// </summary>
+/// Clears all notes from a single track.
+///
+/// Responsibilities:
+/// - Clear all events from specified track
+/// - Store complete backup for undo
+///
+/// Usage:
+///   auto cmd = std::make_unique<ClearTrackCommand>(track, trackNumber);
+///   appModel.ExecuteCommand(std::move(cmd));
 class ClearTrackCommand : public Command
 {
 public:
-	/// <summary>
-	/// Construct a clear track command.
-	/// </summary>
-	/// <param name="track">Reference to the track to clear</param>
-	/// <param name="trackNumber">Track number for display purposes</param>
+	/// Construct a clear track command
+	/// @param trackNumber Track number for display purposes
 	ClearTrackCommand(Track& track, int trackNumber)
 		: mTrack(track)
 		, mTrackNumber(trackNumber)
@@ -60,23 +56,21 @@ private:
 	Track mBackup;          // Backup storage for undo
 };
 
-//==============================================================================
-// QuantizeAllCommand
-//==============================================================================
-
-/// <summary>
-/// Command to quantize all non-empty tracks in the TrackSet.
-/// Provides a single undo operation for quantizing the entire project.
-/// Uses the same duration-aware quantization algorithm as QuantizeCommand.
-/// </summary>
+/// Quantizes all non-empty tracks in the TrackSet.
+///
+/// Responsibilities:
+/// - Quantize all non-empty tracks to grid
+/// - Provide single undo operation for entire project quantization
+/// - Use duration-aware quantization algorithm
+///
+/// Usage:
+///   auto cmd = std::make_unique<QuantizeAllCommand>(trackSet, gridSize);
+///   appModel.ExecuteCommand(std::move(cmd));
 class QuantizeAllCommand : public Command
 {
 public:
-	/// <summary>
-	/// Construct a quantize all command.
-	/// </summary>
-	/// <param name="trackSet">Reference to the TrackSet containing all tracks</param>
-	/// <param name="gridSize">Grid size in ticks (e.g., 960 for quarter notes)</param>
+	/// Construct a quantize all command
+	/// @param gridSize Grid size in ticks (e.g., 960 for quarter notes)
 	QuantizeAllCommand(TrackSet& trackSet, uint64_t gridSize)
 		: mTrackSet(trackSet)
 		, mGridSize(gridSize)
@@ -157,18 +151,14 @@ public:
 	}
 
 private:
-	/// <summary>
-	/// Backup structure for a single track's original tick values.
-	/// </summary>
+	/// Backup structure for a single track's original tick values
 	struct TrackBackup
 	{
 		int trackIndex;
 		std::vector<uint64_t> originalTicks;
 	};
 
-	/// <summary>
-	/// Apply quantization to a single track using shared TrackSet helper.
-	/// </summary>
+	/// Apply quantization to a single track using shared TrackSet helper
 	void QuantizeTrack(Track& track)
 	{
 		TrackSet::QuantizeTrack(track, mGridSize);
@@ -179,24 +169,22 @@ private:
 	std::vector<TrackBackup> mTrackBackups; // Original timestamps for all tracks
 };
 
-//==============================================================================
-// QuantizeMultipleTracksCommand
-//==============================================================================
-
-/// <summary>
-/// Command to quantize specific tracks in the TrackSet.
-/// Provides a single undo operation for quantizing multiple tracks (e.g., all solo tracks).
-/// Uses the same duration-aware quantization algorithm as QuantizeCommand.
-/// </summary>
+/// Quantizes specific tracks in the TrackSet.
+///
+/// Responsibilities:
+/// - Quantize specified tracks to grid (e.g., all solo tracks)
+/// - Provide single undo operation for multi-track quantization
+/// - Use duration-aware quantization algorithm
+///
+/// Usage:
+///   auto cmd = std::make_unique<QuantizeMultipleTracksCommand>(trackSet, trackIndices, gridSize);
+///   appModel.ExecuteCommand(std::move(cmd));
 class QuantizeMultipleTracksCommand : public Command
 {
 public:
-	/// <summary>
-	/// Construct a quantize multiple tracks command.
-	/// </summary>
-	/// <param name="trackSet">Reference to the TrackSet containing all tracks</param>
-	/// <param name="trackIndices">Vector of track indices to quantize</param>
-	/// <param name="gridSize">Grid size in ticks (e.g., 960 for quarter notes)</param>
+	/// Construct a quantize multiple tracks command
+	/// @param trackIndices Vector of track indices to quantize
+	/// @param gridSize Grid size in ticks (e.g., 960 for quarter notes)
 	QuantizeMultipleTracksCommand(TrackSet& trackSet, const std::vector<int>& trackIndices, uint64_t gridSize)
 		: mTrackSet(trackSet)
 		, mGridSize(gridSize)
@@ -279,18 +267,14 @@ public:
 	}
 
 private:
-	/// <summary>
-	/// Backup structure for a single track's original tick values.
-	/// </summary>
+	/// Backup structure for a single track's original tick values
 	struct TrackBackup
 	{
 		int trackIndex;
 		std::vector<uint64_t> originalTicks;
 	};
 
-	/// <summary>
-	/// Apply quantization to a single track using shared TrackSet helper.
-	/// </summary>
+	/// Apply quantization to a single track using shared TrackSet helper
 	void QuantizeTrack(Track& track)
 	{
 		TrackSet::QuantizeTrack(track, mGridSize);

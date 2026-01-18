@@ -7,6 +7,12 @@
 class MainFrame;  // Forward declaration
 class AppModel;   // Forward declaration
 
+/// Handles keyboard shortcuts for MainFrame.
+///
+/// Responsibilities:
+/// - Register keyboard accelerators with MainFrame
+/// - Map keyboard shortcuts to menu item IDs
+/// - Support global shortcuts (spacebar, arrow keys, etc.)
 class KeyboardHandler
 {
 public:

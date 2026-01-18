@@ -1,8 +1,16 @@
-﻿#pragma once
+// TransportPanel.h
+#pragma once
 #include <wx/wx.h>
 #include <wx/spinctrl.h>
 #include "AppModel/AppModel.h"
 
+/// Panel for transport controls and playback management.
+///
+/// Responsibilities:
+/// - Display playback position (ticks and formatted time)
+/// - Provide transport buttons (play, stop, record, rewind, fast-forward, reset)
+/// - Allow tempo and time signature adjustment
+/// - Control metronome and loop settings
 class TransportPanel : public wxPanel
 {
 public:
@@ -25,8 +33,7 @@ public:
 		mTimeDisplay->SetLabel(mTransport.GetFormattedTime());
 	}
 
-	// Updates the tempo control to reflect current Transport tempo.
-	// Called after loading a project to sync UI with loaded tempo value.
+	/// Updates the tempo control to reflect current Transport tempo (called after project load)
 	void UpdateTempoDisplay()
 	{
 		auto beats = mTransport.GetBeatSettings();

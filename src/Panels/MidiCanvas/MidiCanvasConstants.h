@@ -1,7 +1,9 @@
+// MidiCanvasConstants.h
 #pragma once
 #include <wx/wx.h>
 #include <string>
 
+/// Constants for MidiCanvas rendering and interaction
 namespace MidiCanvasConstants
 {
 	// ========== Track Colors ==========

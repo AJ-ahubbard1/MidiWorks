@@ -5,20 +5,23 @@
 
 // TIMER EVENTS
 
-// Update the App Model, then necessary panels
-// Updates here should be reserved for Real-time, Continuous Data
-// Opt for event-driven callbacks for discrete state changes, every millisecond matters!
+/// Update the App Model, then necessary panels
+/// Updates here should be reserved for real-time state changes
+/// Opt for event-driven callbacks for discrete state changes
+/// Every millisecond counts!
 void MainFrame::OnTimer(wxTimerEvent&)
 {
 	mAppModel->Update();
+
 	mTransportPanel->Update(); // Update the tick display 
 	mMidiCanvasPanel->Update();
-	// Note: Logging and drum machine updates now handled via callbacks - no polling needed, see MainFrame::CreateCallbackFunctions()
+	// Note: Logging and drum machine updates now handled via callbacks
+	// no polling needed, see MainFrame::CreateCallbackFunctions()
 }
 
 // VIEW / PANEL MANAGEMENT EVENTS
 
-// Toggle visibility of panes associated with clicked panes in view menu
+/// Toggle visibility of panes associated with clicked panes in view menu
 void MainFrame::OnTogglePane(wxCommandEvent& event)
 {
 	for (const auto& [id, info] : GetAllPanels())
@@ -39,7 +42,7 @@ void MainFrame::OnTogglePane(wxCommandEvent& event)
 	}
 }
 
-// Update AppModel and view menu when a pane's [x] close button is clicked
+/// Update AppModel and view menu when a pane's [x] close button is clicked
 void MainFrame::OnPaneClosed(wxAuiManagerEvent& event)
 {
 	wxString name = event.GetPane()->name;
@@ -59,8 +62,8 @@ void MainFrame::ClosePane(const wxString& paneName)
 	}
 }
 
-// Debug display for layout
-// when docked panes are resized, the dimensions are shown in controlbar
+/// Debug display for layout
+/// when docked panes are resized, the dimensions are shown in controlbar
 void MainFrame::OnAuiRender(wxAuiManagerEvent& event)
 {
 	wxString msg = "Layout changed";
@@ -77,7 +80,7 @@ void MainFrame::OnAuiRender(wxAuiManagerEvent& event)
 
 // EDIT MENU EVENTS
 
-// Undo last action (Ctrl+Z)
+/// Undo last action (Ctrl+Z)
 void MainFrame::OnUndo(wxCommandEvent& event)
 {
 	// Stop playback/recording to prevent iterator invalidation
@@ -88,7 +91,7 @@ void MainFrame::OnUndo(wxCommandEvent& event)
 	Refresh();  // Redraw canvas to show changes
 }
 
-// Redo last undone action (Ctrl+Y)
+/// Redo last undone action (Ctrl+Y)
 void MainFrame::OnRedo(wxCommandEvent& event)
 {
 	// Stop playback/recording to prevent iterator invalidation
@@ -99,7 +102,7 @@ void MainFrame::OnRedo(wxCommandEvent& event)
 	Refresh();  // Redraw canvas to show changes
 }
 
-// Quantize all tracks to grid (Q)
+/// Context-aware quantization to grid (Q)
 void MainFrame::OnQuantize(wxCommandEvent& event)
 {
 	uint64_t gridSize = mMidiCanvasPanel->GetGridSize();
@@ -108,11 +111,12 @@ void MainFrame::OnQuantize(wxCommandEvent& event)
 	Refresh();
 }
 
-// FILE MENU EVENTS
+// FILE MENU EVENTS - connect to AppModel's ProjectManager 
+// Error dialogs are shown via ErrorCallback with detailed message
 
-// HELPER METHOD
-// Prompts user about unsaved changes and optionally saves
-// Returns: Continue (proceed with action) or Cancel (abort action)
+/// HELPER METHOD for file operations 
+/// Prompts user about unsaved changes and optionally saves
+/// Returns: Continue (proceed with action) or Cancel (abort action)
 MainFrame::UnsavedChangesAction MainFrame::PromptForUnsavedChanges()
 {
 	if (!mAppModel->GetProjectManager().IsProjectDirty()) 
@@ -140,7 +144,7 @@ MainFrame::UnsavedChangesAction MainFrame::PromptForUnsavedChanges()
 	return UnsavedChangesAction::Continue;
 }
 
-// Create new project (Ctrl+N)
+/// Create new project (Ctrl+N)
 void MainFrame::OnNew(wxCommandEvent& event)
 {
 	if (PromptForUnsavedChanges() == UnsavedChangesAction::Cancel) 
@@ -159,7 +163,7 @@ void MainFrame::OnNew(wxCommandEvent& event)
 	Refresh();
 }
 
-// Open existing project (Ctrl+O)
+/// Open existing project (Ctrl+O)
 void MainFrame::OnOpen(wxCommandEvent& event)
 {
 	if (PromptForUnsavedChanges() == UnsavedChangesAction::Cancel) 
@@ -180,7 +184,7 @@ void MainFrame::OnOpen(wxCommandEvent& event)
 	}
 
 	std::string path = openDialog.GetPath().ToStdString();
-	if (mAppModel->GetProjectManager().LoadProject(path)) 
+	if (mAppModel->GetProjectManager().LoadProject(path))
 	{
 		// Update UI controls to reflect loaded data
 		mSoundBankPanel->UpdateFromModel();
@@ -189,13 +193,9 @@ void MainFrame::OnOpen(wxCommandEvent& event)
 		UpdateTitle();
 		Refresh();  // Redraw canvas with loaded data
 	}
-	else 
-	{
-		wxMessageBox("Failed to load project", "Error", wxOK | wxICON_ERROR);
-	}
 }
 
-// Save current project (Ctrl+S)
+/// Save current project (Ctrl+S)
 void MainFrame::OnSave(wxCommandEvent& event)
 {
 	if (mAppModel->GetProjectManager().GetCurrentProjectPath().empty())
@@ -205,17 +205,13 @@ void MainFrame::OnSave(wxCommandEvent& event)
 		return;
 	}
 
-	if (mAppModel->GetProjectManager().SaveProject(mAppModel->GetProjectManager().GetCurrentProjectPath())) 
+	if (mAppModel->GetProjectManager().SaveProject(mAppModel->GetProjectManager().GetCurrentProjectPath()))
 	{
 		UpdateTitle();  // Title updates automatically via callback, but ensure it's current
 	}
-	else 
-	{
-		wxMessageBox("Failed to save project", "Error", wxOK | wxICON_ERROR);
-	}
 }
 
-// Save project with new name (Ctrl+Shift+S)
+/// Save project with new name (Ctrl+Shift+S)
 void MainFrame::OnSaveAs(wxCommandEvent& event)
 {
 	wxFileDialog saveDialog(this,
@@ -231,16 +227,13 @@ void MainFrame::OnSaveAs(wxCommandEvent& event)
 	}
 
 	std::string path = saveDialog.GetPath().ToStdString();
-	if (mAppModel->GetProjectManager().SaveProject(path)) 
+	if (mAppModel->GetProjectManager().SaveProject(path))
 	{
 		UpdateTitle();  // Title updates automatically via callback, but ensure it's current
 	}
-	else 
-	{
-		wxMessageBox("Failed to save project", "Error", wxOK | wxICON_ERROR);
-	}
 }
 
+/// Load midi (.mid) file into a new project
 void MainFrame::OnImportMidiFile(wxCommandEvent& event)
 {
 	// Warn user that importing will clear the current project
@@ -272,11 +265,11 @@ void MainFrame::OnImportMidiFile(wxCommandEvent& event)
 	if (mAppModel->GetProjectManager().ImportMIDI(path))
 	{
 		wxMessageBox("MIDI file imported successfully", "Import Complete", wxOK | wxICON_INFORMATION);
-		
+
 		// Update title to reflect dirty state
-		UpdateTitle();  
+		UpdateTitle();
 		// Show new tempo from midifile
-		if (mTransportPanel) 
+		if (mTransportPanel)
 		{
 			mTransportPanel->UpdateTempoDisplay();
 		}
@@ -286,12 +279,9 @@ void MainFrame::OnImportMidiFile(wxCommandEvent& event)
 			mSoundBankPanel->UpdateFromModel();
 		}
 	}
-	else
-	{
-		wxMessageBox("Failed to import MIDI file", "Error", wxOK | wxICON_ERROR);
-	}
 }
 
+/// Save project as a midi file (.mid)
 void MainFrame::OnExportMidiFile(wxCommandEvent& event)
 {
 	wxFileDialog saveDialog(this,
@@ -311,23 +301,19 @@ void MainFrame::OnExportMidiFile(wxCommandEvent& event)
 	{
 		wxMessageBox("MIDI file exported successfully", "Export Complete", wxOK | wxICON_INFORMATION);
 	}
-	else
-	{
-		wxMessageBox("Failed to export MIDI file", "Error", wxOK | wxICON_ERROR);
-	}
 }
 
 
 // APPLICATION LIFECYCLE EVENTS
 
-// Exit application (Alt+F4 or File > Exit)
+/// Exit application (Alt+F4 or File > Exit)
 void MainFrame::OnExit(wxCommandEvent& event)
 {
 	// Trigger close event which handles unsaved changes
 	Close(false);
 }
 
-// Window close event (X button or Close() call)
+/// Window close event (X button or Close() call)
 void MainFrame::OnClose(wxCloseEvent& event)
 {
 	if (PromptForUnsavedChanges() == UnsavedChangesAction::Cancel)
@@ -345,25 +331,25 @@ void MainFrame::OnClose(wxCloseEvent& event)
 
 // TRANSPORT CONTROL EVENTS
 
-// Toggle play/pause (Spacebar)
+/// Toggle play/pause (Spacebar)
 void MainFrame::OnTogglePlay(wxCommandEvent& event)
 {
 	mAppModel->GetTransport().TogglePlay();
 }
 
-// Toggle record (R key)
+/// Toggle record (R key)
 void MainFrame::OnStartRecord(wxCommandEvent& event)
 {
 	mAppModel->GetTransport().ToggleRecord();
 }
 
-// Previous Measure (Left Arrow key)
+/// Previous Measure (Left Arrow key)
 void MainFrame::OnPreviousMeasure(wxCommandEvent& event)
 {
 	mAppModel->GetTransport().JumpToPreviousMeasure();
 }
 
-// Next Measure (Right Arrow key)
+/// Next Measure (Right Arrow key)
 void MainFrame::OnNextMeasure(wxCommandEvent& event)
 {
 	mAppModel->GetTransport().JumpToNextMeasure();
@@ -371,7 +357,7 @@ void MainFrame::OnNextMeasure(wxCommandEvent& event)
 
 // DRUM PAD TRIGGER EVENTS
 
-// Trigger drum pad via keyboard (1-0 keys map to rows 0-9)
+/// Trigger drum pad via keyboard (1-0 keys map to rows 0-9)
 void MainFrame::OnDrumPad(wxCommandEvent& event)
 {
 	int eventId = event.GetId();

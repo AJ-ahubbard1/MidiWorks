@@ -1,8 +1,4 @@
-//==============================================================================
 // ClipboardCommands.h
-// Commands for clipboard operations (paste, paste to tracks, etc.)
-//==============================================================================
-
 #pragma once
 #include "Command.h"
 #include "AppModel/TrackSet/TrackSet.h"
@@ -12,25 +8,24 @@
 #include <set>
 using namespace MidiInterface;
 
-//==============================================================================
-// PasteCommand
-//==============================================================================
+// Clipboard Commands
 
-/// <summary>
-/// Command to paste clipboard notes into tracks with overdub behavior.
-/// Takes clipboard notes (with relative timing) and pastes them at a target tick position.
-/// Uses SeparateOverlappingNotes to handle collisions (like loop recording overdub).
-/// Stores complete track snapshots for undo to handle all modifications.
-/// </summary>
+/// Pastes clipboard notes into tracks with overdub behavior.
+///
+/// Responsibilities:
+/// - Paste clipboard notes at target tick position
+/// - Handle note collisions using SeparateOverlappingNotes (like loop recording)
+/// - Store complete track snapshots for undo
+///
+/// Usage:
+///   auto cmd = std::make_unique<PasteCommand>(trackSet, clipboardNotes, pasteTick);
+///   appModel.ExecuteCommand(std::move(cmd));
 class PasteCommand : public Command
 {
 public:
-	/// <summary>
-	/// Construct a paste command.
-	/// </summary>
-	/// <param name="trackSet">Reference to the track set</param>
-	/// <param name="clipboardNotes">Notes to paste (from clipboard)</param>
-	/// <param name="pasteTick">Tick position where notes should be pasted</param>
+	/// Construct a paste command
+	/// @param clipboardNotes Notes to paste (from clipboard)
+	/// @param pasteTick Tick position where notes should be pasted
 	PasteCommand(TrackSet& trackSet, const std::vector<Clipboard::ClipboardNote>& clipboardNotes, uint64_t pasteTick)
 		: mTrackSet(trackSet)
 		, mClipboardNotes(clipboardNotes)
@@ -107,9 +102,7 @@ public:
 	}
 
 private:
-	/// <summary>
-	/// Stores a complete snapshot of a track for undo purposes.
-	/// </summary>
+	/// Stores a complete snapshot of a track for undo purposes
 	struct TrackSnapshot {
 		int trackIndex = 0;     // Which track this snapshot is for
 		Track originalTrack;    // Complete copy of track before paste
@@ -121,26 +114,24 @@ private:
 	std::vector<TrackSnapshot> mTrackSnapshots;  // Track snapshots for undo
 };
 
-//==============================================================================
-// PasteToTracksCommand
-//==============================================================================
-
-/// <summary>
-/// Command to paste clipboard notes to specific target tracks (instead of original tracks).
-/// Used for cross-track pasting, typically to record-enabled channels.
-/// Each clipboard note is pasted to ALL target tracks, allowing easy layering/doubling.
-/// Uses SeparateOverlappingNotes to handle collisions (like loop recording overdub).
-/// </summary>
+/// Pastes clipboard notes to specific target tracks (instead of original tracks).
+///
+/// Responsibilities:
+/// - Paste clipboard notes to target tracks (overrides original track indices)
+/// - Support cross-track pasting for layering/doubling on record-enabled channels
+/// - Handle note collisions using SeparateOverlappingNotes (like loop recording)
+/// - Store complete track snapshots for undo
+///
+/// Usage:
+///   auto cmd = std::make_unique<PasteToTracksCommand>(trackSet, clipboardNotes, pasteTick, targetTracks);
+///   appModel.ExecuteCommand(std::move(cmd));
 class PasteToTracksCommand : public Command
 {
 public:
-	/// <summary>
-	/// Construct a paste-to-tracks command.
-	/// </summary>
-	/// <param name="trackSet">Reference to the track set</param>
-	/// <param name="clipboardNotes">Notes to paste (from clipboard)</param>
-	/// <param name="pasteTick">Tick position where notes should be pasted</param>
-	/// <param name="targetTracks">Track indices to paste to (overrides clipboard trackIndex)</param>
+	/// Construct a paste-to-tracks command
+	/// @param clipboardNotes Notes to paste (from clipboard)
+	/// @param pasteTick Tick position where notes should be pasted
+	/// @param targetTracks Track indices to paste to (overrides clipboard trackIndex)
 	PasteToTracksCommand(
 		TrackSet& trackSet,
 		const std::vector<Clipboard::ClipboardNote>& clipboardNotes,
@@ -222,9 +213,7 @@ public:
 	}
 
 private:
-	/// <summary>
-	/// Stores a complete snapshot of a track for undo purposes.
-	/// </summary>
+	/// Stores a complete snapshot of a track for undo purposes
 	struct TrackSnapshot {
 		int trackIndex = 0;     // Which track this snapshot is for
 		Track originalTrack;    // Complete copy of track before paste

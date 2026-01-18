@@ -142,7 +142,6 @@
     <ClCompile Include="src\App.cpp" />
     <ClCompile Include="src\AppModel\AppModel.cpp" />
     <ClCompile Include="src\AppModel\DrumMachine\DrumMachine.cpp" />
-    <ClCompile Include="src\AppModel\MidiInputManager\MidiInputManager.cpp" />
     <ClCompile Include="src\AppModel\PreviewManager\PreviewManager.cpp" />
     <ClCompile Include="src\AppModel\ProjectManager\ProjectManager.cpp" />
     <ClCompile Include="src\AppModel\RecordingSession\RecordingSession.cpp" />

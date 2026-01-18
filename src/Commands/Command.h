@@ -1,46 +1,36 @@
-//==============================================================================
 // Command.h
-// Abstract base class for the Command pattern (undo/redo system)
-//==============================================================================
-
 #pragma once
 #include <string>
 
-//==============================================================================
-// Command
-//==============================================================================
-
-/// <summary>
-/// Abstract base class for the Command pattern.
+/// Abstract base class for the Command pattern (undo/redo system).
 ///
-/// Commands encapsulate user actions (like adding, deleting, moving notes) as objects
-/// that can be executed and undone. This enables the undo/redo functionality.
+/// Responsibilities:
+/// - Encapsulate user actions (add, delete, move notes) as executable objects
+/// - Store parameters needed to execute and undo actions
+/// - Provide description for UI display
 ///
 /// Each concrete command stores:
 /// - References to the data it modifies (e.g., Track)
 /// - Parameters needed to execute the action (e.g., note pitch, tick)
 /// - State needed to reverse the action (e.g., original position)
-/// </summary>
+///
+/// Usage:
+///   class MyCommand : public Command {
+///       void Execute() override { /* perform action */ }
+///       void Undo() override { /* reverse action */ }
+///       std::string GetDescription() const override { return "My Action"; }
+///   };
 class Command
 {
 public:
 	virtual ~Command() = default;
 
-	/// <summary>
-	/// Execute the command - perform the action (add note, delete note, etc.)
-	/// Called when the user performs an action or presses Redo (Ctrl+Y).
-	/// </summary>
+	/// Execute the command (called on action or Redo)
 	virtual void Execute() = 0;
 
-	/// <summary>
-	/// Undo the command - reverse the action.
-	/// Called when the user presses Undo (Ctrl+Z).
-	/// </summary>
+	/// Undo the command (called on Ctrl+Z)
 	virtual void Undo() = 0;
 
-	/// <summary>
-	/// Get a human-readable description of this command.
-	/// Used for displaying command history in the UI.
-	/// </summary>
+	/// Get human-readable description for UI display
 	virtual std::string GetDescription() const = 0;
 };

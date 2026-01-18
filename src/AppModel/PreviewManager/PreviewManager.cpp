@@ -5,59 +5,6 @@
 #include "Commands/TrackCommands.h"
 #include "MidiConstants.h"
 
-
-void PreviewManager::SetNoteMovePreview(const NoteLocation& note, uint64_t newStartTick, ubyte newPitch)
-{
-	mNoteEditPreview.isActive = true;
-	mNoteEditPreview.originalNote = note;
-	mNoteEditPreview.previewStartTick = newStartTick;
-	mNoteEditPreview.previewEndTick = newStartTick + (note.endTick - note.startTick);
-	mNoteEditPreview.previewPitch = newPitch;
-}
-
-void PreviewManager::SetNoteResizePreview(const NoteLocation& note, uint64_t newEndTick)
-{
-	mNoteEditPreview.isActive = true;
-	mNoteEditPreview.originalNote = note;
-	mNoteEditPreview.previewStartTick = note.startTick;
-	mNoteEditPreview.previewEndTick = newEndTick;
-	mNoteEditPreview.previewPitch = note.pitch;
-}
-
-void PreviewManager::ClearNoteEditPreview()
-{
-	mNoteEditPreview.isActive = false;
-	mMultiNoteEditPreview.isActive = false;
-}
-
-const PreviewManager::NoteEditPreview& PreviewManager::GetNoteEditPreview() const
-{
-	return mNoteEditPreview;
-}
-
-bool PreviewManager::HasNoteEditPreview() const
-{
-	return mNoteEditPreview.isActive;
-}
-
-void PreviewManager::SetMultipleNotesMovePreview(const std::vector<NoteLocation>& notes, int64_t tickDelta, int pitchDelta)
-{
-	mMultiNoteEditPreview.isActive = true;
-	mMultiNoteEditPreview.originalNotes = notes;
-	mMultiNoteEditPreview.tickDelta = tickDelta;
-	mMultiNoteEditPreview.pitchDelta = pitchDelta;
-}
-
-const PreviewManager::MultiNoteEditPreview& PreviewManager::GetMultiNoteEditPreview() const
-{
-	return mMultiNoteEditPreview;
-}
-
-bool PreviewManager::HasMultiNoteEditPreview() const
-{
-	return mMultiNoteEditPreview.isActive;
-}
-
 void PreviewManager::SetNoteAddPreview(ubyte pitch, uint64_t tick, uint64_t snappedTick, uint64_t duration)
 {
 	uint64_t endTick = snappedTick + duration - MidiConstants::NOTE_SEPARATION_TICKS;
@@ -101,12 +48,34 @@ void PreviewManager::ClearNoteAddPreview()
 	}
 }
 
-const PreviewManager::NoteAddPreview& PreviewManager::GetNoteAddPreview() const
+void PreviewManager::SetNoteMovePreview(const NoteLocation& note, uint64_t newStartTick, ubyte newPitch)
 {
-	return mNoteAddPreview;
+	mNoteEditPreview.isActive = true;
+	mNoteEditPreview.originalNote = note;
+	mNoteEditPreview.previewStartTick = newStartTick;
+	mNoteEditPreview.previewEndTick = newStartTick + (note.endTick - note.startTick);
+	mNoteEditPreview.previewPitch = newPitch;
 }
 
-bool PreviewManager::HasNoteAddPreview() const
+void PreviewManager::SetNoteResizePreview(const NoteLocation& note, uint64_t newEndTick)
 {
-	return mNoteAddPreview.isActive;
+	mNoteEditPreview.isActive = true;
+	mNoteEditPreview.originalNote = note;
+	mNoteEditPreview.previewStartTick = note.startTick;
+	mNoteEditPreview.previewEndTick = newEndTick;
+	mNoteEditPreview.previewPitch = note.pitch;
+}
+
+void PreviewManager::SetMultipleNotesMovePreview(const std::vector<NoteLocation>& notes, int64_t tickDelta, int pitchDelta)
+{
+	mMultiNoteEditPreview.isActive = true;
+	mMultiNoteEditPreview.originalNotes = notes;
+	mMultiNoteEditPreview.tickDelta = tickDelta;
+	mMultiNoteEditPreview.pitchDelta = pitchDelta;
+}
+
+void PreviewManager::ClearNoteEditPreview()
+{
+	mNoteEditPreview.isActive = false;
+	mMultiNoteEditPreview.isActive = false;
 }

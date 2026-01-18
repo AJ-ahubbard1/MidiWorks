@@ -1,12 +1,11 @@
+// Transport.cpp
 #include "Transport.h"
 
-// Is the Playhead currently moving?
-bool Transport::IsMoving() const 
+bool Transport::IsMoving() const
 {
 	return IsPlaying() || IsRecording() || IsFastForwarding() || IsRewinding();
 }
 
-// State transitions
 void Transport::TogglePlay()
 {
 	switch (mState)
@@ -21,11 +20,9 @@ void Transport::TogglePlay()
 void Transport::ToggleRecord()
 {
 	if (mState == State::Stopped) mState = State::ClickedRecord;
-
 	else if (mState == State::Recording) mState = State::StopRecording;
 }
 
-// Loop control
 void Transport::SetLoopSettings(const LoopSettings& settings)
 {
 	bool changed = (mLoopSettings.startTick != settings.startTick ||
@@ -110,7 +107,6 @@ void Transport::ShiftCurrentTime()
 	}
 	double beats = (mCurrentTimeMs / 60000.0) * mBeatSettings.tempo;
 	mCurrentTick = static_cast<uint64_t>(beats * mTicksPerQuarter);
-
 }
 
 void Transport::ShiftToTick(uint64_t newTick)
@@ -168,7 +164,6 @@ wxString Transport::GetFormattedTime(uint64_t timeMs) const
 		timeMs / 60000, (timeMs % 60000) / 1000, timeMs % 1000);
 }
 
-// Check if a beat occurred between lastTick and currentTick
 Transport::BeatInfo Transport::CheckForBeat(uint64_t lastTick, uint64_t currentTick) const
 {
 	BeatInfo info;
