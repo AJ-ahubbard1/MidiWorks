@@ -66,11 +66,11 @@ public:
 	/// Check if any channel has solo enabled
 	bool SolosFound() const;
 
-	/// Get all channels with record enabled
-	std::vector<MidiChannel*> GetRecordEnabledChannels();
+	/// Get the numbers of all channels with record enabled
+	std::vector<int> GetRecordEnabledChannelNumbers();
 
-	/// Get all channels with solo enabled
-	std::vector<MidiChannel*> GetSoloChannels();
+	/// Get the numbers of all channels with solo enabled
+	std::vector<int> GetSoloChannelNumbers();
 
 	/// Check if a channel should play based on mute/solo state
 	/// @param checkRecord If true, also requires record to be enabled

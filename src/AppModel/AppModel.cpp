@@ -107,21 +107,14 @@ void AppModel::SetNoteResizePreview(const NoteLocation& note, uint64_t newEndTic
 // Adds a note to all channels that have Record enabled
 void AppModel::AddNoteToRecordChannels(ubyte pitch, uint64_t startTick, uint64_t duration)
 {
-	auto recordOnChannels = mSoundBank.GetRecordEnabledChannels();
-	if (recordOnChannels.empty()) return;
+	// Get a list of all record-enabled track indices 
+	auto recordOnChannelNumbers = mSoundBank.GetRecordEnabledChannelNumbers();
+	if (recordOnChannelNumbers.empty()) return;
 
 	// @TODO velocity should be based on recording settings, separate from preview settings
 	ubyte velocity = mSoundBank.GetPreviewVelocity();
 
-	// Get a list of all record-enabled track indices 
-	std::vector<int> targetTracks;
-	targetTracks.reserve(recordOnChannels.size());
-	for (const MidiChannel* channel : recordOnChannels)
-	{
-		targetTracks.emplace_back(static_cast<int>(channel->channelNumber));
-	}
-
-	auto cmd = std::make_unique<AddNoteCommand>(mTrackSet, targetTracks, pitch, velocity, startTick, duration);
+	auto cmd = std::make_unique<AddNoteCommand>(mTrackSet, recordOnChannelNumbers, pitch, velocity, startTick, duration);
 	mUndoRedoManager.ExecuteCommand(std::move(cmd));
 }
 
@@ -223,16 +216,11 @@ void AppModel::Quantize(uint64_t gridSize)
 	}
 
 	// Priority 2: If track(s) are solo'd, quantize only solo tracks (single undo)
-	std::vector<MidiChannel*> soloChannels = mSoundBank.GetSoloChannels();
-	if (!soloChannels.empty())
+	// Get a list of all solo-enabled track indices 
+	std::vector<int> soloChannelNumbers = mSoundBank.GetSoloChannelNumbers();
+	if (!soloChannelNumbers.empty())
 	{
-		std::vector<int> trackIndices;
-		for (MidiChannel* channel : soloChannels)
-		{
-			trackIndices.push_back(channel->channelNumber);
-		}
-
-		auto cmd = std::make_unique<QuantizeMultipleTracksCommand>(mTrackSet, trackIndices, gridSize);
+		auto cmd = std::make_unique<QuantizeMultipleTracksCommand>(mTrackSet, soloChannelNumbers, gridSize);
 		mUndoRedoManager.ExecuteCommand(std::move(cmd));
 		return;
 	}
@@ -261,19 +249,13 @@ void AppModel::PasteNotesToRecordTracks(std::optional<uint64_t> pasteTick)
 {
 	if (!mClipboard.HasData()) return;
 
-	// Get record-enabled channels and convert to track indices
-	auto recordChannels = mSoundBank.GetRecordEnabledChannels();
-	if (recordChannels.empty()) return;  // No record-enabled tracks
-
-	std::vector<int> targetTracks;
-	for (MidiChannel* channel : recordChannels)
-	{
-		targetTracks.push_back(static_cast<int>(channel->channelNumber));
-	}
+	// Get track indices of record-enabled channels
+	auto recordChannelNumbers = mSoundBank.GetRecordEnabledChannelNumbers();
+	if (recordChannelNumbers.empty()) return;  // No record-enabled tracks
 
 	// Create and execute paste command
 	uint64_t tick = pasteTick.value_or(mTransport.GetCurrentTick());
-	auto cmd = std::make_unique<PasteToTracksCommand>(mTrackSet, mClipboard.GetNotes(), tick, targetTracks);
+	auto cmd = std::make_unique<PasteToTracksCommand>(mTrackSet, mClipboard.GetNotes(), tick, recordChannelNumbers);
 	mUndoRedoManager.ExecuteCommand(std::move(cmd));
 }
 

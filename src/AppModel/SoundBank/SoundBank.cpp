@@ -52,30 +52,29 @@ bool SoundBank::SolosFound() const
 	return false;
 }
 
-std::vector<MidiChannel*> SoundBank::GetRecordEnabledChannels()
+std::vector<int> SoundBank::GetRecordEnabledChannelNumbers()
 {
-	std::vector<MidiChannel*> result;
+	std::vector<int> results;
 	for (auto& channel : mChannels)
 	{
 		if (channel.record)
 		{
-			result.push_back(&channel);
+			results.emplace_back(channel.channelNumber);
 		}
 	}
-	return result;
+	return results;
 }
 
-std::vector<MidiChannel*> SoundBank::GetSoloChannels()
+std::vector<int> SoundBank::GetSoloChannelNumbers()
 {
-	std::vector<MidiChannel*> result;
+	std::vector<int> results;
 	for (auto& channel : mChannels)
 	{
 		if (channel.solo)
 		{
-			result.push_back(&channel);
+			results.emplace_back(channel.channelNumber);
 		}
 	}
-	return result;
 }
 
 bool SoundBank::ShouldChannelPlay(const MidiChannel& channel, bool checkRecord) const 
@@ -171,13 +170,13 @@ void SoundBank::PlayPreviewNote(ubyte pitch)
 	mPreviewChannels.clear();
 
 	// Get record-enabled channels
-	auto channels = GetRecordEnabledChannels();
+	auto channels = GetRecordEnabledChannelNumbers();
 
 	// Play note on each record-enabled channel
-	for (MidiChannel* channel : channels)
+	for (ubyte channel : channels)
 	{
-		PlayNote(pitch, mPreviewVelocity, channel->channelNumber);
-		mPreviewChannels.push_back(channel->channelNumber);
+		PlayNote(pitch, mPreviewVelocity, channel);
+		mPreviewChannels.push_back(channel);
 	}
 
 	mIsPreviewingNote = true;

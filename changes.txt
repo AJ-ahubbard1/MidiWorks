@@ -1,0 +1,260 @@
+diff --git a/docs/BugList.md b/docs/BugList.md
+index 2d50fca..197ddfa 100644
+--- a/docs/BugList.md
++++ b/docs/BugList.md
+@@ -14,6 +14,59 @@ Track bugs and issues discovered during testing of MidiWorks.
+ 
+ ---
+ 
++### #40 - SoundBank needs encapsulation layer for MidiChannel access
++**Status:** Open
++**Priority:** Medium
++**Found:** 2026-01-18
++
++**Description:**
++External code (particularly UI panels) directly accesses `MidiChannel` fields by getting channel references from `SoundBank::GetChannel()`, violating encapsulation. This tight coupling makes the code fragile - changes to MidiChannel's internal structure require updates across multiple UI files.
++
++**Design Decision:**
++- **MidiChannel** remains a simple data struct (POD-like) - no getter/setter methods needed
++- **SoundBank** provides the encapsulation boundary - all channel access goes through SoundBank methods
++- **External code** should call SoundBank methods instead of accessing MidiChannel fields directly
++
++**Examples of Direct Field Access:**
++In `src/Panels/ChannelControls.h`, code gets a channel reference then directly accesses fields:
++```cpp
++MidiChannel& mChannel = soundBank.GetChannel(0);
++mChannel.programNumber = 25;  // Direct access - should use SoundBank method
++mChannel.volume = 100;        // Direct access - should use SoundBank method
++mChannel.mute = true;         // Direct access - should use SoundBank method
++```
++
++Fields accessed directly:
++- `programNumber`, `volume`, `mute`, `solo`, `record`
++- `customColor`, `customName`, `channelNumber`, `minimized`
++
++**Expected Behavior:**
++SoundBank should provide methods like:
++- `SetChannelProgram(ubyte channel, ubyte program)`
++- `SetChannelVolume(ubyte channel, ubyte volume)`
++- `SetChannelMute(ubyte channel, bool mute)`
++- `GetChannelProgram(ubyte channel)`
++- etc.
++
++External code should never hold `MidiChannel&` references or access fields directly.
++
++**Proposed Solution:**
++1. Add getter/setter methods to SoundBank for commonly accessed channel properties
++2. Update UI code (ChannelControls, SoundBankPanel, etc.) to call SoundBank methods
++3. Consider making `GetChannel()` private or removing it entirely
++4. MidiChannel remains a simple struct - no changes needed
++
++**Files to Investigate:**
++- `src/AppModel/SoundBank/SoundBank.h` - Add encapsulation methods here
++- `src/Panels/ChannelControls.h` - Heavy usage of direct field access
++- `src/Panels/SoundBankPanel.h` - May also access channels directly
++- Any other files that call `GetChannel()` and access fields
++
++**Notes:**
++Recent refactoring of `GetRecordEnabledChannelNumbers()` and `GetSoloChannelNumbers()` follows this pattern - returning just the needed data instead of exposing full channel objects.
++
++---
++
+ ### #39 - Loop region editing doesn't respect time signatures with non-4 denominators
+ **Status:** Open
+ **Priority:** Medium
+diff --git a/src/AppModel/AppModel.cpp b/src/AppModel/AppModel.cpp
+index 348d299..767f744 100644
+--- a/src/AppModel/AppModel.cpp
++++ b/src/AppModel/AppModel.cpp
+@@ -107,21 +107,14 @@ void AppModel::SetNoteResizePreview(const NoteLocation& note, uint64_t newEndTic
+ // Adds a note to all channels that have Record enabled
+ void AppModel::AddNoteToRecordChannels(ubyte pitch, uint64_t startTick, uint64_t duration)
+ {
+-	auto recordOnChannels = mSoundBank.GetRecordEnabledChannels();
+-	if (recordOnChannels.empty()) return;
++	// Get a list of all record-enabled track indices 
++	auto recordOnChannelNumbers = mSoundBank.GetRecordEnabledChannelNumbers();
++	if (recordOnChannelNumbers.empty()) return;
+ 
+ 	// @TODO velocity should be based on recording settings, separate from preview settings
+ 	ubyte velocity = mSoundBank.GetPreviewVelocity();
+ 
+-	// Get a list of all record-enabled track indices 
+-	std::vector<int> targetTracks;
+-	targetTracks.reserve(recordOnChannels.size());
+-	for (const MidiChannel* channel : recordOnChannels)
+-	{
+-		targetTracks.emplace_back(static_cast<int>(channel->channelNumber));
+-	}
+-
+-	auto cmd = std::make_unique<AddNoteCommand>(mTrackSet, targetTracks, pitch, velocity, startTick, duration);
++	auto cmd = std::make_unique<AddNoteCommand>(mTrackSet, recordOnChannelNumbers, pitch, velocity, startTick, duration);
+ 	mUndoRedoManager.ExecuteCommand(std::move(cmd));
+ }
+ 
+@@ -223,16 +216,11 @@ void AppModel::Quantize(uint64_t gridSize)
+ 	}
+ 
+ 	// Priority 2: If track(s) are solo'd, quantize only solo tracks (single undo)
+-	std::vector<MidiChannel*> soloChannels = mSoundBank.GetSoloChannels();
+-	if (!soloChannels.empty())
++	// Get a list of all solo-enabled track indices 
++	std::vector<int> soloChannelNumbers = mSoundBank.GetSoloChannelNumbers();
++	if (!soloChannelNumbers.empty())
+ 	{
+-		std::vector<int> trackIndices;
+-		for (MidiChannel* channel : soloChannels)
+-		{
+-			trackIndices.push_back(channel->channelNumber);
+-		}
+-
+-		auto cmd = std::make_unique<QuantizeMultipleTracksCommand>(mTrackSet, trackIndices, gridSize);
++		auto cmd = std::make_unique<QuantizeMultipleTracksCommand>(mTrackSet, soloChannelNumbers, gridSize);
+ 		mUndoRedoManager.ExecuteCommand(std::move(cmd));
+ 		return;
+ 	}
+@@ -261,19 +249,13 @@ void AppModel::PasteNotesToRecordTracks(std::optional<uint64_t> pasteTick)
+ {
+ 	if (!mClipboard.HasData()) return;
+ 
+-	// Get record-enabled channels and convert to track indices
+-	auto recordChannels = mSoundBank.GetRecordEnabledChannels();
+-	if (recordChannels.empty()) return;  // No record-enabled tracks
+-
+-	std::vector<int> targetTracks;
+-	for (MidiChannel* channel : recordChannels)
+-	{
+-		targetTracks.push_back(static_cast<int>(channel->channelNumber));
+-	}
++	// Get track indices of record-enabled channels
++	auto recordChannelNumbers = mSoundBank.GetRecordEnabledChannelNumbers();
++	if (recordChannelNumbers.empty()) return;  // No record-enabled tracks
+ 
+ 	// Create and execute paste command
+ 	uint64_t tick = pasteTick.value_or(mTransport.GetCurrentTick());
+-	auto cmd = std::make_unique<PasteToTracksCommand>(mTrackSet, mClipboard.GetNotes(), tick, targetTracks);
++	auto cmd = std::make_unique<PasteToTracksCommand>(mTrackSet, mClipboard.GetNotes(), tick, recordChannelNumbers);
+ 	mUndoRedoManager.ExecuteCommand(std::move(cmd));
+ }
+ 
+diff --git a/src/AppModel/PreviewManager/PreviewManager.cpp b/src/AppModel/PreviewManager/PreviewManager.cpp
+index 1b35f30..f9c011f 100644
+--- a/src/AppModel/PreviewManager/PreviewManager.cpp
++++ b/src/AppModel/PreviewManager/PreviewManager.cpp
+@@ -11,11 +11,10 @@ void PreviewManager::SetNoteAddPreview(ubyte pitch, uint64_t tick, uint64_t snap
+ 
+ 	// Collision check: Check for conflicts in ALL record-enabled channels
+ 	// (since note will be added to all of them)
+-	auto channels = mSoundBank.GetRecordEnabledChannels();
+-	for (const MidiChannel* channel : channels)
++	auto channels = mSoundBank.GetRecordEnabledChannelNumbers();
++	for (int channel : channels)
+ 	{
+-		int trackIndex = static_cast<int>(channel->channelNumber);
+-		auto conflicts = mTrackSet.FindNotesInRegion(snappedTick, endTick, pitch, pitch, trackIndex);
++		auto conflicts = mTrackSet.FindNotesInRegion(snappedTick, endTick, pitch, pitch, channel);
+ 		if (!conflicts.empty())
+ 		{
+ 			return;  // Collision detected in this channel, don't update preview
+diff --git a/src/AppModel/SoundBank/SoundBank.cpp b/src/AppModel/SoundBank/SoundBank.cpp
+index 3be6c81..cc49144 100644
+--- a/src/AppModel/SoundBank/SoundBank.cpp
++++ b/src/AppModel/SoundBank/SoundBank.cpp
+@@ -52,30 +52,29 @@ bool SoundBank::SolosFound() const
+ 	return false;
+ }
+ 
+-std::vector<MidiChannel*> SoundBank::GetRecordEnabledChannels()
++std::vector<int> SoundBank::GetRecordEnabledChannelNumbers()
+ {
+-	std::vector<MidiChannel*> result;
++	std::vector<int> results;
+ 	for (auto& channel : mChannels)
+ 	{
+ 		if (channel.record)
+ 		{
+-			result.push_back(&channel);
++			results.emplace_back(channel.channelNumber);
+ 		}
+ 	}
+-	return result;
++	return results;
+ }
+ 
+-std::vector<MidiChannel*> SoundBank::GetSoloChannels()
++std::vector<int> SoundBank::GetSoloChannelNumbers()
+ {
+-	std::vector<MidiChannel*> result;
++	std::vector<int> results;
+ 	for (auto& channel : mChannels)
+ 	{
+ 		if (channel.solo)
+ 		{
+-			result.push_back(&channel);
++			results.emplace_back(channel.channelNumber);
+ 		}
+ 	}
+-	return result;
+ }
+ 
+ bool SoundBank::ShouldChannelPlay(const MidiChannel& channel, bool checkRecord) const 
+@@ -171,13 +170,13 @@ void SoundBank::PlayPreviewNote(ubyte pitch)
+ 	mPreviewChannels.clear();
+ 
+ 	// Get record-enabled channels
+-	auto channels = GetRecordEnabledChannels();
++	auto channels = GetRecordEnabledChannelNumbers();
+ 
+ 	// Play note on each record-enabled channel
+-	for (MidiChannel* channel : channels)
++	for (ubyte channel : channels)
+ 	{
+-		PlayNote(pitch, mPreviewVelocity, channel->channelNumber);
+-		mPreviewChannels.push_back(channel->channelNumber);
++		PlayNote(pitch, mPreviewVelocity, channel);
++		mPreviewChannels.push_back(channel);
+ 	}
+ 
+ 	mIsPreviewingNote = true;
+diff --git a/src/AppModel/SoundBank/SoundBank.h b/src/AppModel/SoundBank/SoundBank.h
+index 761a845..8a2aaf1 100644
+--- a/src/AppModel/SoundBank/SoundBank.h
++++ b/src/AppModel/SoundBank/SoundBank.h
+@@ -66,11 +66,11 @@ public:
+ 	/// Check if any channel has solo enabled
+ 	bool SolosFound() const;
+ 
+-	/// Get all channels with record enabled
+-	std::vector<MidiChannel*> GetRecordEnabledChannels();
++	/// Get the numbers of all channels with record enabled
++	std::vector<int> GetRecordEnabledChannelNumbers();
+ 
+-	/// Get all channels with solo enabled
+-	std::vector<MidiChannel*> GetSoloChannels();
++	/// Get the numbers of all channels with solo enabled
++	std::vector<int> GetSoloChannelNumbers();
+ 
+ 	/// Check if a channel should play based on mute/solo state
+ 	/// @param checkRecord If true, also requires record to be enabled
+diff --git a/src/Panels/MidiCanvas/MidiCanvas.cpp b/src/Panels/MidiCanvas/MidiCanvas.cpp
+index cfd56d0..9ef2d4d 100644
+--- a/src/Panels/MidiCanvas/MidiCanvas.cpp
++++ b/src/Panels/MidiCanvas/MidiCanvas.cpp
+@@ -240,14 +240,10 @@ std::vector<NoteLocation> MidiCanvasPanel::FindNotesInRegionWithSoloFilter(
+ 	if (soundBank.SolosFound())
+ 	{
+ 		std::vector<NoteLocation> results;
+-		auto soloChannels = soundBank.GetSoloChannels();
+-		for (MidiChannel* channel : soloChannels)
++		std::vector<int> soloChannels = soundBank.GetSoloChannelNumbers();
++		for (int channel : soloChannels)
+ 		{
+-			std::vector<NoteLocation> channelNotes = mTrackSet.FindNotesInRegion(
+-				minTick, maxTick,
+-				minPitch, maxPitch,
+-				channel->channelNumber
+-			);
++			auto channelNotes = mTrackSet.FindNotesInRegion(minTick, maxTick, minPitch, maxPitch, channel);
+ 			results.insert(results.end(), channelNotes.begin(), channelNotes.end());
+ 		}
+ 		return results;

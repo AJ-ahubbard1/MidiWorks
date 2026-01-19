@@ -240,14 +240,10 @@ std::vector<NoteLocation> MidiCanvasPanel::FindNotesInRegionWithSoloFilter(
 	if (soundBank.SolosFound())
 	{
 		std::vector<NoteLocation> results;
-		auto soloChannels = soundBank.GetSoloChannels();
-		for (MidiChannel* channel : soloChannels)
+		std::vector<int> soloChannels = soundBank.GetSoloChannelNumbers();
+		for (int channel : soloChannels)
 		{
-			std::vector<NoteLocation> channelNotes = mTrackSet.FindNotesInRegion(
-				minTick, maxTick,
-				minPitch, maxPitch,
-				channel->channelNumber
-			);
+			auto channelNotes = mTrackSet.FindNotesInRegion(minTick, maxTick, minPitch, maxPitch, channel);
 			results.insert(results.end(), channelNotes.begin(), channelNotes.end());
 		}
 		return results;

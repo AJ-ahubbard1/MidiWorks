@@ -14,6 +14,59 @@ Track bugs and issues discovered during testing of MidiWorks.
 
 ---
 
+### #40 - SoundBank needs encapsulation layer for MidiChannel access
+**Status:** Open
+**Priority:** Medium
+**Found:** 2026-01-18
+
+**Description:**
+External code (particularly UI panels) directly accesses `MidiChannel` fields by getting channel references from `SoundBank::GetChannel()`, violating encapsulation. This tight coupling makes the code fragile - changes to MidiChannel's internal structure require updates across multiple UI files.
+
+**Design Decision:**
+- **MidiChannel** remains a simple data struct (POD-like) - no getter/setter methods needed
+- **SoundBank** provides the encapsulation boundary - all channel access goes through SoundBank methods
+- **External code** should call SoundBank methods instead of accessing MidiChannel fields directly
+
+**Examples of Direct Field Access:**
+In `src/Panels/ChannelControls.h`, code gets a channel reference then directly accesses fields:
+```cpp
+MidiChannel& mChannel = soundBank.GetChannel(0);
+mChannel.programNumber = 25;  // Direct access - should use SoundBank method
+mChannel.volume = 100;        // Direct access - should use SoundBank method
+mChannel.mute = true;         // Direct access - should use SoundBank method
+```
+
+Fields accessed directly:
+- `programNumber`, `volume`, `mute`, `solo`, `record`
+- `customColor`, `customName`, `channelNumber`, `minimized`
+
+**Expected Behavior:**
+SoundBank should provide methods like:
+- `SetChannelProgram(ubyte channel, ubyte program)`
+- `SetChannelVolume(ubyte channel, ubyte volume)`
+- `SetChannelMute(ubyte channel, bool mute)`
+- `GetChannelProgram(ubyte channel)`
+- etc.
+
+External code should never hold `MidiChannel&` references or access fields directly.
+
+**Proposed Solution:**
+1. Add getter/setter methods to SoundBank for commonly accessed channel properties
+2. Update UI code (ChannelControls, SoundBankPanel, etc.) to call SoundBank methods
+3. Consider making `GetChannel()` private or removing it entirely
+4. MidiChannel remains a simple struct - no changes needed
+
+**Files to Investigate:**
+- `src/AppModel/SoundBank/SoundBank.h` - Add encapsulation methods here
+- `src/Panels/ChannelControls.h` - Heavy usage of direct field access
+- `src/Panels/SoundBankPanel.h` - May also access channels directly
+- Any other files that call `GetChannel()` and access fields
+
+**Notes:**
+Recent refactoring of `GetRecordEnabledChannelNumbers()` and `GetSoloChannelNumbers()` follows this pattern - returning just the needed data instead of exposing full channel objects.
+
+---
+
 ### #39 - Loop region editing doesn't respect time signatures with non-4 denominators
 **Status:** Open
 **Priority:** Medium

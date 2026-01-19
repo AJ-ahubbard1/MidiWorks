@@ -11,11 +11,10 @@ void PreviewManager::SetNoteAddPreview(ubyte pitch, uint64_t tick, uint64_t snap
 
 	// Collision check: Check for conflicts in ALL record-enabled channels
 	// (since note will be added to all of them)
-	auto channels = mSoundBank.GetRecordEnabledChannels();
-	for (const MidiChannel* channel : channels)
+	auto channels = mSoundBank.GetRecordEnabledChannelNumbers();
+	for (int channel : channels)
 	{
-		int trackIndex = static_cast<int>(channel->channelNumber);
-		auto conflicts = mTrackSet.FindNotesInRegion(snappedTick, endTick, pitch, pitch, trackIndex);
+		auto conflicts = mTrackSet.FindNotesInRegion(snappedTick, endTick, pitch, pitch, channel);
 		if (!conflicts.empty())
 		{
 			return;  // Collision detected in this channel, don't update preview
