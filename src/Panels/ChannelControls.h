@@ -254,11 +254,31 @@ private:
 	void OnMuteToggled(wxCommandEvent& event)
 	{
 		mChannel.mute = mMuteCheck->GetValue();
+		if (mChannel.mute && mMidiOut)
+		{
+			mMidiOut->sendMessage(MidiMessage::AllNotesOff(mChannel.channelNumber));
+		}
 	}
 
 	void OnSoloToggled(wxCommandEvent& event)
 	{
+		bool wasSoloed = mChannel.solo; // save previous state
 		mChannel.solo = mSoloCheck->GetValue();
+	
+		if (mChannel.solo)
+		{
+			// Solo is enabled: silence all non-soloed channels
+			mAppModel->GetSoundBank().SilenceNonSoloedChannels();
+		}
+		else if (wasSoloed && mAppModel->GetSoundBank().SolosFound())
+		{
+			// Solo disabled, but other channels are still soloed
+			// This channel is now excluded from solo group, silence it
+			if (mMidiOut)
+			{
+				mMidiOut->sendMessage(MidiMessage::AllNotesOff(mChannel.channelNumber));
+			}
+		}
 	}
 
 	void OnRecordToggled(wxCommandEvent& event)

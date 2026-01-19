@@ -43,13 +43,6 @@ private:
 	wxChoice* mMidiOutChoice;
 	std::array<ChannelControlsPanel*, 15> mChannelControls;  // 15 channels (channel 16 reserved for metronome)
 
-	void OnMidiOutChoice(wxCommandEvent& event)
-	{
-		ubyte port = mMidiOutChoice->GetSelection();
-		mSoundBank.GetMidiOutDevice()->changePort(port);
-		mSoundBank.ApplyChannelSettings();
-	}
-
 	void CreateControls()
 	{
 		auto midiOut = mSoundBank.GetMidiOutDevice();
@@ -89,5 +82,12 @@ private:
 	void BindEventHandlers()
 	{
 		mMidiOutChoice->Bind(wxEVT_CHOICE, &SoundBankPanel::OnMidiOutChoice, this);
+	}
+	
+	void OnMidiOutChoice(wxCommandEvent& event)
+	{
+		ubyte port = mMidiOutChoice->GetSelection();
+		mSoundBank.GetMidiOutDevice()->changePort(port);
+		mSoundBank.ApplyChannelSettings();
 	}
 };

@@ -16,10 +16,11 @@ void MainFrame::OnModelTimer(wxTimerEvent&)
 }
 
 /// Update the UI, now separated from model updates
-/// This timer is slower to improve performance
+/// This timer is slower to improve overall app performance
 void MainFrame::OnDisplayTimer(wxTimerEvent&)
 {
-	mTransportPanel->Update(); // Update the tick display 
+	// Update the tick display 
+	mTransportPanel->Update(); 
 	mMidiCanvasPanel->Update();
 	// Note: Logging and drum machine updates now handled via callbacks
 	// no polling needed, see MainFrame::CreateCallbackFunctions()

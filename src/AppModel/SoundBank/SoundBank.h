@@ -90,6 +90,9 @@ public:
 	/// Send All Notes Off to all channels
 	void SilenceAllChannels();
 
+	/// Same as Silence All Channels, but doesn't silence channels with solo enabled
+	void SilenceNonSoloedChannels();
+
 	/// Play a metronome click
 	/// @param isDownbeat true for accented downbeat, false for regular beat
 	void PlayMetronomeClick(bool isDownbeat);

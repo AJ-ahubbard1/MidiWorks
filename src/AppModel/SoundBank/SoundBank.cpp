@@ -139,6 +139,20 @@ void SoundBank::SilenceAllChannels()
 	}
 }
 
+void SoundBank::SilenceNonSoloedChannels()
+{
+	if (!mMidiOut) return;
+
+	for (ubyte c = 0; c < MidiConstants::CHANNEL_COUNT; c++)
+	{
+		if (!GetChannel(c).solo)
+		{
+			mMidiOut->sendMessage(MidiMessage::AllNotesOff(c));
+		}
+	}
+
+}
+
 void SoundBank::PlayMetronomeClick(bool isDownbeat)
 {
 	if (!mMidiOut) return;
