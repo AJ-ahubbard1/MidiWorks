@@ -12,6 +12,26 @@ Track bugs and issues discovered during testing of MidiWorks.
 
 ## Bugs
 
+### #41 -  
+**Status:** Open
+**Priority:** High/Medium/Low
+**Found:** YYYY-MM-DD
+
+**Description:**
+
+
+**Steps to Reproduce:**
+1.
+
+**Expected Behavior:**
+
+
+**Actual Behavior:**
+
+
+**Notes:**
+
+
 ---
 
 ### #40 - SoundBank needs encapsulation layer for MidiChannel access

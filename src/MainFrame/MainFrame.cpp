@@ -2,6 +2,7 @@
 #include "MainFrame.h"
 #include <wx/string.h>
 #include "Commands/TrackCommands.h"
+#include "RtMidiWrapper/MidiDevice/MidiError.h"
 
 
 MainFrame::MainFrame()
@@ -69,7 +70,7 @@ void MainFrame::CreateDockablePanes()
 // Add callback functions here
 void MainFrame::CreateCallbackFunctions()
 {
-	// Register log callback for MIDI event logging
+	// Register log callback for MIDI event messages from input device 
 	mAppModel->GetMidiInputManager().SetLogCallback([this](const TimedMidiEvent& event)
 	{
 		if (mLogPanel)
@@ -101,23 +102,59 @@ void MainFrame::CreateCallbackFunctions()
 		}
 	});
 
-	// Error handling callback - displays errors to user
-	mAppModel->SetErrorCallback([this](const std::string& title, const std::string& msg, ErrorLevel level) 
+	// Error handling callback - displays errors to user AND logs them
+	// These errors are triggered by the project manager, examples are bad file import/export, no permissions, or corrupted midi data. 
+	mAppModel->SetErrorCallback([this](const std::string& title, const std::string& msg, ErrorLevel level)
 	{
-    	long style = wxOK;
-    	switch (level) 
+		// Log to panel (visible in GUI)
+		if (mLogPanel)
 		{
-        case ErrorLevel::Info:    
-			style |= wxICON_INFORMATION; 
+			std::string fullMsg = title + ": " + msg;
+			switch (level)
+			{
+				case ErrorLevel::Error:
+					mLogPanel->LogError(fullMsg);
+					break;
+				case ErrorLevel::Warning:
+					mLogPanel->LogWarning(fullMsg);
+					break;
+				case ErrorLevel::Info:
+					// Info messages don't need to clutter the log
+					break;
+			}
+		}
+
+		// Still show dialog for all errors
+    	long style = wxOK;
+    	switch (level)
+		{
+        case ErrorLevel::Info:
+			style |= wxICON_INFORMATION;
 			break;
-        case ErrorLevel::Warning: 
-			style |= wxICON_WARNING; 
+        case ErrorLevel::Warning:
+			style |= wxICON_WARNING;
 			break;
-        case ErrorLevel::Error:   
-			style |= wxICON_ERROR; 
+        case ErrorLevel::Error:
+			style |= wxICON_ERROR;
 			break;
     	}
     	wxMessageBox(msg, title, style);
+	});
+
+	// Wire MIDI device errors to log panel 
+	MidiInterface::SetMidiErrorCallback([this](const std::string& message, bool isWarning)
+	{
+		if (mLogPanel)
+		{
+			if (isWarning)
+			{
+				mLogPanel->LogWarning("MIDI Device: " + message);
+			}
+			else
+			{
+				mLogPanel->LogError("MIDI Device: " + message);
+			}
+		}
 	});
 }
 

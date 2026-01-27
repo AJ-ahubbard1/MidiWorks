@@ -50,6 +50,7 @@ MidiWorks aims to make MIDI composition as easy and intuitive as possible. The f
 - [x] File menu with keyboard shortcuts (Ctrl+N/O/S/Shift+S)
 - [x] Dirty flag tracking with asterisk in title bar
 - [x] Unsaved changes prompt on exit/new/open
+- [ ] Use a saved project as a template for startup. 
 
 ### Mixing & Channels
 - [x] 16 MIDI channel support (15 usable + 1 metronome)

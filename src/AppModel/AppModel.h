@@ -21,6 +21,7 @@
 #include "MidiConstants.h"
 
 // Error Handling callback types
+// Triggered by project manager when errors like bad file import/export or unable to save due to permissions occur.   
 enum class ErrorLevel { Info, Warning, Error };
 using ErrorCallback = std::function<void(const std::string& title, const std::string& msg, ErrorLevel level)>;
 

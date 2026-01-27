@@ -39,7 +39,12 @@ public:
 			oss << "Note Off - Pitch: " << int(msg.mm.mData[1]);
 			break;
 		default:
-			oss << "Other MIDI Event";
+			// Show raw MIDI data for unknown events to help debug
+			oss << "Other MIDI Event - Raw: [0x"
+				<< std::hex << std::setfill('0') << std::setw(2) << int(msg.mm.mData[0]) << " "
+				<< "0x" << std::setw(2) << int(msg.mm.mData[1]) << " "
+				<< "0x" << std::setw(2) << int(msg.mm.mData[2])
+				<< std::dec << "]";
 			break;
 		}
 
@@ -72,6 +77,40 @@ public:
 		}
 		mTextCtrl->SetValue(fullText);
 		mTextCtrl->ShowPosition(0);
+	}
+
+	void LogError(const std::string& message)
+	{
+		// Format error message with timestamp (cross-platform using wxDateTime)
+		wxDateTime now = wxDateTime::Now();
+		wxString timestamp = now.Format("%H:%M:%S");
+		wxString errorMsg = "[" + timestamp + "] ERROR: " + message + "\n";
+
+		// Set text color to red for errors
+		mTextCtrl->SetDefaultStyle(wxTextAttr(*wxRED));
+		mTextCtrl->AppendText(errorMsg);
+
+		// Reset color back to black for MIDI events
+		mTextCtrl->SetDefaultStyle(wxTextAttr(*wxBLACK));
+
+		mTextCtrl->ShowPosition(mTextCtrl->GetLastPosition()); // scroll to bottom
+	}
+
+	void LogWarning(const std::string& message)
+	{
+		// Format warning message with timestamp (cross-platform using wxDateTime)
+		wxDateTime now = wxDateTime::Now();
+		wxString timestamp = now.Format("%H:%M:%S");
+		wxString warnMsg = "[" + timestamp + "] WARNING: " + message + "\n";
+
+		// Set text color to orange for warnings
+		mTextCtrl->SetDefaultStyle(wxTextAttr(wxColour(255, 140, 0)));
+		mTextCtrl->AppendText(warnMsg);
+
+		// Reset color back to black
+		mTextCtrl->SetDefaultStyle(wxTextAttr(*wxBLACK));
+
+		mTextCtrl->ShowPosition(mTextCtrl->GetLastPosition());
 	}
 
 private:

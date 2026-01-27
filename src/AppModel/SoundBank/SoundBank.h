@@ -73,6 +73,9 @@ public:
 	std::vector<int> GetSoloChannelNumbers();
 
 	/// Check if a channel should play based on mute/solo state
+	/// Example usage: 
+	/// - Channel should not check record value during track playback, just mute/solo.
+	/// - Channel should check record value when adding notes to hear preview, unless muted.
 	/// @param checkRecord If true, also requires record to be enabled
 	bool ShouldChannelPlay(const MidiChannel& channel, bool checkRecord = false) const;
 

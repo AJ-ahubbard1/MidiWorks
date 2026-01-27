@@ -75,6 +75,7 @@ std::vector<int> SoundBank::GetSoloChannelNumbers()
 			results.emplace_back(channel.channelNumber);
 		}
 	}
+	return results;
 }
 
 bool SoundBank::ShouldChannelPlay(const MidiChannel& channel, bool checkRecord) const 
