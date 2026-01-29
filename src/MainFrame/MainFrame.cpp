@@ -21,6 +21,7 @@ MainFrame::MainFrame()
 	Bind(wxEVT_CLOSE_WINDOW, &MainFrame::OnClose, this);
 	mModelTimer.Bind(wxEVT_TIMER, &MainFrame::OnModelTimer, this);
 	mDisplayTimer.Bind(wxEVT_TIMER, &MainFrame::OnDisplayTimer, this);
+	mMidiStatusTimer.Bind(wxEVT_TIMER, &MainFrame::OnMidiStatusTimer, this);
 
 	// Set up Keyboard Shortcuts, now delegated to KeyboardHandler
 	mKeyboardHandler = std::make_unique<KeyboardHandler>(this, mAppModel);
@@ -32,6 +33,7 @@ MainFrame::MainFrame()
 	mAuiManager.Update();
 	mModelTimer.Start(1);
 	mDisplayTimer.Start(16);
+	mMidiStatusTimer.Start(1000);
 	Bind(wxEVT_AUI_RENDER, &MainFrame::OnAuiRender, this);
 
 	CreateStatusBar();
@@ -44,9 +46,6 @@ void MainFrame::CreateDockablePanes()
 	mSoundBankPanel = new SoundBankPanel(this, mAppModel);
 	RegisterPanel({"Sound Bank", mSoundBankPanel, PanePosition::Left, wxSize(313, 636)});
 
-	mMidiSettingsPanel = new MidiSettingsPanel(this, mAppModel, *wxLIGHT_GREY, "Midi Settings");
-	RegisterPanel({"Midi Settings", mMidiSettingsPanel, PanePosition::Left, wxSize(247, 253), false});
-
 	mTransportPanel = new TransportPanel(this, mAppModel, *wxLIGHT_GREY, "Transport");
 	RegisterPanel({"Transport", mTransportPanel, PanePosition::Top, wxSize(-1, -1), true, false, false});
 
@@ -54,7 +53,10 @@ void MainFrame::CreateDockablePanes()
 	RegisterPanel({"Midi Canvas", mMidiCanvasPanel, PanePosition::Center});
 
 	mLogPanel = new LogPanel(this);
-	RegisterPanel({"Midi Log", mLogPanel, PanePosition::Float, wxSize(247, 300), false});
+	RegisterPanel({"Midi Log", mLogPanel, PanePosition::Right, wxSize(247, 300), false});
+	
+	mMidiSettingsPanel = new MidiSettingsPanel(this, mAppModel, *wxLIGHT_GREY, "Midi Settings");
+	RegisterPanel({"Midi Settings", mMidiSettingsPanel, PanePosition::Right, wxSize(247, 253), false});
 
 	mUndoHistoryPanel = new UndoHistoryPanel(this, mAppModel);
 	RegisterPanel({"Undo History", mUndoHistoryPanel, PanePosition::Float, wxSize(247, 300), false});

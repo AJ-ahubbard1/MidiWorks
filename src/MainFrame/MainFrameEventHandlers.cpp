@@ -12,7 +12,6 @@
 void MainFrame::OnModelTimer(wxTimerEvent&)
 {
 	mAppModel->Update();
-
 }
 
 /// Update the UI, now separated from model updates
@@ -24,6 +23,39 @@ void MainFrame::OnDisplayTimer(wxTimerEvent&)
 	mMidiCanvasPanel->Update();
 	// Note: Logging and drum machine updates now handled via callbacks
 	// no polling needed, see MainFrame::CreateCallbackFunctions()
+}
+
+/// Polls the number of Midi Devices to detect changes, then updates UI accordingly
+void MainFrame::OnMidiStatusTimer(wxTimerEvent&)
+{
+	// Midi Input
+	int portCountChange = mAppModel->GetMidiInputManager().DetectPortChanges();
+	if (!portCountChange) return;
+
+	// Handle when a device is added or removed
+	std::string logMsg;
+	if (portCountChange > 0)
+	{
+		logMsg = "New device detected: ";	
+	}
+	else
+	{
+		logMsg = "A device was unplugged: "; 
+	}
+
+	auto& changedPorts = mAppModel->GetMidiInputManager().GetDevice().getChangedPorts();
+	logMsg += changedPorts[0];
+
+	if (mLogPanel)
+	{
+		mLogPanel->LogWarning(logMsg);
+	}
+
+	if (mMidiSettingsPanel)
+	{ 
+		mMidiSettingsPanel->UpdateList();
+	}
+	mAppModel->ReportError("Midi Input Device", logMsg, ErrorLevel::Info);
 }
 
 // VIEW / PANEL MANAGEMENT EVENTS
@@ -151,6 +183,21 @@ MainFrame::UnsavedChangesAction MainFrame::PromptForUnsavedChanges()
 	return UnsavedChangesAction::Continue;
 }
 
+void MainFrame::UpdateUIOnLoad()
+{
+	mAppModel->GetTransport().Reset();
+	if (mSoundBankPanel)
+	{
+		mSoundBankPanel->UpdateFromModel();
+	}
+	if (mTransportPanel)
+	{
+		mTransportPanel->UpdateTempoDisplay();
+	}
+	UpdateTitle();
+	Refresh();
+}
+
 /// Create new project (Ctrl+N)
 void MainFrame::OnNew(wxCommandEvent& event)
 {
@@ -161,13 +208,8 @@ void MainFrame::OnNew(wxCommandEvent& event)
 
 	// Clear all data
 	mAppModel->GetProjectManager().ClearProject();
-
-	// Update UI controls to reflect cleared state
-	mSoundBankPanel->UpdateFromModel();
-	mTransportPanel->UpdateTempoDisplay();
-
-	UpdateTitle();
-	Refresh();
+	
+	UpdateUIOnLoad();
 }
 
 /// Open existing project (Ctrl+O)
@@ -193,12 +235,7 @@ void MainFrame::OnOpen(wxCommandEvent& event)
 	std::string path = openDialog.GetPath().ToStdString();
 	if (mAppModel->GetProjectManager().LoadProject(path))
 	{
-		// Update UI controls to reflect loaded data
-		mSoundBankPanel->UpdateFromModel();
-		mTransportPanel->UpdateTempoDisplay();
-
-		UpdateTitle();
-		Refresh();  // Redraw canvas with loaded data
+		UpdateUIOnLoad();
 	}
 }
 
@@ -272,19 +309,7 @@ void MainFrame::OnImportMidiFile(wxCommandEvent& event)
 	if (mAppModel->GetProjectManager().ImportMIDI(path))
 	{
 		wxMessageBox("MIDI file imported successfully", "Import Complete", wxOK | wxICON_INFORMATION);
-
-		// Update title to reflect dirty state
-		UpdateTitle();
-		// Show new tempo from midifile
-		if (mTransportPanel)
-		{
-			mTransportPanel->UpdateTempoDisplay();
-		}
-		// Show patch changes from midifile
-		if (mSoundBankPanel)
-		{
-			mSoundBankPanel->UpdateFromModel();
-		}
+		UpdateUIOnLoad();
 	}
 }
 

@@ -30,6 +30,7 @@ private:
     wxAuiManager mAuiManager;			  // Advanced UI, enables dockable panes
     wxTimer mModelTimer;	                // 1 ms timer for model updates 
     wxTimer mDisplayTimer;					// Slower timer for UI refresh 
+    wxTimer mMidiStatusTimer;               // 1 second timer to check +- devices
     std::unique_ptr<KeyboardHandler> mKeyboardHandler;
     int mNextPanelId = ID_PANELS_BEGIN;     // Auto-incrementing panel ID counter
     
@@ -53,14 +54,15 @@ private:
     void SetPanelVisibility(int id, bool vis);
     void CreateMenuBar();
     void CreateSizer();
-    void OnModelTimer(wxTimerEvent&);
-    void OnDisplayTimer(wxTimerEvent&);
     void SyncMenuChecks();
     void UpdateTitle();
     uint64_t GetDeltaTimeMs();
 	void FixLinuxControlSizes(wxWindow* parent);
     
 	// EVENT HANDLERS - Implemented in MainFrameEventHandlers.cpp
+    void OnModelTimer(wxTimerEvent&);
+    void OnDisplayTimer(wxTimerEvent&);
+    void OnMidiStatusTimer(wxTimerEvent&);
     // View / Panel Management Events
     void OnTogglePane(wxCommandEvent& event);
     void OnPaneClosed(wxAuiManagerEvent& event);
@@ -76,6 +78,7 @@ private:
 	// Helper for unsaved changes prompt 
     enum class UnsavedChangesAction { Continue, Cancel };
     UnsavedChangesAction PromptForUnsavedChanges();
+    void UpdateUIOnLoad();
     void OnNew(wxCommandEvent& event);
     void OnOpen(wxCommandEvent& event);
     void OnSave(wxCommandEvent& event);

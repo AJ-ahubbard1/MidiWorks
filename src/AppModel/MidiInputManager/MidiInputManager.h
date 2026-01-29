@@ -78,6 +78,14 @@ public:
 		return mm;
 	}
 
+	/// checks RtMidi for changes to the port count
+	/// @return the difference in port count, not 0 means the ports have changed 
+	/// and the UI needs to be updated
+	int DetectPortChanges()
+	{
+		return mMidiIn->detectChange();
+	}
+
 private:
 	std::shared_ptr<MidiIn> mMidiIn;
 	MidiLogCallback mLogCallback;

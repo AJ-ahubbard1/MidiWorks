@@ -392,10 +392,12 @@ void AppModel::ReportError(const std::string& title, const std::string& msg, Err
 
 void AppModel::HandleIncomingMidi()
 {
-	auto message = mMidiInputManager.PollAndNotify(mTransport.GetCurrentTick());
-	if (!message) return;
-
-	RouteAndPlayMessage(*message, mTransport.GetCurrentTick());
+	uint64_t currentTick = mTransport.GetCurrentTick();
+	// Get all midi messages from RTMidi Queue 
+	while (auto message = mMidiInputManager.PollAndNotify(currentTick))
+	{
+		RouteAndPlayMessage(*message, currentTick);
+	}
 }
 
 // Returns the change in time from lastTick's last value to now, then updates lastTick 

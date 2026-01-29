@@ -31,6 +31,7 @@ namespace MidiInterface
 		{
 			mInstrument->closePort();
 			delete mInstrument;
+			mInstrument = nullptr;
 			std::cout << "MidiIn deleted\n";
 		}
 
@@ -84,6 +85,40 @@ namespace MidiInterface
 		{
 			mInstrument->cancelCallback();
 		}
+		/// identifies what ports have been added/removed 	
+		void findDifference(std::vector<std::string>& biggerVec, std::vector<std::string>& smallerVec)
+		{
+			if (biggerVec.size() < smallerVec.size()) return findDifference(smallerVec, biggerVec);
+			
+			mChangedPorts.clear();
+			for (auto& str1 : biggerVec)
+			{
+				if (std::find(smallerVec.begin(), smallerVec.end(), str1) == smallerVec.end())
+				{
+					mChangedPorts.push_back(str1);
+				}
+			}
+		}
+
+		/// verify that number of ports hasn't changed
+		/// @returns the difference in port count
+	    int detectChange()
+		{
+			auto portCount = mInstrument->getPortCount();
+		
+			// if count hasn't changed
+			if (portCount == mNumPorts) return 0;
+
+			int difference = portCount - mNumPorts;
+			mNumPorts = portCount;
+			auto oldPorts = mPortNames;
+			mPortNames.clear();
+			fillPortNames();
+			findDifference(oldPorts, mPortNames);
+			return difference;
+		}
+
+		const std::vector<std::string>& getChangedPorts() const { return mChangedPorts; }
 
 	private:
 		ubyte mPortNum{0};
@@ -91,6 +126,7 @@ namespace MidiInterface
 		ubyte mNumPorts{0};
 		Range mRange{36, 96};
 		std::vector<std::string> mPortNames;
+		std::vector<std::string> mChangedPorts;
 		MidiMessage mMessage;
 
 		void fillPortNames()

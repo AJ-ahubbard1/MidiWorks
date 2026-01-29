@@ -121,6 +121,9 @@ void MidiCanvasPanel::Update()
 		ClampOffset();
 	}
 
+	// Don't redraw if there is no change to the canvas
+	if (mMouseMode == MouseMode::Idle && !mTransport.IsMoving() && !tickChanged) return;
+	
 	Refresh();
 }
 
@@ -142,6 +145,8 @@ void MidiCanvasPanel::Draw(wxPaintEvent&)
 
 	wxGraphicsContext* gc = wxGraphicsContext::Create(dc);
 	if (!gc) return;
+
+
 
 	// Draw all canvas elements in order
 	DrawGrid(gc);
