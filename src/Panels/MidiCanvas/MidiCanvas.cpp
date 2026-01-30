@@ -13,28 +13,20 @@ MidiCanvasPanel::MidiCanvasPanel(wxWindow* parent, std::shared_ptr<AppModel> app
 {
 	SetBackgroundStyle(wxBG_STYLE_PAINT);
 
-	// Create main vertical sizer
-	wxBoxSizer* mainSizer = new wxBoxSizer(wxVERTICAL);
+	wxBoxSizer* mainVertSizer = new wxBoxSizer(wxVERTICAL);
+	wxBoxSizer* horizTopControlsSizer = new wxBoxSizer(wxHORIZONTAL);
 
-	// Create horizontal sizer for top controls
-	wxBoxSizer* controlsSizer = new wxBoxSizer(wxHORIZONTAL);
-
-	// Grid snap checkbox
 	mGridSnapCheckbox = new wxCheckBox(this, wxID_ANY, "Grid Snap");
 	mGridSnapCheckbox->SetValue(true);  // Enable by default
-	controlsSizer->Add(mGridSnapCheckbox, 0, wxALL | wxALIGN_CENTER_VERTICAL, 5);
-	controlsSizer->AddSpacer(5);
+	horizTopControlsSizer->Add(mGridSnapCheckbox, 0, wxALL | wxALIGN_CENTER_VERTICAL, 5);
+	horizTopControlsSizer->AddSpacer(5);
 
-	// Show MIDI Events checkbox (debug)
 	mShowMidiEventsCheckbox = new wxCheckBox(this, wxID_ANY, "Show MIDI Events");
 	mShowMidiEventsCheckbox->SetValue(false);  // Off by default
-	controlsSizer->Add(mShowMidiEventsCheckbox, 0, wxALL | wxALIGN_CENTER_VERTICAL, 5);
-	controlsSizer->AddSpacer(5);
+	horizTopControlsSizer->Add(mShowMidiEventsCheckbox, 0, wxALL | wxALIGN_CENTER_VERTICAL, 5);
+	horizTopControlsSizer->AddSpacer(5);
 
-	// Duration selector
-	controlsSizer->Add(new wxStaticText(this, wxID_ANY, "Duration:"), 0, wxALL | wxALIGN_CENTER_VERTICAL, 5);
 	mDurationChoice = new wxChoice(this, wxID_ANY);
-
 	// Populate duration choices from constants
 	for (int i = 0; i < MidiConstants::NOTE_DURATIONS_COUNT; i++)
 	{
@@ -47,42 +39,30 @@ MidiCanvasPanel::MidiCanvasPanel(wxWindow* parent, std::shared_ptr<AppModel> app
 		mDurationChoice->Append(label, (void*)(intptr_t)MidiConstants::NOTE_DURATIONS[i].ticks);
 	}
 	mDurationChoice->SetSelection(MidiConstants::DEFAULT_DURATION_INDEX);
-
-	controlsSizer->AddSpacer(5);
-	controlsSizer->Add(mDurationChoice, 0, wxALL | wxALIGN_CENTER_VERTICAL, 5);
-	controlsSizer->AddSpacer(5);
+	horizTopControlsSizer->Add(new wxStaticText(this, wxID_ANY, "Duration:"), 0, wxALL | wxALIGN_CENTER_VERTICAL, 5);
+	horizTopControlsSizer->AddSpacer(5);
+	horizTopControlsSizer->Add(mDurationChoice, 0, wxALL | wxALIGN_CENTER_VERTICAL, 5);
+	horizTopControlsSizer->AddSpacer(5);
 
 	// Custom tick duration input (shown when "Custom" is selected)
-	controlsSizer->Add(new wxStaticText(this, wxID_ANY, "Ticks:"), 0, wxALL | wxALIGN_CENTER_VERTICAL, 5);
+	mTicksText = new wxStaticText(this, wxID_ANY, ""); // Blank label set to "Ticks:" when custom is selected
 	mCustomTicksCtrl = new wxSpinCtrl(this, wxID_ANY, "960", wxDefaultPosition, wxSize(80, -1));
 	mCustomTicksCtrl->SetRange(1, MAX_CUSTOM_TICKS);
 	mCustomTicksCtrl->SetValue(MidiConstants::TICKS_PER_QUARTER);
 	mCustomTicksCtrl->Show(false);  // Hidden by default
-	controlsSizer->Add(mCustomTicksCtrl, 0, wxALL | wxALIGN_CENTER_VERTICAL, 5);
+	horizTopControlsSizer->Add(mTicksText, 0, wxALL | wxALIGN_CENTER_VERTICAL, 5);
+	horizTopControlsSizer->Add(mCustomTicksCtrl, 0, wxALL | wxALIGN_CENTER_VERTICAL, 5);
 
-	// Bind choice change event to show/hide custom input
-	mDurationChoice->Bind(wxEVT_CHOICE, [this](wxCommandEvent& e) {
-		int selection = mDurationChoice->GetSelection();
-		intptr_t duration = (intptr_t)mDurationChoice->GetClientData(selection);
-		bool isCustom = (duration == 0);
-		mCustomTicksCtrl->Show(isCustom);
-		Layout();  // Refresh layout to show/hide control
-	});
+	horizTopControlsSizer->AddStretchSpacer();
 
-	controlsSizer->AddStretchSpacer();
-
-	// Debug message at the end (so it doesn't cover other controls)
 	mDebugMessage = new wxStaticText(this, wxID_ANY, "", wxDefaultPosition, wxSize(200, -1));
-	controlsSizer->Add(mDebugMessage, 0, wxALL | wxALIGN_CENTER_VERTICAL, 5);
-	controlsSizer->AddSpacer(30);
+	horizTopControlsSizer->Add(mDebugMessage, 0, wxALL | wxALIGN_CENTER_VERTICAL, 5);
+	horizTopControlsSizer->AddSpacer(40);
 
-	// Add controls to main sizer at the top
-	mainSizer->Add(controlsSizer, 0, wxEXPAND);
+	mainVertSizer->Add(horizTopControlsSizer, 0, wxEXPAND);
+	SetSizer(mainVertSizer);
 
-	// Apply the sizer to the panel
-	SetSizer(mainSizer);
-
-	// Bind all Event Handlers
+	mDurationChoice->Bind(wxEVT_CHOICE, &MidiCanvasPanel::OnDurationChoice, this);
 	Bind(wxEVT_PAINT, &MidiCanvasPanel::Draw, this);
 	Bind(wxEVT_MOUSEWHEEL, &MidiCanvasPanel::OnMouseWheel, this);
 	Bind(wxEVT_LEFT_DOWN, &MidiCanvasPanel::OnLeftDown, this);
@@ -121,9 +101,6 @@ void MidiCanvasPanel::Update()
 		ClampOffset();
 	}
 
-	// Don't redraw if there is no change to the canvas
-	if (mMouseMode == MouseMode::Idle && !mTransport.IsMoving() && !tickChanged) return;
-	
 	Refresh();
 }
 
@@ -145,8 +122,6 @@ void MidiCanvasPanel::Draw(wxPaintEvent&)
 
 	wxGraphicsContext* gc = wxGraphicsContext::Create(dc);
 	if (!gc) return;
-
-
 
 	// Draw all canvas elements in order
 	DrawGrid(gc);

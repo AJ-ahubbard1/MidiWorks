@@ -4,6 +4,24 @@
 #include <cmath>
 
 
+void MidiCanvasPanel::OnDurationChoice(wxCommandEvent& e)
+{
+	int selection = mDurationChoice->GetSelection();
+	intptr_t duration = (intptr_t)mDurationChoice->GetClientData(selection);
+	// custom ticks control with label only shown when custom duration selected
+	if (duration == 0)
+	{
+		mCustomTicksCtrl->Show(true);
+		mTicksText->SetLabelText("Ticks:");
+	} 
+	else
+	{
+		mCustomTicksCtrl->Show(false);
+		mTicksText->SetLabelText("");
+	}
+	Layout();  // Refresh layout to show/hide control
+}
+
 // ============================================================================
 // MOUSE WHEEL - ZOOM
 // ============================================================================

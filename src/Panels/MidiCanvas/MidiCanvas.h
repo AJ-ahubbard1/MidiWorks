@@ -49,6 +49,7 @@ private:
 	wxStaticText* mDebugMessage;
 	wxCheckBox* mGridSnapCheckbox;
 	wxChoice* mDurationChoice;
+	wxStaticText* mTicksText;
 	wxSpinCtrl* mCustomTicksCtrl;
 	wxCheckBox* mShowMidiEventsCheckbox;
 
@@ -158,6 +159,9 @@ private:
 	// ========================================================================
 	// EVENT HANDLERS - Implemented in MidiCanvasEventHandlers.cpp
 	// ========================================================================
+	
+	// Duration Choice
+	void OnDurationChoice(wxCommandEvent& e);
 
 	// Mouse 
 	void OnMouseWheel(wxMouseEvent& event);			// Zooming
